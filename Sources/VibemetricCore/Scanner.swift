@@ -40,15 +40,17 @@ public enum Scanner {
         let lock = NSLock()
         var sessions: [Session] = []
         DispatchQueue.concurrentPerform(iterations: jobs.count) { i in
-            let (tool, url) = jobs[i]
-            let parsed: Session?
-            switch tool {
-            case .claudeCode: parsed = ClaudeCodeParser.parse(file: url)
-            case .codex: parsed = CodexParser.parse(file: url)
+            autoreleasepool {
+                let (tool, url) = jobs[i]
+                let parsed: Session?
+                switch tool {
+                case .claudeCode: parsed = ClaudeCodeParser.parse(file: url)
+                case .codex: parsed = CodexParser.parse(file: url)
+                }
+                guard var s = parsed, !isAssessmentRun(s) else { return }
+                SignalExtractor.annotate(&s)
+                lock.lock(); sessions.append(s); lock.unlock()
             }
-            guard var s = parsed, !isAssessmentRun(s) else { return }
-            SignalExtractor.annotate(&s)
-            lock.lock(); sessions.append(s); lock.unlock()
         }
         sessions.sort { ($0.start ?? .distantPast) < ($1.start ?? .distantPast) }
         return ScanResult(sessions: sessions, sources: sources, duration: Date().timeIntervalSince(started))
