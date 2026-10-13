@@ -10,7 +10,8 @@
 # Back up the private key (generate_keys -x <file>). Without it, installed apps cannot accept updates.
 #
 # Writes into ../vibemetric-web (override with WEB_DIR):
-#   public/download/Vibemetric.dmg      the website's download button
+#   public/download/Vibemetric-<v>.dmg  the website's download button (replaces the previous version;
+#                                       app/lib/site.ts points the button at it)
 #   public/updates/Vibemetric-<v>.dmg   the copy that Sparkle downloads
 #   public/appcast.xml                  the feed that installed apps check
 # Optional release notes: public/updates/Vibemetric-<v>.html, written before you run this script.
@@ -38,7 +39,10 @@ VARIANT=prod NOTARIZE=1 PRO_ENABLED=1 ./scripts/build-app.sh
 WEB="${WEB_DIR:-../vibemetric-web}"
 mkdir -p "$WEB/public/updates" "$WEB/public/download"
 cp build/Vibemetric.dmg "$WEB/public/updates/Vibemetric-$VERSION.dmg"
-cp build/Vibemetric.dmg "$WEB/public/download/Vibemetric.dmg"
+# The website download is named <product>-<version>.dmg. Only the current one is kept there; every
+# version stays in public/updates for Sparkle.
+rm -f "$WEB/public/download/"Vibemetric*.dmg
+cp build/Vibemetric.dmg "$WEB/public/download/Vibemetric-$VERSION.dmg"
 
 # Signs each update with the private key from the Keychain and lists every DMG in public/updates.
 .build/artifacts/sparkle/Sparkle/bin/generate_appcast \
@@ -48,6 +52,6 @@ cp build/Vibemetric.dmg "$WEB/public/download/Vibemetric.dmg"
 
 # The version and size that the website shows.
 SIZE="$(du -m build/Vibemetric.dmg | cut -f1)"
-sed -i '' -E "s/version: \"[^\"]*\"/version: \"$VERSION\"/; s/size: \"[^\"]*\"/size: \"$SIZE MB download\"/" "$WEB/app/lib/site.ts"
+sed -i '' -E "s/version: \"[^\"]*\"/version: \"$VERSION\"/; s/size: \"[^\"]*\"/size: \"$SIZE MB download\"/; s#downloadUrl: \"[^\"]*\"#downloadUrl: \"/download/Vibemetric-$VERSION.dmg\"#" "$WEB/app/lib/site.ts"
 
 echo "Released $VERSION (build $(( $(git rev-list --count HEAD) + 100 ))). Now commit and deploy $WEB."
