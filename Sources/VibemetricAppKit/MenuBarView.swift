@@ -82,35 +82,58 @@ struct MenuBarPanel: View {
         .frame(width: 340 * scale)
     }
 
+    /// The most urgent fix leads; the score is a small line under it, so the number doesn't come first.
     private func summary(_ record: CardRecord) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(record.card.totalLabel ?? "—")
-                    .scaledFont(44, weight: .heavy, design: .monospaced)
-                Text("/ 100").scaledFont(15, weight: .semibold, design: .monospaced).foregroundStyle(.secondary)
-                Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("AI NATIVE SCORE").scaledFont(10, weight: .bold, design: .monospaced).foregroundStyle(.secondary)
-                    RelativeDateText(date: record.createdAt).scaledFont(10).foregroundStyle(.secondary)
-                }
-            }
-            VStack(spacing: 5) {
-                ForEach(record.card.ordered) { d in
-                    HStack(spacing: 8) {
-                        Text(d.dimension.title).scaledFont(11).frame(maxWidth: .infinity, alignment: .leading)
-                        ScorePips(score: d.score, size: 6)
-                        Text(d.score.map(String.init) ?? "–")
-                            .scaledFont(11, weight: .bold, design: .monospaced)
-                            .foregroundStyle(d.band.map(Theme.color(for:)) ?? .secondary)
-                            .frame(width: 16, alignment: .trailing)
+        let card = record.card
+        let imp = card.improvement
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("Most urgent").scaledFont(12, weight: .semibold).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 10) {
+                if let count = imp.count, let label = imp.countLabel, !label.isEmpty {
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Text("\(count)").scaledFont(28, weight: .bold).monospacedDigit()
+                        Text(inline(label)).scaledFont(14, weight: .medium).fixedSize(horizontal: false, vertical: true)
+                    }
+                    Divider()
+                    (Text("Fix: ").bold() + Text(inline(imp.title)))
+                        .scaledFont(13)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    // Cards without a count: the fix itself is the headline.
+                    Text(inline(imp.title)).scaledFont(15, weight: .semibold).fixedSize(horizontal: false, vertical: true)
+                    if let target = imp.dimension {
+                        Text(target.title).scaledFont(12).foregroundStyle(.secondary)
                     }
                 }
             }
-            (Text("Next: ").bold() + Text(record.card.improvement.title))
-                .scaledFont(12)
-                .lineLimit(3)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 8))
+
+            if card.moreToFix > 0 {
+                HStack {
+                    Spacer()
+                    Button("+\(card.moreToFix) more to fix →") { show(selectLatest: true) }
+                        .buttonStyle(.plain)
+                        .scaledFont(12, weight: .medium)
+                        .foregroundStyle(Theme.accent)
+                }
+            }
+
+            Divider()
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("Score").scaledFont(12).foregroundStyle(.secondary)
+                Text(card.totalLabel ?? "—").scaledFont(17, weight: .semibold).monospacedDigit()
+                Text("/ 100").scaledFont(12, design: .monospaced).foregroundStyle(.secondary)
+                if let baseline = model.baseline(for: record), let delta = ScoreChanges.totalDelta(card, to: baseline.card), delta != 0 {
+                    Text("\(delta > 0 ? "↗ +" : "↘ ")\(delta)")
+                        .scaledFont(12, weight: .semibold)
+                        .foregroundStyle(delta > 0 ? Theme.color(for: .strong) : Theme.color(for: .bottleneck))
+                        .help("Since \(baseline.createdAt.formatted(date: .abbreviated, time: .shortened))")
+                }
+                Spacer()
+                RelativeDateText(date: record.createdAt).scaledFont(11).foregroundStyle(.secondary)
+            }
         }
     }
 

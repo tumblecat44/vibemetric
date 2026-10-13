@@ -41,6 +41,8 @@ enum JSONSchema {
                 "dimension": dimensionID,
                 "impact": str,
                 "evidence": array(evidence, max: 3),
+                "count": ["type": ["integer", "null"], "minimum": 1],
+                "countLabel": ["type": ["string", "null"]],
             ]),
             "followUp": ["anyOf": [
                 object([

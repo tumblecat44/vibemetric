@@ -45,6 +45,18 @@ enum Snapshot {
                 try render(view, scheme: scheme).write(to: dir.appendingPathComponent("card-\(scheme == .light ? "light" : "dark").png"))
             }
             if let share = ShareCard.png(card: card, date: Date()) { try share.write(to: dir.appendingPathComponent("share.png")) }
+            // The menu bar panel for the same card, in a throwaway preferences domain.
+            let suite = "vibemetric-snapshot-\(UUID())"
+            if let defaults = UserDefaults(suiteName: suite) {
+                defaults.set(false, forKey: AutoSettings.enabledKey)
+                let model = AppModel(preferences: defaults, startAutomatically: false, history: [record] + (baseline.map { [$0] } ?? []))
+                for scheme in [ColorScheme.light, .dark] {
+                    let panel = MenuBarPanel().environment(model).background(scheme == .dark ? Color(white: 0.17) : Color(white: 0.93))
+                        .environment(\.colorScheme, scheme)
+                    try render(panel, scheme: scheme).write(to: dir.appendingPathComponent("menubar-\(scheme == .light ? "light" : "dark").png"))
+                }
+                defaults.removePersistentDomain(forName: suite)
+            }
             print("Snapshots written to \(dir.path)")
             exit(0)
         } catch {

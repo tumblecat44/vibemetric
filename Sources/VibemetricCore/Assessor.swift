@@ -326,7 +326,10 @@ public final class Assessor: Sendable {
         dimension it raises. `situation` is what you saw, one or two sentences with the number. `impact` is why it matters, one sentence. \
         `actions` are the 2–3 steps, one short sentence each. `suggestedInstruction` is the text to paste into the context file or prompt, \
         written so it works as is. `tryItOn` names the task from the records to try it on; `signOfSuccess` is the observable sign it \
-        helped. `evidence`: up to 3 references, as above.
+        helped. `evidence`: up to 3 references, as above. `count` and `countLabel` are the headline number the menu bar shows \
+        for this problem: a count you verified in the records, and at most 6 words that complete it, for example 23 and \
+        "agent edits never tested", or 9 and "times you repeated the same rule". Count the problem, not the good cases. \
+        Both are null when no honest count exists.
         - `followUp`: always null.
         - `deductions`: the rubric's permission-bypass deduction. At most **one** entry in total, with `points` 1, `reason` (every tool and \
         project where permissions were bypassed, and why no restriction, hook, or isolation managed the risk), and `evidence`. An empty \

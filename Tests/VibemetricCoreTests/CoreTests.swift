@@ -437,6 +437,26 @@ final class ReadableCardTests: XCTestCase {
         XCTAssertNil(old.dimensions[0].evidence.first?.project)
     }
 
+    func testMenuBarCountAndMoreToFix() throws {
+        var json = Self.readableCard.replacingOccurrences(of: #""impact":"Two tasks broke.","evidence":[]}"#,
+                                                          with: #""impact":"Two tasks broke.","evidence":[],"count":23,"countLabel":"agent edits never tested"}"#)
+        var card = try JSONDecoder().decode(ScoreCard.self, from: Data(json.utf8))
+        XCTAssertEqual(card.improvement.count, 23)
+        XCTAssertEqual(card.improvement.countLabel, "agent edits never tested")
+        // Every category scored 4: all are in the bottleneck band; the improvement's own category doesn't count.
+        XCTAssertEqual(card.moreToFix, 9)
+        card.dimensions[0].score = 8
+        XCTAssertEqual(card.moreToFix, 8)
+        json = Self.readableCard
+        XCTAssertNil(try JSONDecoder().decode(ScoreCard.self, from: Data(json.utf8)).improvement.count)
+    }
+
+    func testSchemaAsksForTheMenuBarCount() throws {
+        let obj = try JSONSerialization.jsonObject(with: Data(JSONSchema.scoreCard.utf8)) as! [String: Any]
+        let improvement = (obj["properties"] as! [String: Any])["improvement"] as! [String: Any]
+        XCTAssertTrue(Set(improvement["required"] as! [String]).isSuperset(of: ["count", "countLabel"]))
+    }
+
     func testEvidenceLabelFallsBackToToolAndRawDate() {
         let e = ScoreCard.Evidence(tool: "codex", sessionId: "x", date: "unknown", note: "n")
         XCTAssertEqual(e.label, "codex · unknown")
