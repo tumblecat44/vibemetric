@@ -131,11 +131,13 @@ struct MenuBarPanel: View {
                 .frame(width: 20, height: 20)
                 .background(Theme.accent.opacity(0.18), in: Circle())
                 .foregroundStyle(Theme.accent)
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 (Text("Problem: ").bold() + Text(inline(problem)))
                     .scaledFont(13)
                     .lineLimit(4)
                     .fixedSize(horizontal: false, vertical: true)
+                // A line between the problem and the fix; Divider() is too faint on the grey box.
+                Rectangle().fill(.secondary.opacity(0.4)).frame(height: 1)
                 (Text("Fix: ").bold().foregroundColor(Theme.accent) + Text(inline(fix)))
                     .scaledFont(13)
                     .lineLimit(3)
