@@ -88,35 +88,18 @@ struct MenuBarPanel: View {
         let imp = card.improvement
         return VStack(alignment: .leading, spacing: 10) {
             Text("Most urgent").scaledFont(12, weight: .semibold).foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 10) {
-                // The problem, then the recommendation: a counted problem when the records give one,
-                // otherwise what was seen.
-                if let count = imp.count, let label = imp.countLabel, !label.isEmpty {
-                    HStack(alignment: .firstTextBaseline, spacing: 10) {
-                        Text("\(count)").scaledFont(28, weight: .bold).monospacedDigit()
-                        Text(inline(label)).scaledFont(14, weight: .medium).fixedSize(horizontal: false, vertical: true)
-                    }
-                } else {
-                    (Text("Problem: ").bold() + Text(inline(imp.situation)))
-                        .scaledFont(13)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Divider()
-                (Text("Fix: ").bold() + Text(inline(imp.title)))
-                    .scaledFont(13)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let target = imp.dimension {
-                    Text(target.title).scaledFont(11).foregroundStyle(.secondary)
-                }
+            // Two problems, each with its fix: the card's first improvement, then the weakest other category.
+            let firstProblem = imp.count.flatMap { count in imp.countLabel.map { "\(count) \($0)" } } ?? imp.situation
+            fixBox(number: 1, problem: firstProblem, fix: imp.title, category: imp.dimension?.title)
+            let second = card.nextFixes.first { $0.isReadable && $0.tryThis?.isEmpty == false }
+            if let second {
+                fixBox(number: 2, problem: second.saw ?? second.headline, fix: second.tryThis ?? "", category: second.dimension.title)
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 8))
-
-            if card.moreToFix > 0 {
+            let rest = card.moreToFix - (second == nil ? 0 : 1)
+            if rest > 0 {
                 HStack {
                     Spacer()
-                    Button("+\(card.moreToFix) more to fix →") { show(selectLatest: true) }
+                    Button("+\(rest) more to fix →") { show(selectLatest: true) }
                         .buttonStyle(.plain)
                         .scaledFont(12, weight: .medium)
                         .foregroundStyle(Theme.accent)
@@ -138,6 +121,31 @@ struct MenuBarPanel: View {
                 RelativeDateText(date: record.createdAt).scaledFont(11).foregroundStyle(.secondary)
             }
         }
+    }
+
+    /// One problem and its fix, labeled so the two are never confused.
+    private func fixBox(number: Int, problem: String, fix: String, category: String?) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text("\(number)")
+                .scaledFont(12, weight: .bold)
+                .frame(width: 20, height: 20)
+                .background(Theme.accent.opacity(0.18), in: Circle())
+                .foregroundStyle(Theme.accent)
+            VStack(alignment: .leading, spacing: 6) {
+                (Text("Problem: ").bold() + Text(inline(problem)))
+                    .scaledFont(13)
+                    .lineLimit(4)
+                    .fixedSize(horizontal: false, vertical: true)
+                (Text("Fix: ").bold().foregroundColor(Theme.accent) + Text(inline(fix)))
+                    .scaledFont(13)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let category { Text(category).scaledFont(11).foregroundStyle(.secondary) }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 8))
     }
 
     private func show(selectLatest: Bool) {

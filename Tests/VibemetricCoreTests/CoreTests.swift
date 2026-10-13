@@ -451,6 +451,19 @@ final class ReadableCardTests: XCTestCase {
         XCTAssertNil(try JSONDecoder().decode(ScoreCard.self, from: Data(json.utf8)).improvement.count)
     }
 
+    func testNextFixesStartWithTheWeakestOtherCategory() throws {
+        var card = try JSONDecoder().decode(ScoreCard.self, from: Data(Self.readableCard.utf8))
+        // The improvement raises Testing & Evals; Security is the weakest other category.
+        if let i = card.dimensions.firstIndex(where: { $0.dimension == .security }) { card.dimensions[i].score = 1 }
+        if let i = card.dimensions.firstIndex(where: { $0.dimension == .testingEvals }) { card.dimensions[i].score = 0 }
+        XCTAssertEqual(card.nextFixes.first?.dimension, .security)
+        XCTAssertFalse(card.nextFixes.contains { $0.dimension == .testingEvals })
+        XCTAssertEqual(card.moreToFix, card.nextFixes.count)
+        // Ties keep rubric order.
+        if let i = card.dimensions.firstIndex(where: { $0.dimension == .security }) { card.dimensions[i].score = 4 }
+        XCTAssertEqual(card.nextFixes.first?.dimension, .planningSpecs)
+    }
+
     func testSchemaAsksForTheMenuBarCount() throws {
         let obj = try JSONSerialization.jsonObject(with: Data(JSONSchema.scoreCard.utf8)) as! [String: Any]
         let improvement = (obj["properties"] as! [String: Any])["improvement"] as! [String: Any]

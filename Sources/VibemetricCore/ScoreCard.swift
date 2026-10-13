@@ -242,10 +242,16 @@ public struct ScoreCard: Codable, Sendable {
         public var countLabel: String?
     }
 
-    /// Other categories in the bottleneck band, besides the one the improvement raises: the menu bar's "+N more to fix".
-    public var moreToFix: Int {
-        ordered.filter { $0.band == .bottleneck && $0.dimension != improvement.dimension }.count
+    /// Other categories in the bottleneck band, besides the one the improvement raises, weakest first
+    /// (rubric order breaks ties). The menu bar shows the first with its fix and counts the rest.
+    public var nextFixes: [DimensionResult] {
+        ordered.filter { $0.band == .bottleneck && $0.dimension != improvement.dimension }
+            .enumerated().sorted { ($0.element.score ?? 0, $0.offset) < ($1.element.score ?? 0, $1.offset) }
+            .map(\.element)
     }
+
+    /// All the categories in `nextFixes`: the count behind the menu bar's "+N more to fix".
+    public var moreToFix: Int { nextFixes.count }
 
     /// True when every scored dimension carries the short readable fields (rubric 4 output).
     public var isReadable: Bool {
