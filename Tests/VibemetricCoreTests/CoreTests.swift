@@ -10,10 +10,11 @@ final class CoreTests: XCTestCase {
         XCTAssertThrowsError(try JSONDecoder().decode([VibemetricCore.Dimension].self, from: Data(#"["unknown"]"#.utf8)))
     }
 
-    func testClaudeCodeParserFoldsToolResultsAndSkipsInjectedText() throws {
+    func testScannerPreservesClaudeEventsAndSignalsAfterFileProcessing() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let project = dir.appendingPathComponent("-Users-me-app")
         try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
         let lines = [
             #"{"type":"user","cwd":"/Users/me/app","timestamp":"2026-09-01T10:00:00.000Z","permissionMode":"acceptEdits","origin":{"kind":"human"},"message":{"role":"user","content":"Fix the login bug. Done when npm test passes."}}"#,
             #"{"type":"user","isMeta":true,"timestamp":"2026-09-01T10:00:01.000Z","message":{"role":"user","content":"<local-command-caveat>ignore</local-command-caveat>"}}"#,
@@ -24,8 +25,9 @@ final class CoreTests: XCTestCase {
         let file = project.appendingPathComponent("s1.jsonl")
         try lines.joined(separator: "\n").write(to: file, atomically: true, encoding: .utf8)
 
-        var s = try XCTUnwrap(ClaudeCodeParser.parse(file: file))
-        SignalExtractor.annotate(&s)
+        let scan = Scanner.scan(sources: [TranscriptSource(tool: .claudeCode, root: dir)])
+        XCTAssertEqual(scan.sessions.count, 1)
+        let s = try XCTUnwrap(scan.sessions.first)
         XCTAssertEqual(s.project, "app")
         XCTAssertEqual(s.title, "Fix login")
         XCTAssertEqual(s.userTurns, 1)
@@ -34,6 +36,19 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(s.permissionModes, ["acceptEdits"])
         XCTAssertEqual(s.signals.verifyAfterEdit, 1)
         XCTAssertEqual(s.signals.specLanguage, 1)
+        // The scanner drains an autorelease pool after each file. Check that the event text stored
+        // in the returned session is still complete after that drain. The prompt text is fixture data.
+        let first = try XCTUnwrap(s.events.first)
+        let last = try XCTUnwrap(s.events.last)
+        guard case let .user(prompt) = first.kind,
+              case let .tool(name, input, failed, result) = last.kind else {
+            return XCTFail("Expected the user prompt and the final tool result")
+        }
+        XCTAssertEqual(prompt, "Fix the login bug. Done when npm test passes.")
+        XCTAssertEqual(name, "Bash")
+        XCTAssertEqual(input, "npm test")
+        XCTAssertTrue(failed)
+        XCTAssertEqual(result, "1 failing")
     }
 
     func testRedactorRemovesSecrets() {
