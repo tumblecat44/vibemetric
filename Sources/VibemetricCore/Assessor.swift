@@ -305,7 +305,8 @@ public final class Assessor: Sendable {
         this section decides how to write it down. Write every field as short, plain sentences of at most 20 words, in the active \
         voice, addressed to the person as "you". No Markdown: no asterisks, headings, bullets, tables, or emoji. Put commands, file \
         names, and settings in backticks, for example `CLAUDE.md` or `npm test`. Use a concrete number from the records whenever one \
-        exists ("8 of 31 code changes", "in 9 prompts"), and never invent one. Name a project by the name the records use.
+        exists ("8 of 31 code changes", "in 9 prompts"), and never invent one. Name a project by the name the records use. \
+        Write dates in sentences as month and day, for example "Oct 4", never as 2026-10-04.
 
         - `language`: BCP-47 code of the person's primary language in the records.
         - `diagnosis`: one plain sentence of at most 20 words that names the main strength and the main gap, for example \
@@ -316,7 +317,8 @@ public final class Assessor: Sendable {
           - `impact`: why it matters, in one sentence: what it cost or gained in the person's actual work.
           - `tryThis`: one concrete action that reaches the next anchor, in one sentence starting with a verb; null at 10. \
         For a `not_assessable` dimension, `saw` states the evidence limitation, `impact` says what would make it assessable, and `tryThis` is null.
-          - `evidence`: up to 3 references you verified: tool, full session id, date (YYYY-MM-DD), `project` (the project's short name), \
+          - `evidence`: up to 3 references you verified: tool, full session id, date (YYYY-MM-DD), `project` (the project's short name; \
+        when a session ran in a parent folder such as `Documents` or the home folder, name the project it worked on), \
         and `note`, one short line on what happened there, for example "12 edits, no test run, then reported done".
           - `changeReason`: null when there is no previous card or the score is unchanged; otherwise one sentence on what in the records \
         led to a different score than last time.
