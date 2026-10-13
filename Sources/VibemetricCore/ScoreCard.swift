@@ -236,6 +236,15 @@ public struct ScoreCard: Codable, Sendable {
         public var dimension: Dimension?
         public var impact: String?
         public var evidence: [Evidence]?
+        /// The menu bar's headline number for this problem, with what it counts: 23, "agent edits never tested".
+        /// nil when the records give no honest count.
+        public var count: Int?
+        public var countLabel: String?
+    }
+
+    /// Other categories in the bottleneck band, besides the one the improvement raises: the menu bar's "+N more to fix".
+    public var moreToFix: Int {
+        ordered.filter { $0.band == .bottleneck && $0.dimension != improvement.dimension }.count
     }
 
     /// True when every scored dimension carries the short readable fields (rubric 4 output).
