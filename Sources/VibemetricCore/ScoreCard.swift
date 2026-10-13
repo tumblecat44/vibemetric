@@ -31,6 +31,22 @@ public enum Dimension: String, Codable, CaseIterable, Sendable, Identifiable {
         self = value
     }
 
+    /// The plain question each dimension answers, shown under its name.
+    public var question: String {
+        switch self {
+        case .planningSpecs: "Do you agree on the goal and the checks before work starts?"
+        case .contextEngineering: "Does each project tell the AI what it must know?"
+        case .memory: "Does the AI remember what it learned, correctly?"
+        case .toolIntegration: "Does recurring work run through tools and skills?"
+        case .taskMapping: "Is big work split into the right pieces?"
+        case .feedbackLoops: "Do results decide the next step?"
+        case .testingEvals: "Do you check the AI's work?"
+        case .humanSteering: "Do you review and redirect the AI with clear reasons?"
+        case .security: "Is the agent limited to what each task needs?"
+        case .efficiencyCost: "Do the model and effort match each task?"
+        }
+    }
+
     public var title: String {
         switch self {
         case .planningSpecs: "Planning & Specs"
@@ -85,6 +101,17 @@ public struct ScoreCard: Codable, Sendable {
         public var evidence: [Evidence]
         /// Why the score differs from the previous assessment; nil when unchanged or there was none.
         public var changeReason: String?
+        /// Readable cards (rubric 4 output): short plain-text fields the app lays out. nil on older cards,
+        /// which show `points` or `reason` instead.
+        /// What the records show, with a number where one exists.
+        public var saw: String?
+        /// Why it matters: the effect on the person's work.
+        public var impact: String?
+        /// One action that would move the score up; nil or empty at 10.
+        public var tryThis: String?
+
+        /// True when the card carries the short readable fields.
+        public var isReadable: Bool { saw?.isEmpty == false }
 
         public struct Point: Codable, Sendable {
             public var heading: String
@@ -124,7 +151,7 @@ public struct ScoreCard: Codable, Sendable {
         public var band: Band? { score.map(Band.init(score:)) }
 
         enum CodingKeys: String, CodingKey {
-            case dimension, score, status, headline, reason, points, conclusion, evidence, changeReason
+            case dimension, score, status, headline, reason, points, conclusion, evidence, changeReason, saw, impact, tryThis
         }
 
         public init(from decoder: Decoder) throws {
@@ -137,8 +164,20 @@ public struct ScoreCard: Codable, Sendable {
             conclusion = try c.decodeIfPresent(String.self, forKey: .conclusion)
             evidence = try c.decodeIfPresent([Evidence].self, forKey: .evidence) ?? []
             changeReason = try c.decodeIfPresent(String.self, forKey: .changeReason)
+            saw = try c.decodeIfPresent(String.self, forKey: .saw)
+            impact = try c.decodeIfPresent(String.self, forKey: .impact)
+            tryThis = try c.decodeIfPresent(String.self, forKey: .tryThis)
             reason = try c.decodeIfPresent(String.self, forKey: .reason)
-                ?? Self.compose(points: points ?? [], conclusion: conclusion)
+                ?? (points?.isEmpty == false || saw == nil
+                    ? Self.compose(points: points ?? [], conclusion: conclusion)
+                    : Self.compose(saw: saw, impact: impact, tryThis: tryThis))
+        }
+
+        /// The readable fields as one Markdown text, for the report and other single-block readers.
+        static func compose(saw: String?, impact: String?, tryThis: String?) -> String {
+            [("What we saw", saw), ("Why it matters", impact), ("Try this", tryThis)]
+                .compactMap { label, text in text.flatMap { $0.isEmpty ? nil : "**\(label):** \($0)" } }
+                .joined(separator: "\n\n")
         }
 
         /// Points and conclusion as one Markdown text, for places that show a single block.
@@ -168,6 +207,22 @@ public struct ScoreCard: Codable, Sendable {
         public var sessionId: String
         public var date: String
         public var note: String
+        /// The project the session belongs to, shown instead of the session id. nil on older cards.
+        public var project: String?
+
+        /// "checkout-flow · Oct 8": what the app shows for a reference.
+        public var label: String {
+            let day = Self.shortDate(date) ?? date
+            return "\(project?.isEmpty == false ? project! : tool) · \(day)"
+        }
+
+        static func shortDate(_ iso: String) -> String? {
+            let parser = DateFormatter()
+            parser.locale = Locale(identifier: "en_US_POSIX")
+            parser.dateFormat = "yyyy-MM-dd"
+            guard let day = parser.date(from: String(iso.prefix(10))) else { return nil }
+            return day.formatted(.dateTime.month(.abbreviated).day())
+        }
     }
 
     public struct Improvement: Codable, Sendable {
@@ -177,6 +232,16 @@ public struct ScoreCard: Codable, Sendable {
         public var suggestedInstruction: String?
         public var signOfSuccess: String
         public var tryItOn: String
+        /// Readable cards: the dimension this improvement raises, why it matters, and its references.
+        public var dimension: Dimension?
+        public var impact: String?
+        public var evidence: [Evidence]?
+    }
+
+    /// True when every scored dimension carries the short readable fields (rubric 4 output).
+    public var isReadable: Bool {
+        let scored = ordered.filter { $0.status == .scored }
+        return !scored.isEmpty && scored.allSatisfy(\.isReadable)
     }
 
     /// Whether the person acted on the previous card's "one improvement to make first",

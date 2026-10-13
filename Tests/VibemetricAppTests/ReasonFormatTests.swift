@@ -57,3 +57,12 @@ struct TableLayoutTests {
         #expect(ReviewBlock.parse("````text\n$guard ``` literal\n````") == [.code("$guard ``` literal")])
     }
 }
+
+struct InlineCodeTests {
+    @Test func backticksBecomeCodeAndAsterisksStayLiteral() {
+        let text = inline("Run `npm test` after *every* change.")
+        #expect(String(text.characters) == "Run npm test after *every* change.")
+        let code = text.runs.filter { $0.inlinePresentationIntent == .code }.map { String(text[$0.range].characters) }
+        #expect(code == ["npm test"])
+    }
+}
