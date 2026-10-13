@@ -20,7 +20,7 @@ struct ReadableCardContent: View {
         VStack(alignment: .leading, spacing: 30) {
             header.id("header")
             fixFirst.id("improvement")
-            if !glanceGood.isEmpty || !glanceBad.isEmpty { glance }
+            if !glanceGood.isEmpty { glance }
             categories.id("dimensions")
             if let baseline, !changes.isEmpty { changesSection(baseline) }
             if !card.roadmap.isEmpty { roadmap.id("roadmap") }
@@ -62,63 +62,20 @@ struct ReadableCardContent: View {
         }
     }
 
-    // MARK: Fix this first
+    // MARK: What to fix: the first fix, then the other weak categories, one page at a time
 
-    private var fixFirst: some View {
-        let imp = card.improvement
-        let target = imp.dimension.flatMap { d in card.ordered.first { $0.dimension == d } }
-        return VStack(alignment: .leading, spacing: 10) {
-            Heading(text: "Fix this first")
-            VStack(alignment: .leading, spacing: 14) {
-                if let target {
-                    Text("\(target.dimension.title.uppercased()) · \(target.score.map { "\($0)/10" } ?? target.status.label)")
-                        .scaledFont(12, weight: .bold)
-                        .foregroundStyle(Theme.accent)
-                }
-                Text(imp.title).scaledFont(20, weight: .bold).foregroundStyle(Theme.ink)
-                    .fixedSize(horizontal: false, vertical: true)
-                LabeledRows(rows: [("What we saw", imp.situation), ("Why it matters", imp.impact ?? "")])
-                if let instruction = imp.suggestedInstruction, !instruction.isEmpty {
-                    CopyBox(caption: "Add this to your context file or prompt", text: instruction)
-                }
-                if !imp.actions.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(Array(imp.actions.enumerated()), id: \.offset) { i, action in
-                            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                                Text("\(i + 1)").scaledFont(13, weight: .bold).foregroundStyle(Theme.accent).frame(width: 14)
-                                Text(inline(action)).scaledFont(14).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-                    }
-                }
-                LabeledRows(rows: [("Try it on", imp.tryItOn), ("Sign it helped", imp.signOfSuccess)], muted: true)
-                EvidenceChips(evidence: imp.evidence ?? [])
-            }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.accent, lineWidth: 1.5))
-        }
-    }
+    private var fixFirst: some View { FixCarousel(card: card) }
 
     // MARK: At a glance: the best and weakest categories, one line each
 
     private var scored: [ScoreCard.DimensionResult] { card.ordered.filter { $0.score != nil } }
     private var glanceGood: [ScoreCard.DimensionResult] {
-        Array(scored.filter { ($0.score ?? 0) >= 6 }.sorted { ($0.score ?? 0) > ($1.score ?? 0) }.prefix(2))
+        Array(scored.filter { ($0.score ?? 0) >= 6 }.sorted { ($0.score ?? 0) > ($1.score ?? 0) }.prefix(3))
     }
-    private var glanceBad: [ScoreCard.DimensionResult] {
-        Array(scored.filter { ($0.score ?? 0) <= 5 && $0.dimension != card.improvement.dimension }
-            .sorted { ($0.score ?? 0) < ($1.score ?? 0) }.prefix(2))
-    }
-
     private var glance: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Heading(text: "At a glance")
-            HStack(alignment: .top, spacing: 14) {
-                if !glanceGood.isEmpty { glanceCard(title: "Going well", symbol: "checkmark", band: .strong, items: glanceGood) }
-                if !glanceBad.isEmpty { glanceCard(title: "Needs work", symbol: "exclamationmark", band: .bottleneck, items: glanceBad) }
-            }
+            Heading(text: "Going well")
+            glanceCard(title: "Keep doing this", symbol: "checkmark", band: .strong, items: glanceGood)
         }
     }
 
@@ -227,6 +184,119 @@ struct ReadableCardContent: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         } label: {
             Text("About this score").scaledFont(14, weight: .semibold).foregroundStyle(Theme.ink)
+        }
+    }
+}
+
+/// "What to fix": the card's first improvement, then each other category in the bottleneck band, weakest
+/// first (the same order as the menu bar). One page at a time, moved with the arrows, the dots or the arrow keys.
+struct FixCarousel: View {
+    var card: ScoreCard
+    @State private var page = 0
+
+    private var others: [ScoreCard.DimensionResult] { card.nextFixes.filter { $0.isReadable } }
+    private var count: Int { 1 + others.count }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Heading(text: page == 0 ? "Fix this first" : "Also fix")
+                Spacer()
+                if count > 1 { navigation }
+            }
+            Group {
+                if page == 0 { firstPage } else if others.indices.contains(page - 1) { categoryPage(others[page - 1]) }
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(page == 0 ? Theme.accent : Theme.rule, lineWidth: page == 0 ? 1.5 : 1))
+            .id(page)
+            .transition(.opacity)
+            if count > 1 { dots }
+        }
+        .focusable()
+        .focusEffectDisabled()
+        .onKeyPress(.leftArrow) { go(-1); return .handled }
+        .onKeyPress(.rightArrow) { go(1); return .handled }
+        .onChange(of: count) { page = min(page, count - 1) }
+    }
+
+    private func go(_ step: Int) {
+        withAnimation(.easeOut(duration: 0.15)) { page = (page + step + count) % count }
+    }
+
+    private var navigation: some View {
+        HStack(spacing: 8) {
+            Text("\(page + 1) of \(count)").scaledFont(12).monospacedDigit().foregroundStyle(Theme.muted)
+            Button { go(-1) } label: { Image(systemName: "chevron.left") }
+                .help("Previous")
+            Button { go(1) } label: { Image(systemName: "chevron.right") }
+                .help("Next")
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+    }
+
+    private var dots: some View {
+        HStack(spacing: 6) {
+            ForEach(0..<count, id: \.self) { i in
+                Button {
+                    withAnimation(.easeOut(duration: 0.15)) { page = i }
+                } label: {
+                    Capsule()
+                        .fill(i == page ? Theme.accent : Theme.rule)
+                        .frame(width: i == page ? 18 : 7, height: 7)
+                }
+                .buttonStyle(.plain)
+                .help(i == 0 ? "Fix this first" : others[i - 1].dimension.title)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func label(_ d: ScoreCard.DimensionResult?, fallback: VibemetricCore.Dimension?) -> some View {
+        let title = d?.dimension.title ?? fallback?.title
+        let score = d.flatMap { $0.score.map { "\($0)/10" } ?? $0.status.label }
+        return Text([title?.uppercased(), score].compactMap { $0 }.joined(separator: " · "))
+            .scaledFont(12, weight: .bold)
+            .foregroundStyle(Theme.accent)
+    }
+
+    private var firstPage: some View {
+        let imp = card.improvement
+        let target = imp.dimension.flatMap { d in card.ordered.first { $0.dimension == d } }
+        return VStack(alignment: .leading, spacing: 14) {
+            if imp.dimension != nil { label(target, fallback: imp.dimension) }
+            Text(inline(imp.title)).scaledFont(20, weight: .bold).foregroundStyle(Theme.ink)
+                .fixedSize(horizontal: false, vertical: true)
+            LabeledRows(rows: [("What we saw", imp.situation), ("Why it matters", imp.impact ?? "")])
+            if let instruction = imp.suggestedInstruction, !instruction.isEmpty {
+                CopyBox(caption: "Add this to your context file or prompt", text: instruction)
+            }
+            if !imp.actions.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(imp.actions.enumerated()), id: \.offset) { i, action in
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Text("\(i + 1)").scaledFont(13, weight: .bold).foregroundStyle(Theme.accent).frame(width: 14)
+                            Text(inline(action)).scaledFont(14).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+            LabeledRows(rows: [("Try it on", imp.tryItOn), ("Sign it helped", imp.signOfSuccess)], muted: true)
+            EvidenceChips(evidence: imp.evidence ?? [])
+        }
+    }
+
+    private func categoryPage(_ d: ScoreCard.DimensionResult) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            label(d, fallback: nil)
+            Text(inline(d.headline)).scaledFont(20, weight: .bold).foregroundStyle(Theme.ink)
+                .fixedSize(horizontal: false, vertical: true)
+            LabeledRows(rows: [("What we saw", d.saw ?? ""), ("Why it matters", d.impact ?? ""), ("Try this", d.tryThis ?? "")],
+                        boldLast: true)
+            EvidenceChips(evidence: d.evidence)
         }
     }
 }
