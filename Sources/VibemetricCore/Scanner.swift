@@ -32,7 +32,7 @@ public struct ScanResult: Sendable {
 public enum Scanner {
     public static func scan(sources: [TranscriptSource] = TranscriptSource.defaults()) -> ScanResult {
         let started = Date()
-        var jobs: [(AgentTool, URL)] = []
+        var jobs: [(agentTool: AgentTool, transcriptFile: URL)] = []
         for source in sources {
             jobs += transcriptFiles(for: source).map { (source.tool, $0) }
         }
@@ -40,20 +40,27 @@ public enum Scanner {
         let lock = NSLock()
         var sessions: [Session] = []
         DispatchQueue.concurrentPerform(iterations: jobs.count) { i in
+            // Free each file's temporary Foundation objects before this thread takes the next file.
             autoreleasepool {
-                let (tool, url) = jobs[i]
-                let parsed: Session?
-                switch tool {
-                case .claudeCode: parsed = ClaudeCodeParser.parse(file: url)
-                case .codex: parsed = CodexParser.parse(file: url)
-                }
-                guard var s = parsed, !isAssessmentRun(s) else { return }
-                SignalExtractor.annotate(&s)
-                lock.lock(); sessions.append(s); lock.unlock()
+                let (agentTool, transcriptFile) = jobs[i]
+                guard let session = annotatedSession(from: transcriptFile, agentTool: agentTool) else { return }
+                lock.lock(); sessions.append(session); lock.unlock()
             }
         }
         sessions.sort { ($0.start ?? .distantPast) < ($1.start ?? .distantPast) }
         return ScanResult(sessions: sessions, sources: sources, duration: Date().timeIntervalSince(started))
+    }
+
+    /// Parses one transcript file and annotates its signals. Returns nil for unreadable files and assessment runs.
+    static func annotatedSession(from transcriptFile: URL, agentTool: AgentTool) -> Session? {
+        let parsed: Session?
+        switch agentTool {
+        case .claudeCode: parsed = ClaudeCodeParser.parse(file: transcriptFile)
+        case .codex: parsed = CodexParser.parse(file: transcriptFile)
+        }
+        guard var session = parsed, !isAssessmentRun(session) else { return nil }
+        SignalExtractor.annotate(&session)
+        return session
     }
 
     /// Fork rollouts may omit the original prompt, so recognize the app-owned workspace too.

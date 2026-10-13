@@ -36,6 +36,8 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(s.permissionModes, ["acceptEdits"])
         XCTAssertEqual(s.signals.verifyAfterEdit, 1)
         XCTAssertEqual(s.signals.specLanguage, 1)
+        // The scanner drains an autorelease pool after each file. Check that the event text stored
+        // in the returned session is still complete after that drain. The prompt text is fixture data.
         let first = try XCTUnwrap(s.events.first)
         let last = try XCTUnwrap(s.events.last)
         guard case let .user(prompt) = first.kind,
