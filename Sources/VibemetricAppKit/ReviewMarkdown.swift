@@ -108,7 +108,10 @@ public struct ReviewMarkdown: View {
                     ViewThatFits(in: .horizontal) {
                         table(headers: headers, rows: rows)
                             .frame(minWidth: 560 * scale, idealWidth: 560 * scale, maxWidth: .infinity)
-                        compactTable(headers: headers, rows: rows)
+                        ScrollView(.horizontal) {
+                            table(headers: headers, rows: rows)
+                                .frame(width: 560 * scale)
+                        }
                     }
                 }
             }
@@ -188,20 +191,6 @@ public struct ReviewMarkdown: View {
         cell.trimmingCharacters(in: .whitespaces).range(of: #"^#?\d{1,3}\.?$"#, options: .regularExpression) != nil
     }
 
-    private func compactTable(headers: [String], rows: [[String]]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
-                if index > 0 { Divider().overlay(Theme.rule) }
-                ForEach(Array(row.enumerated()), id: \.offset) { column, cell in
-                    if column > 1 {
-                        Text(headers[column]).scaledFont(10, weight: .semibold).foregroundStyle(Theme.muted)
-                    }
-                    inline(cell).scaledFont(column < 2 ? 12 : 11, weight: column < 2 ? .semibold : .regular)
-                }
-            }
-        }.padding(12)
-            .background(Theme.paper.opacity(0.55), in: RoundedRectangle(cornerRadius: 8))
-    }
 }
 
 struct ReviewCodeBlock: View {
