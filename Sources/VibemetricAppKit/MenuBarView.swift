@@ -89,21 +89,24 @@ struct MenuBarPanel: View {
         return VStack(alignment: .leading, spacing: 10) {
             Text("Most urgent").scaledFont(12, weight: .semibold).foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 10) {
+                // The problem, then the recommendation: a counted problem when the records give one,
+                // otherwise what was seen.
                 if let count = imp.count, let label = imp.countLabel, !label.isEmpty {
                     HStack(alignment: .firstTextBaseline, spacing: 10) {
                         Text("\(count)").scaledFont(28, weight: .bold).monospacedDigit()
                         Text(inline(label)).scaledFont(14, weight: .medium).fixedSize(horizontal: false, vertical: true)
                     }
-                    Divider()
-                    (Text("Fix: ").bold() + Text(inline(imp.title)))
+                } else {
+                    (Text("Problem: ").bold() + Text(inline(imp.situation)))
                         .scaledFont(13)
                         .fixedSize(horizontal: false, vertical: true)
-                } else {
-                    // Cards without a count: the fix itself is the headline.
-                    Text(inline(imp.title)).scaledFont(15, weight: .semibold).fixedSize(horizontal: false, vertical: true)
-                    if let target = imp.dimension {
-                        Text(target.title).scaledFont(12).foregroundStyle(.secondary)
-                    }
+                }
+                Divider()
+                (Text("Fix: ").bold() + Text(inline(imp.title)))
+                    .scaledFont(13)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let target = imp.dimension {
+                    Text(target.title).scaledFont(11).foregroundStyle(.secondary)
                 }
             }
             .padding(12)
