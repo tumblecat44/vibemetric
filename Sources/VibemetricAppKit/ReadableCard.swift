@@ -193,9 +193,14 @@ struct ReadableCardContent: View {
 struct FixCarousel: View {
     var card: ScoreCard
     @State private var page = 0
+    /// The row's width, measured; the first layout uses a typical window width.
+    @State private var width: CGFloat = 756
+    private let spacing: CGFloat = 14
 
     private var others: [ScoreCard.DimensionResult] { card.nextFixes.filter { $0.isReadable } }
     private var count: Int { 1 + others.count }
+    /// Each card is narrower than the row, so the next one shows at the right edge.
+    private var cardWidth: CGFloat { count > 1 ? (width * 0.86).rounded() : width }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -204,15 +209,25 @@ struct FixCarousel: View {
                 Spacer()
                 if count > 1 { navigation }
             }
-            Group {
-                if page == 0 { firstPage } else if others.indices.contains(page - 1) { categoryPage(others[page - 1]) }
+            // Measures the row's width; the cards themselves are wider than it in total.
+            Color.clear.frame(maxWidth: .infinity).frame(height: 0)
+                .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width = $0 }
+            // Laid out side by side and clipped, rather than in a ScrollView, so it also renders to images.
+            HStack(alignment: .top, spacing: spacing) {
+                ForEach(0..<count, id: \.self) { i in
+                    framed(i)
+                        .frame(width: cardWidth)
+                        .opacity(i == page ? 1 : 0.55)
+                        .onTapGesture { if i != page { withAnimation(.easeOut(duration: 0.3)) { page = i } } }
+                }
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(page == 0 ? Theme.accent : Theme.rule, lineWidth: page == 0 ? 1.5 : 1))
-            .id(page)
-            .transition(.opacity)
+            .fixedSize(horizontal: true, vertical: false)
+            .offset(x: -CGFloat(page) * (cardWidth + spacing))
+            .frame(width: width, alignment: .leading)
+            .clipped()
+            .gesture(DragGesture(minimumDistance: 24).onEnded { drag in
+                if drag.translation.width < -60 { go(1) } else if drag.translation.width > 60 { go(-1) }
+            })
             if count > 1 { dots }
         }
         .focusable()
@@ -222,8 +237,19 @@ struct FixCarousel: View {
         .onChange(of: count) { page = min(page, count - 1) }
     }
 
+    /// One page in its box; every box in the row takes the height of the tallest.
+    private func framed(_ i: Int) -> some View {
+        Group {
+            if i == 0 { firstPage } else if others.indices.contains(i - 1) { categoryPage(others[i - 1]) }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(i == 0 ? Theme.accent : Theme.rule, lineWidth: i == 0 ? 1.5 : 1))
+    }
+
     private func go(_ step: Int) {
-        withAnimation(.easeOut(duration: 0.15)) { page = (page + step + count) % count }
+        withAnimation(.easeOut(duration: 0.3)) { page = min(max(page + step, 0), count - 1) }
     }
 
     private var navigation: some View {
@@ -242,7 +268,7 @@ struct FixCarousel: View {
         HStack(spacing: 6) {
             ForEach(0..<count, id: \.self) { i in
                 Button {
-                    withAnimation(.easeOut(duration: 0.15)) { page = i }
+                    withAnimation(.easeOut(duration: 0.3)) { page = i }
                 } label: {
                     Capsule()
                         .fill(i == page ? Theme.accent : Theme.rule)
