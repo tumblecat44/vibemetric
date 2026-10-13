@@ -383,13 +383,63 @@ final class ReasonPointsTests: XCTestCase {
         XCTAssertNil(try JSONDecoder().decode(ScoreCard.self, from: Data(CoreTests.sampleCard.utf8)).dimensions[0].points)
     }
 
-    func testSchemaAsksForPointsAndConclusion() throws {
+    func testSchemaAsksForReadableFields() throws {
         let obj = try JSONSerialization.jsonObject(with: Data(JSONSchema.scoreCard.utf8)) as! [String: Any]
-        let dims = (obj["properties"] as! [String: Any])["dimensions"] as! [String: Any]
-        let item = dims["items"] as! [String: Any]
+        let props = obj["properties"] as! [String: Any]
+        let item = (props["dimensions"] as! [String: Any])["items"] as! [String: Any]
         let required = Set(item["required"] as! [String])
-        XCTAssertTrue(required.isSuperset(of: ["headline", "points", "conclusion"]))
+        XCTAssertTrue(required.isSuperset(of: ["headline", "saw", "impact", "tryThis", "evidence"]))
+        XCTAssertFalse(required.contains("points"))
         XCTAssertFalse(required.contains("reason"))
+        let evidence = ((item["properties"] as! [String: Any])["evidence"] as! [String: Any])["items"] as! [String: Any]
+        XCTAssertTrue((evidence["required"] as! [String]).contains("project"))
+        let improvement = Set((props["improvement"] as! [String: Any])["required"] as! [String])
+        XCTAssertTrue(improvement.isSuperset(of: ["dimension", "impact", "evidence"]))
+    }
+}
+
+final class ReadableCardTests: XCTestCase {
+    static var readableCard: String {
+        let dims = Dimension.allCases.map {
+            #"{"dimension":"\#($0.rawValue)","score":4,"status":"scored","headline":"You rarely make the AI prove its work","saw":"Tests ran after 8 of 31 code changes.","impact":"Two tasks broke the next day.","tryThis":"Run `npm test` after every change.","evidence":[{"tool":"claude","sessionId":"abc12345-0000","date":"2026-10-08","note":"12 edits, no test run.","project":"checkout-flow"}],"changeReason":null}"#
+        }.joined(separator: ",")
+        return """
+        {"language":"en","diagnosis":"Your AI does solid work, but you rarely make it prove the work is done.","dimensions":[\(dims)],
+        "improvement":{"title":"Make the agent run the tests","situation":"Tests ran after 8 of 31 changes.","actions":["a","b"],
+        "suggestedInstruction":"Run `npm test` after every change.","signOfSuccess":"x","tryItOn":"y","dimension":"testing_evals",
+        "impact":"Two tasks broke.","evidence":[]},"followUp":null,"deductions":[],"roadmap":[{"stage":1,"change":"c","result":"r"}],
+        "scope":{"assessedAt":"2026-10-13","timeZone":"UTC","recordDates":[],"sessionsExamined":31,"tasksCheckedInDetail":6,"elapsedMinutes":0,"limits":[]}}
+        """
+    }
+
+    func testReadableCardDecodesAndComposesItsReason() throws {
+        let card = try JSONDecoder().decode(ScoreCard.self, from: Data(Self.readableCard.utf8))
+        XCTAssertTrue(card.isReadable)
+        let d = card.dimensions[0]
+        XCTAssertEqual(d.saw, "Tests ran after 8 of 31 code changes.")
+        XCTAssertTrue(d.reason.hasPrefix("**What we saw:** Tests ran"))
+        XCTAssertTrue(d.reason.contains("**Try this:** Run `npm test`"))
+        XCTAssertEqual(card.improvement.dimension, .testingEvals)
+        XCTAssertEqual(d.evidence[0].project, "checkout-flow")
+        XCTAssertTrue(d.evidence[0].label.hasPrefix("checkout-flow · "))
+        // The Markdown report keeps working from the composed reason.
+        XCTAssertTrue(MarkdownRenderer.render(card).contains("**What we saw:** Tests ran after 8 of 31"))
+        // Round-trips through the saved JSON.
+        let again = try JSONDecoder().decode(ScoreCard.self, from: JSONEncoder().encode(card))
+        XCTAssertTrue(again.isReadable)
+        XCTAssertEqual(again.dimensions[0].tryThis, d.tryThis)
+    }
+
+    func testOlderCardsAreNotReadable() throws {
+        let old = try JSONDecoder().decode(ScoreCard.self, from: Data(CoreTests.sampleCard.utf8))
+        XCTAssertFalse(old.isReadable)
+        XCTAssertNil(old.improvement.dimension)
+        XCTAssertNil(old.dimensions[0].evidence.first?.project)
+    }
+
+    func testEvidenceLabelFallsBackToToolAndRawDate() {
+        let e = ScoreCard.Evidence(tool: "codex", sessionId: "x", date: "unknown", note: "n")
+        XCTAssertEqual(e.label, "codex · unknown")
     }
 }
 

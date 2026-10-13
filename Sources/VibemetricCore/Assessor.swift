@@ -298,37 +298,39 @@ public final class Assessor: Sendable {
         \(previousDate.map { Self.followUpRules(previousDate: f.string(from: $0)) } ?? "")\(instructions.map(Self.personNotes) ?? "")
         # Return format
 
-        Return the card as structured output that matches the provided JSON schema instead of Markdown. The app renders the Markdown layout from section 3 and computes the total, bands, and progress bars itself.
+        Return the card as structured output that matches the provided JSON schema instead of Markdown. The app lays out the card \
+        itself and computes the total, bands, and progress bars.
+
+        The card is read in a small window by a busy developer. Section 3 still decides what to judge and which evidence counts; \
+        this section decides how to write it down. Write every field as short, plain sentences of at most 20 words, in the active \
+        voice, addressed to the person as "you". No Markdown: no asterisks, headings, bullets, tables, or emoji. Put commands, file \
+        names, and settings in backticks, for example `CLAUDE.md` or `npm test`. Use a concrete number from the records whenever one \
+        exists ("8 of 31 code changes", "in 9 prompts"), and never invent one. Name a project by the name the records use.
 
         - `language`: BCP-47 code of the person's primary language in the records.
-        - `diagnosis`: exactly two short plain-language sentences from "Score and diagnosis" (about 45 words in total).
-        - `dimensions`: all 10 in rubric order. `score` is an integer 0–10, or null with `status` `not_assessable` only under the rubric's Not assessable rule; never use `not_reviewed`. \
-        Lay out each reason so it can be scanned: \
-        `headline` is the short summary, the reason's opening judgment in one sentence, without Markdown asterisks. \
-        `points` are headed points that carry the connected account in section 3. Use as many as the evidence needs, from 1 to 5, \
-        and never add a point only to fill the list. Each scored dimension shows both sides: at least one good point and at least one \
-        bad point, except that a score of 10 needs no bad point and a score of 0 or 1 needs no good point. Each `heading` is a short, specific label \
-        (for example "Context files carry the rules" or "Two projects still re-explain setup"), and each `body` is 2–4 short sentences, \
-        or Markdown bullets when bullets organize the information better (steps, several projects, several cases). Introduce unfamiliar \
-        projects and tools briefly. No long paragraphs. Each point's `tone` is `good` (a strength the evidence supports) or `bad` (a gap, \
-        risk, or missing practice, including practice the AI did on its own that earns the person no credit). Almost every point is good \
-        or bad: judge it by the main message of its heading, and when a point has both an important strength and an important gap, make \
-        them two points. Use `neutral` only when a point makes no judgment at all, such as an exclusion at the person's request or a \
-        definition; never use it for a mixed result. Start every bullet in a `body` with ✅ (good) or ⚠️ (bad) after the "- ", using \
-        ℹ️ only under the same rule, then a short bold label and a colon, for example "- ⚠️ **Acme backend:** CLAUDE.md has 501 lines". \
-        `conclusion` is the ending summary in one or two sentences: why the evidence supports this score and, below 10, the specific gap to \
-        the next anchor, without Markdown asterisks. For a `not_assessable` dimension, use one point for the evidence limitation. \
-        `evidence`: up to 4 references you verified: tool, full session id, date (YYYY-MM-DD), and what happened there. \
-        `changeReason`: null when there is no previous card or the score is unchanged; otherwise one or two sentences saying what in the records \
+        - `diagnosis`: one plain sentence of at most 20 words that names the main strength and the main gap, for example \
+        "Your AI does solid work, but you rarely make it prove the work is done."
+        - `dimensions`: all 10 in rubric order. `score` is an integer 0–10, or null with `status` `not_assessable` only under the rubric's Not assessable rule; never use `not_reviewed`.
+          - `headline`: the verdict, at most 10 words, for example "You rarely make the AI prove its work".
+          - `saw`: what the records show, in one or two sentences, with the number behind the judgment.
+          - `impact`: why it matters, in one sentence: what it cost or gained in the person's actual work.
+          - `tryThis`: one concrete action that reaches the next anchor, in one sentence starting with a verb; null at 10. \
+        For a `not_assessable` dimension, `saw` states the evidence limitation, `impact` says what would make it assessable, and `tryThis` is null.
+          - `evidence`: up to 3 references you verified: tool, full session id, date (YYYY-MM-DD), `project` (the project's short name), \
+        and `note`, one short line on what happened there, for example "12 edits, no test run, then reported done".
+          - `changeReason`: null when there is no previous card or the score is unchanged; otherwise one sentence on what in the records \
         led to a different score than last time.
-        - `improvement`: "One improvement to make first". `actions` are the 2–3 actions; `suggestedInstruction` is an optional short instruction to give their AI; \
-        `tryItOn` names the task from the records to try it on; `signOfSuccess` is the observable sign it helped.
+        - `improvement`: "One improvement to make first". `title` is the task, at most 10 words, starting with a verb. `dimension` is the \
+        dimension it raises. `situation` is what you saw, one or two sentences with the number. `impact` is why it matters, one sentence. \
+        `actions` are the 2–3 steps, one short sentence each. `suggestedInstruction` is the text to paste into the context file or prompt, \
+        written so it works as is. `tryItOn` names the task from the records to try it on; `signOfSuccess` is the observable sign it \
+        helped. `evidence`: up to 3 references, as above.
         - `followUp`: always null.
         - `deductions`: the rubric's permission-bypass deduction. At most **one** entry in total, with `points` 1, `reason` (every tool and \
         project where permissions were bypassed, and why no restriction, hook, or isolation managed the risk), and `evidence`. An empty \
         array when no deduction applies. Score Security on its anchors without the deduction; the app subtracts it from Security (never below 0). \
         In `previous-card.json`, Security already includes any earlier deduction; `scoreBeforeDeduction` holds the score before it.
-        - `roadmap`: up to 3 stages from "AI-use improvement roadmap".
+        - `roadmap`: up to 3 stages from "AI-use improvement roadmap"; `change` and `result` are one short sentence each.
         - `scope`: `assessedAt` is today's date; `recordDates` covers each tool with records; `sessionsExamined` and `tasksCheckedInDetail` are honest counts; \
         set `elapsedMinutes` to 0 (the app measures it); `limits` holds the important investigation limits, including any shortfall against 300 sessions, the project screening results the rubric asks for in the Scope note, and the evidence limitation behind each Not assessable dimension.
         """

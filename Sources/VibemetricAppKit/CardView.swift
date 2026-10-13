@@ -84,6 +84,15 @@ struct CardContent: View {
     private func change(for d: VibemetricCore.Dimension) -> ScoreChange? { changes.first { $0.dimension == d } }
 
     var body: some View {
+        if card.isReadable {
+            ReadableCardContent(record: record, baseline: baseline, expandAll: expandAll, deepDiveFooter: deepDiveFooter)
+        } else {
+            classic
+        }
+    }
+
+    /// The original layout, kept for cards scored before the readable fields.
+    private var classic: some View {
         VStack(alignment: .leading, spacing: 22) {
             header.id("header")
             // A deduction taken off Security is explained inside the Security category; only older

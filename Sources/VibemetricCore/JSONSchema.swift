@@ -16,18 +16,17 @@ enum JSONSchema {
             return a
         }
 
-        let evidence = object(["tool": str, "sessionId": str, "date": str, "note": str])
+        let evidence = object(["tool": str, "sessionId": str, "date": str, "note": str, "project": str])
+        let dimensionID: [String: Any] = ["type": "string", "enum": Dimension.allCases.map(\.rawValue)]
         let dimension = object([
-            "dimension": ["type": "string", "enum": Dimension.allCases.map(\.rawValue)],
+            "dimension": dimensionID,
             "score": ["type": ["integer", "null"], "minimum": 0, "maximum": 10],
             "status": ["type": "string", "enum": ["scored", "not_assessable", "not_reviewed"]],
             "headline": str,
-            "points": array(object([
-                "heading": str, "body": str,
-                "tone": ["type": "string", "enum": ["good", "bad", "neutral"]],
-            ]), max: 5),
-            "conclusion": str,
-            "evidence": array(evidence, max: 4),
+            "saw": str,
+            "impact": str,
+            "tryThis": ["type": ["string", "null"]],
+            "evidence": array(evidence, max: 3),
             "changeReason": ["type": ["string", "null"]],
         ])
         let schema = object([
@@ -39,6 +38,9 @@ enum JSONSchema {
                 "actions": array(str, min: 2, max: 3),
                 "suggestedInstruction": ["type": ["string", "null"]],
                 "signOfSuccess": str, "tryItOn": str,
+                "dimension": dimensionID,
+                "impact": str,
+                "evidence": array(evidence, max: 3),
             ]),
             "followUp": ["anyOf": [
                 object([
