@@ -89,8 +89,7 @@ struct MenuBarPanel: View {
         return VStack(alignment: .leading, spacing: 10) {
             Text("Most urgent").scaledFont(12, weight: .semibold).foregroundStyle(.secondary)
             // Two problems, each with its fix: the card's first improvement, then the weakest other category.
-            let firstProblem = imp.count.flatMap { count in imp.countLabel.map { "\(count) \($0)" } } ?? imp.situation
-            fixBox(number: 1, problem: firstProblem, fix: imp.title, category: imp.dimension?.title)
+            fixBox(number: 1, problem: imp.situation, fix: imp.title, category: imp.dimension?.title)
             let second = card.nextFixes.first { $0.isReadable && $0.tryThis?.isEmpty == false }
             if let second {
                 fixBox(number: 2, problem: second.saw ?? second.headline, fix: second.tryThis ?? "", category: second.dimension.title)

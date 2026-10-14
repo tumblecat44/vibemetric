@@ -314,6 +314,9 @@ public struct ScoreCard: Codable, Sendable {
 
     public var language: String
     public var diagnosis: String
+    /// The summary at the top of the card: 2–3 plain-language bullets. nil on cards scored before it existed;
+    /// those show `diagnosis` instead.
+    public var summary: [String]?
     public var dimensions: [DimensionResult]
     public var improvement: Improvement
     /// nil when there was no previous card to follow up on.

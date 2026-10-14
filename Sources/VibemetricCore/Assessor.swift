@@ -311,9 +311,16 @@ public final class Assessor: Sendable {
         - `language`: BCP-47 code of the person's primary language in the records.
         - `diagnosis`: one plain sentence of at most 20 words that names the main strength and the main gap, for example \
         "Your AI does solid work, but you rarely make it prove the work is done."
+        - `summary`: the summary shown at the top of the card, as 2 or 3 bullet points, one string each, without a bullet \
+        character. Write for someone who is not technical: everyday words, no jargon or rubric terms, at most 15 words each. \
+        First what is going well, then the biggest thing holding the person back, then the one thing to do first. For example: \
+        "Your AI does careful, solid work." / "But it often says done without testing anything." / \
+        "Start by asking it to run your tests before it finishes."
         - `dimensions`: all 10 in rubric order. `score` is an integer 0–10, or null with `status` `not_assessable` only under the rubric's Not assessable rule; never use `not_reviewed`.
           - `headline`: the verdict, at most 10 words, for example "You rarely make the AI prove its work".
-          - `saw`: what the records show, in one or two sentences, with the number behind the judgment.
+          - `saw`: below 8, only the problem, as it happened in the person's sessions and written as `situation` below asks; \
+        the app shows it under "Problem:", so leave out what went well. At 8 or above, what went well, the same way. \
+        Never start with a label such as "Positive:", "Gap:", or "Problem:".
           - `impact`: why it matters, in one sentence: what it cost or gained in the person's actual work.
           - `tryThis`: one concrete action that reaches the next anchor, in one sentence starting with a verb; null at 10. \
         For a `not_assessable` dimension, `saw` states the evidence limitation, `impact` says what would make it assessable, and `tryThis` is null.
@@ -323,7 +330,13 @@ public final class Assessor: Sendable {
           - `changeReason`: null when there is no previous card or the score is unchanged; otherwise one sentence on what in the records \
         led to a different score than last time.
         - `improvement`: "One improvement to make first". `title` is the task, at most 10 words, starting with a verb. `dimension` is the \
-        dimension it raises. `situation` is what you saw, one or two sentences with the number. `impact` is why it matters, one sentence. \
+        dimension it raises. `situation` is the problem, told the way you would tell a friend: what the person or their AI actually did, \
+        how often, and what it cost them, as 2 or 3 short plain sentences of at most 15 words each, one point per sentence, \
+        because the app shows each sentence as its own bullet. Name the real thing (the command, the rule, \
+        the kind of task), not the rubric's terms: no "anchor", "completion criteria", "evidence", "dimension", or "the user". \
+        For example: "The AI changed code 23 times last week. It never ran your tests once. You caught three breakages \
+        yourself, a day later." or "You retyped the same rule, `use pnpm, never npm`, in 9 sessions. The AI still reached for npm \
+        twice." `impact` is why it matters, one short sentence; the app adds it as the last bullet. \
         `actions` are the 2–3 steps, one short sentence each. `suggestedInstruction` is the text to paste into the context file or prompt, \
         written so it works as is. `tryItOn` names the task from the records to try it on; `signOfSuccess` is the observable sign it \
         helped. `evidence`: up to 3 references, as above. `count` and `countLabel` are the headline number the menu bar shows \
