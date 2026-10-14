@@ -1,4 +1,5 @@
 import AppKit
+import NaturalLanguage
 import SwiftUI
 import VibemetricCore
 
@@ -20,7 +21,7 @@ struct ReadableCardContent: View {
         VStack(alignment: .leading, spacing: 30) {
             header.id("header")
             fixFirst.id("improvement")
-            if !glanceGood.isEmpty || !glanceBad.isEmpty { glance }
+            if !glanceGood.isEmpty { glance }
             categories.id("dimensions")
             if let baseline, !changes.isEmpty { changesSection(baseline) }
             if !card.roadmap.isEmpty { roadmap.id("roadmap") }
@@ -50,10 +51,25 @@ struct ReadableCardContent: View {
                 }
                 .scaledFont(13)
             }
-            Text(card.diagnosis)
-                .scaledFont(24, weight: .bold)
+            // The summary in plain words: bullets when the card has them, else the one-sentence diagnosis.
+            if let summary = card.summary, !summary.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(summary.enumerated()), id: \.offset) { _, line in
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text("•").foregroundStyle(Theme.muted)
+                            Text(line).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                .scaledFont(16)
                 .foregroundStyle(Theme.ink)
-                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 2)
+            } else {
+                Text(card.diagnosis)
+                    .scaledFont(16, weight: .medium)
+                    .foregroundStyle(Theme.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if card.isLowCoverage(sessionsAvailable: record.sessionsScanned) {
                 Label("Few sessions were examined, so this score may miss evidence.", systemImage: "exclamationmark.triangle.fill")
                     .scaledFont(12)
@@ -62,63 +78,20 @@ struct ReadableCardContent: View {
         }
     }
 
-    // MARK: Fix this first
+    // MARK: What to fix: the first fix, then the other weak categories, one page at a time
 
-    private var fixFirst: some View {
-        let imp = card.improvement
-        let target = imp.dimension.flatMap { d in card.ordered.first { $0.dimension == d } }
-        return VStack(alignment: .leading, spacing: 10) {
-            Heading(text: "Fix this first")
-            VStack(alignment: .leading, spacing: 14) {
-                if let target {
-                    Text("\(target.dimension.title.uppercased()) · \(target.score.map { "\($0)/10" } ?? target.status.label)")
-                        .scaledFont(12, weight: .bold)
-                        .foregroundStyle(Theme.accent)
-                }
-                Text(imp.title).scaledFont(20, weight: .bold).foregroundStyle(Theme.ink)
-                    .fixedSize(horizontal: false, vertical: true)
-                LabeledRows(rows: [("What we saw", imp.situation), ("Why it matters", imp.impact ?? "")])
-                if let instruction = imp.suggestedInstruction, !instruction.isEmpty {
-                    CopyBox(caption: "Add this to your context file or prompt", text: instruction)
-                }
-                if !imp.actions.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(Array(imp.actions.enumerated()), id: \.offset) { i, action in
-                            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                                Text("\(i + 1)").scaledFont(13, weight: .bold).foregroundStyle(Theme.accent).frame(width: 14)
-                                Text(inline(action)).scaledFont(14).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-                    }
-                }
-                LabeledRows(rows: [("Try it on", imp.tryItOn), ("Sign it helped", imp.signOfSuccess)], muted: true)
-                EvidenceChips(evidence: imp.evidence ?? [])
-            }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.accent, lineWidth: 1.5))
-        }
-    }
+    private var fixFirst: some View { FixCarousel(card: card) }
 
     // MARK: At a glance: the best and weakest categories, one line each
 
     private var scored: [ScoreCard.DimensionResult] { card.ordered.filter { $0.score != nil } }
     private var glanceGood: [ScoreCard.DimensionResult] {
-        Array(scored.filter { ($0.score ?? 0) >= 6 }.sorted { ($0.score ?? 0) > ($1.score ?? 0) }.prefix(2))
+        Array(scored.filter { ($0.score ?? 0) >= 6 }.sorted { ($0.score ?? 0) > ($1.score ?? 0) }.prefix(3))
     }
-    private var glanceBad: [ScoreCard.DimensionResult] {
-        Array(scored.filter { ($0.score ?? 0) <= 5 && $0.dimension != card.improvement.dimension }
-            .sorted { ($0.score ?? 0) < ($1.score ?? 0) }.prefix(2))
-    }
-
     private var glance: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Heading(text: "At a glance")
-            HStack(alignment: .top, spacing: 14) {
-                if !glanceGood.isEmpty { glanceCard(title: "Going well", symbol: "checkmark", band: .strong, items: glanceGood) }
-                if !glanceBad.isEmpty { glanceCard(title: "Needs work", symbol: "exclamationmark", band: .bottleneck, items: glanceBad) }
-            }
+            Heading(text: "Going well")
+            glanceCard(title: "Keep doing this", symbol: "checkmark", band: .strong, items: glanceGood)
         }
     }
 
@@ -231,6 +204,126 @@ struct ReadableCardContent: View {
     }
 }
 
+/// "What to fix": the card's first improvement, then each other category in the bottleneck band, weakest
+/// first (the same order as the menu bar). One page at a time, moved with the arrows, the dots or the arrow keys.
+struct FixCarousel: View {
+    var card: ScoreCard
+    @State private var page = 0
+    /// The row's width, measured; the first layout uses a typical window width.
+    @State private var width: CGFloat = 756
+    private let spacing: CGFloat = 14
+
+    private var others: [ScoreCard.DimensionResult] { card.nextFixes.filter { $0.isReadable } }
+    private var count: Int { 1 + others.count }
+    /// Each card is narrower than the row, so the next one shows at the right edge.
+    private var cardWidth: CGFloat { count > 1 ? (width * 0.86).rounded() : width }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Heading(text: page == 0 ? "Fix this first" : "Also fix")
+                Spacer()
+                if count > 1 { navigation }
+            }
+            // Measures the row's width; the cards themselves are wider than it in total.
+            Color.clear.frame(maxWidth: .infinity).frame(height: 0)
+                .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width = $0 }
+            // Laid out side by side and clipped, rather than in a ScrollView, so it also renders to images.
+            HStack(alignment: .top, spacing: spacing) {
+                ForEach(0..<count, id: \.self) { i in
+                    framed(i)
+                        .frame(width: cardWidth)
+                        .opacity(i == page ? 1 : 0.55)
+                        .onTapGesture { if i != page { withAnimation(.easeOut(duration: 0.3)) { page = i } } }
+                }
+            }
+            .fixedSize(horizontal: true, vertical: false)
+            .offset(x: -CGFloat(page) * (cardWidth + spacing))
+            .frame(width: width, alignment: .leading)
+            .clipped()
+            .gesture(DragGesture(minimumDistance: 24).onEnded { drag in
+                if drag.translation.width < -60 { go(1) } else if drag.translation.width > 60 { go(-1) }
+            })
+            if count > 1 { dots }
+        }
+        .focusable()
+        .focusEffectDisabled()
+        .onKeyPress(.leftArrow) { go(-1); return .handled }
+        .onKeyPress(.rightArrow) { go(1); return .handled }
+        .onChange(of: count) { page = min(page, count - 1) }
+    }
+
+    /// One page in its box; every box in the row takes the height of the tallest.
+    private func framed(_ i: Int) -> some View {
+        Group {
+            if i == 0 { firstPage } else if others.indices.contains(i - 1) { categoryPage(others[i - 1]) }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(i == 0 ? Theme.accent : Theme.rule, lineWidth: i == 0 ? 1.5 : 1))
+    }
+
+    private func go(_ step: Int) {
+        withAnimation(.easeOut(duration: 0.3)) { page = min(max(page + step, 0), count - 1) }
+    }
+
+    private var navigation: some View {
+        HStack(spacing: 8) {
+            Text("\(page + 1) of \(count)").scaledFont(12).monospacedDigit().foregroundStyle(Theme.muted)
+            Button { go(-1) } label: { Image(systemName: "chevron.left") }
+                .help("Previous")
+            Button { go(1) } label: { Image(systemName: "chevron.right") }
+                .help("Next")
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+    }
+
+    private var dots: some View {
+        HStack(spacing: 6) {
+            ForEach(0..<count, id: \.self) { i in
+                Button {
+                    withAnimation(.easeOut(duration: 0.3)) { page = i }
+                } label: {
+                    Capsule()
+                        .fill(i == page ? Theme.accent : Theme.rule)
+                        .frame(width: i == page ? 18 : 7, height: 7)
+                }
+                .buttonStyle(.plain)
+                .help(i == 0 ? "Fix this first" : others[i - 1].dimension.title)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func label(_ d: ScoreCard.DimensionResult?, fallback: VibemetricCore.Dimension?) -> some View {
+        let title = d?.dimension.title ?? fallback?.title
+        let score = d.flatMap { $0.score.map { "\($0)/10" } ?? $0.status.label }
+        return Text([title?.uppercased(), score].compactMap { $0 }.joined(separator: " · "))
+            .scaledFont(12, weight: .bold)
+            .foregroundStyle(Theme.accent)
+    }
+
+    private var firstPage: some View {
+        let imp = card.improvement
+        let target = imp.dimension.flatMap { d in card.ordered.first { $0.dimension == d } }
+        return VStack(alignment: .leading, spacing: 16) {
+            if imp.dimension != nil { label(target, fallback: imp.dimension) }
+            ProblemSolution(problem: [imp.situation, imp.impact ?? ""], evidence: imp.evidence ?? [],
+                            solution: imp.title, prompt: imp.suggestedInstruction, steps: imp.actions,
+                            tryItOn: imp.tryItOn, signOfSuccess: imp.signOfSuccess)
+        }
+    }
+
+    private func categoryPage(_ d: ScoreCard.DimensionResult) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            label(d, fallback: nil)
+            ProblemSolution(problem: [d.saw ?? d.headline, d.impact ?? ""], evidence: d.evidence, solution: d.tryThis ?? "")
+        }
+    }
+}
+
 /// One category: name, plain question, verdict and score; a click opens what we saw, why it matters, what to try,
 /// and the evidence.
 struct CategoryRow: View {
@@ -287,8 +380,8 @@ struct CategoryRow: View {
             if expanded {
                 VStack(alignment: .leading, spacing: 12) {
                     if result.isReadable {
-                        LabeledRows(rows: [("What we saw", result.saw ?? ""), ("Why it matters", result.impact ?? ""),
-                                           ("Try this", result.tryThis ?? "")], boldLast: true)
+                        ProblemSolution(problem: [result.saw ?? "", result.impact ?? ""], evidence: result.evidence,
+                                        solution: result.tryThis ?? "", strong: result.band == .strong)
                     } else {
                         // A category from an older card inside a readable one: its reason as written.
                         Text(markdown(result.reason)).scaledFont(13).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
@@ -304,7 +397,7 @@ struct CategoryRow: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(Theme.color(for: .bottleneck).opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
                     }
-                    EvidenceChips(evidence: result.evidence)
+                    if !result.isReadable { EvidenceChips(evidence: result.evidence) }
                     if let footer { footer }
                 }
                 .padding(.leading, 2)
@@ -323,27 +416,138 @@ private struct Heading: View {
     }
 }
 
-/// "What we saw / Why it matters / Try this": a grey label column and the text. Empty rows are left out.
-private struct LabeledRows: View {
-    var rows: [(String, String)]
-    var muted = false
-    var boldLast = false
+/// Problem and Solution: the one structure every fix and category uses.
+/// Problem is what happened and what it cost, as one paragraph, with the sessions it comes from.
+/// Solution is the fix in one line; when there is more, tabs hold the prompt to paste and the steps.
+/// For a strong category the labels read "What's working" and "Next step".
+private struct ProblemSolution: View {
+    /// Sentences joined into one paragraph; empty ones are left out.
+    var problem: [String]
+    var evidence: [ScoreCard.Evidence] = []
+    var solution: String
+    var prompt: String? = nil
+    var steps: [String] = []
+    var tryItOn: String? = nil
+    var signOfSuccess: String? = nil
+    var strong = false
+
+    private enum Tab: String, CaseIterable { case prompt = "Prompt", steps = "Steps" }
+    @State private var tab: Tab = .prompt
+
+    private var problemText: String {
+        problem.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.joined(separator: " ")
+    }
+    /// The problem as bullets, one sentence each.
+    private var problemPoints: [String] { sentences(problemText) }
+    private var hasPrompt: Bool { !(prompt ?? "").trimmingCharacters(in: .whitespaces).isEmpty }
+    private var hasSteps: Bool { !steps.isEmpty || !(tryItOn ?? "").isEmpty || !(signOfSuccess ?? "").isEmpty }
 
     var body: some View {
-        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 16, verticalSpacing: 8) {
-            let shown = rows.filter { !$0.1.trimmingCharacters(in: .whitespaces).isEmpty }
-            ForEach(Array(shown.enumerated()), id: \.offset) { i, row in
-                GridRow {
-                    Text(row.0).scaledFont(13).foregroundStyle(Theme.muted).gridColumnAlignment(.leading)
-                        .frame(minWidth: 110, alignment: .leading)
-                    Text(inline(row.1))
-                        .scaledFont(14, weight: boldLast && i == shown.count - 1 ? .semibold : .regular)
-                        .foregroundStyle(muted ? Theme.muted : Theme.ink)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 16) {
+            if !problemText.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    PartLabel(text: strong ? "What's working" : "Problem",
+                              symbol: strong ? "checkmark.circle.fill" : "exclamationmark.triangle.fill", color: problemColor)
+                    VStack(alignment: .leading, spacing: 5) {
+                        ForEach(Array(problemPoints.enumerated()), id: \.offset) { _, point in
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Text("•").foregroundStyle(problemColor)
+                                Text(inline(point)).fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                    .scaledFont(14)
+                    .foregroundStyle(Theme.ink)
+                    EvidenceChips(evidence: evidence)
                 }
+                .modifier(PartPanel(color: problemColor))
+            }
+            if !solution.isEmpty || hasPrompt || hasSteps {
+                VStack(alignment: .leading, spacing: 8) {
+                    PartLabel(text: strong ? "Next step" : "Solution",
+                              symbol: strong ? "arrow.up.right.circle.fill" : "lightbulb.fill", color: solutionColor)
+                    if !solution.isEmpty {
+                        Text(inline(solution)).scaledFont(15, weight: .semibold).foregroundStyle(Theme.ink)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if hasPrompt && hasSteps {
+                        // Drawn tabs rather than a segmented Picker, so they also render in snapshots.
+                        HStack(spacing: 4) {
+                            ForEach(Tab.allCases, id: \.self) { t in
+                                Button { tab = t } label: {
+                                    Text(t.rawValue)
+                                        .scaledFont(13, weight: .semibold)
+                                        .padding(.horizontal, 12).padding(.vertical, 4)
+                                        .foregroundStyle(tab == t ? Theme.paper : Theme.muted)
+                                        .background(tab == t ? Theme.ink : Color.clear, in: Capsule())
+                                        .contentShape(Capsule())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(3)
+                        .background(Theme.rule.opacity(0.5), in: Capsule())
+                        .padding(.top, 2)
+                    }
+                    if hasPrompt && (tab == .prompt || !hasSteps) {
+                        CopyBox(caption: "Paste this into your context file or prompt", text: prompt!)
+                    } else if hasSteps {
+                        stepsView
+                    }
+                }
+                .modifier(PartPanel(color: solutionColor))
             }
         }
+    }
+
+    private var problemColor: Color { strong ? Theme.color(for: .strong) : Theme.color(for: .bottleneck) }
+    private var solutionColor: Color { strong ? Theme.accent : Theme.color(for: .strong) }
+
+    private var stepsView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(steps.enumerated()), id: \.offset) { i, step in
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text("\(i + 1)").scaledFont(13, weight: .bold).foregroundStyle(Theme.accent).frame(width: 14)
+                    Text(inline(step)).scaledFont(14).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            if let tryItOn, !tryItOn.isEmpty {
+                Text(inline("Try it on: " + tryItOn)).scaledFont(13).foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true).padding(.top, 2)
+            }
+            if let signOfSuccess, !signOfSuccess.isEmpty {
+                Text(inline("You'll know it worked when: " + signOfSuccess)).scaledFont(13).foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+/// "Problem" / "Solution": a small bold label in the part's color, with its symbol.
+private struct PartLabel: View {
+    var text: String
+    var symbol: String
+    var color: Color
+    var body: some View {
+        Label(text, systemImage: symbol)
+            .scaledFont(13, weight: .bold)
+            .foregroundStyle(color)
+    }
+}
+
+/// The panel behind Problem or Solution: a light tint of the part's color, so the two read as separate
+/// blocks at a glance.
+private struct PartPanel: ViewModifier {
+    var color: Color
+    func body(content: Content) -> some View {
+        content
+            .padding(.vertical, 12)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(color.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
     }
 }
 
@@ -371,7 +575,7 @@ private struct CopyBox: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.paper, in: RoundedRectangle(cornerRadius: 10))
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 10))
     }
 }
 
@@ -389,8 +593,8 @@ private struct EvidenceChips: View {
                             open = open == i ? nil : i
                         } label: {
                             Text(e.label)
-                                .scaledFont(12, weight: .medium)
-                                .padding(.horizontal, 10).padding(.vertical, 4)
+                                .scaledFont(11, weight: .medium)
+                                .padding(.horizontal, 8).padding(.vertical, 3)
                                 .foregroundStyle(open == i ? Theme.paper : Theme.ink)
                                 .background(open == i ? Theme.ink : Theme.rule.opacity(0.6), in: Capsule())
                         }
@@ -409,6 +613,25 @@ private struct EvidenceChips: View {
             }
         }
     }
+}
+
+/// Splits text into sentences for bullets. Text inside `backticks` is never split.
+func sentences(_ text: String) -> [String] {
+    // Mask sentence punctuation inside code so file names like `CLAUDE.md` stay whole.
+    var chars = Array(text), code = false
+    for i in chars.indices {
+        if chars[i] == "`" { code.toggle() } else if code && (chars[i] == "." || chars[i] == "!" || chars[i] == "?") { chars[i] = "\u{2024}" }
+    }
+    let masked = String(chars)
+    let tokenizer = NLTokenizer(unit: .sentence)
+    tokenizer.string = masked
+    var out: [String] = []
+    tokenizer.enumerateTokens(in: masked.startIndex..<masked.endIndex) { range, _ in
+        let s = masked[range].trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "\u{2024}", with: ".")
+        if !s.isEmpty { out.append(s) }
+        return true
+    }
+    return out.isEmpty ? [text] : out
 }
 
 /// Readable fields are plain text with `code` in backticks; render only that, so stray asterisks stay literal.

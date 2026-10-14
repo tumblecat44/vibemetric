@@ -32,6 +32,7 @@ enum JSONSchema {
         let schema = object([
             "language": str,
             "diagnosis": str,
+            "summary": array(str, min: 2, max: 3),
             "dimensions": array(dimension, min: 10, max: 10),
             "improvement": object([
                 "title": str, "situation": str,
