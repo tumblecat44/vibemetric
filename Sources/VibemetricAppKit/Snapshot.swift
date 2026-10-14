@@ -68,7 +68,8 @@ enum Snapshot {
     @MainActor
     private static func render(_ view: some View, scheme: ColorScheme) throws -> Data {
         let renderer = ImageRenderer(content: view)
-        renderer.scale = 1
+        // VIBEMETRIC_SNAPSHOT_SCALE=2 renders at Retina resolution, for README and website images.
+        renderer.scale = ProcessInfo.processInfo.environment["VIBEMETRIC_SNAPSHOT_SCALE"].flatMap(Double.init) ?? 1
         // NSColor dynamic providers resolve against the current appearance, so set it explicitly.
         NSApplication.shared.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
         var data: Data?
