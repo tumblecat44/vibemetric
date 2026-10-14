@@ -80,7 +80,7 @@ struct ReadableCardContent: View {
 
     // MARK: What to fix: the first fix, then the other weak categories, one page at a time
 
-    private var fixFirst: some View { FixCarousel(card: card) }
+    private var fixFirst: some View { FixCarousel(card: card, footer: deepDiveFooter) }
 
     // MARK: At a glance: the best and weakest categories, one line each
 
@@ -208,6 +208,8 @@ struct ReadableCardContent: View {
 /// first (the same order as the menu bar). One page at a time, moved with the arrows, the dots or the arrow keys.
 struct FixCarousel: View {
     var card: ScoreCard
+    /// Shown under each page's Solution for that page's category (the Pro deep dive in official builds).
+    var footer: ((VibemetricCore.Dimension) -> AnyView)? = nil
     @State private var page = 0
     /// The row's width, measured; the first layout uses a typical window width.
     @State private var width: CGFloat = 756
@@ -313,6 +315,7 @@ struct FixCarousel: View {
             ProblemSolution(problem: [imp.situation, imp.impact ?? ""], evidence: imp.evidence ?? [],
                             solution: imp.title, prompt: imp.suggestedInstruction, steps: imp.actions,
                             tryItOn: imp.tryItOn, signOfSuccess: imp.signOfSuccess)
+            if let dimension = imp.dimension, let footer { footer(dimension) }
         }
     }
 
@@ -320,6 +323,7 @@ struct FixCarousel: View {
         VStack(alignment: .leading, spacing: 16) {
             label(d, fallback: nil)
             ProblemSolution(problem: [d.saw ?? d.headline, d.impact ?? ""], evidence: d.evidence, solution: d.tryThis ?? "")
+            if let footer { footer(d.dimension) }
         }
     }
 }
