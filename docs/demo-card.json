@@ -1,0 +1,223 @@
+{
+  "language": "en",
+  "diagnosis": "Your AI does solid work, but you rarely make it prove the work is done.",
+  "summary": [
+    "Your AI does careful, solid work with the tools you set up.",
+    "But it often says done without running your tests.",
+    "Start by asking it to run the tests after every change."
+  ],
+  "dimensions": [
+    {
+      "dimension": "planning_specs",
+      "score": 6,
+      "status": "scored",
+      "headline": "You usually say what you want, rarely how to check it",
+      "saw": "Most big tasks start with a clear goal. Few say how you'll know it's done.",
+      "impact": "Two features were rebuilt after you saw the result.",
+      "tryThis": "Add pass/fail checks to every task bigger than one file.",
+      "evidence": [
+        {
+          "tool": "claude",
+          "sessionId": "cc-demo",
+          "date": "2026-10-09",
+          "note": "Login flow rebuilt after review",
+          "project": "pantry-app"
+        }
+      ],
+      "changeReason": null
+    },
+    {
+      "dimension": "context_engineering",
+      "score": 8,
+      "status": "scored",
+      "headline": "Your main projects tell the AI what it needs",
+      "saw": "acme-api and pantry-app both have a short, current CLAUDE.md. The AI follows them without reminders.",
+      "impact": "You rarely repeat setup instructions in chat.",
+      "tryThis": "Add a CLAUDE.md to your two smaller projects.",
+      "evidence": [
+        {
+          "tool": "claude",
+          "sessionId": "cc-demo",
+          "date": "2026-10-11",
+          "note": "Followed test and lint commands from CLAUDE.md",
+          "project": "acme-api"
+        }
+      ],
+      "changeReason": null
+    },
+    {
+      "dimension": "memory_knowledge",
+      "score": 7,
+      "status": "scored",
+      "headline": "Saved rules mostly stick",
+      "saw": "You save useful rules, and later sessions use them.",
+      "impact": "Fewer repeated instructions across projects.",
+      "tryThis": "Review saved memory once a month and delete what's stale.",
+      "evidence": [],
+      "changeReason": null
+    },
+    {
+      "dimension": "tool_integration",
+      "score": 8,
+      "status": "scored",
+      "headline": "Recurring work runs through skills",
+      "saw": "Releases and reviews run through saved skills, so the AI never relearns them.",
+      "impact": "Repeat work takes minutes, not an afternoon.",
+      "tryThis": "Share your release skill with your team.",
+      "evidence": [],
+      "changeReason": null
+    },
+    {
+      "dimension": "task_mapping",
+      "score": 6,
+      "status": "scored",
+      "headline": "Big tasks are split, but handoffs are loose",
+      "saw": "Large tasks get broken into steps. Outputs between steps are not checked.",
+      "impact": "One step built on a broken result.",
+      "tryThis": "Name each step's output and check it before the next one.",
+      "evidence": [],
+      "changeReason": null
+    },
+    {
+      "dimension": "feedback_loops",
+      "score": 5,
+      "status": "scored",
+      "headline": "Failures get fixed, but nothing changes the loop",
+      "saw": "Failed checks get fixed and rerun. The same failures come back the next week.",
+      "impact": "You spend time on the same fixes.",
+      "tryThis": "Turn a repeated failure into a saved rule or check.",
+      "evidence": [],
+      "changeReason": null
+    },
+    {
+      "dimension": "testing_evals",
+      "score": 3,
+      "status": "scored",
+      "headline": "The AI says done without testing",
+      "saw": "The AI changed code 23 times last week. It never ran your tests once. You caught three breakages yourself, a day later.",
+      "impact": "Bugs reach you instead of the tests.",
+      "tryThis": "Make the AI run the tests after every change.",
+      "evidence": [
+        {
+          "tool": "claude",
+          "sessionId": "cc-demo",
+          "date": "2026-10-12",
+          "note": "23 edits, no test run, then reported done",
+          "project": "acme-api"
+        },
+        {
+          "tool": "claude",
+          "sessionId": "cc-demo",
+          "date": "2026-10-10",
+          "note": "Broken checkout found the next day",
+          "project": "pantry-app"
+        }
+      ],
+      "changeReason": null
+    },
+    {
+      "dimension": "human_steering",
+      "score": 7,
+      "status": "scored",
+      "headline": "You redirect the AI with clear reasons",
+      "saw": "You stop the AI when it drifts and explain why.",
+      "impact": "Work comes back on track quickly.",
+      "tryThis": "Check that your correction actually took effect.",
+      "evidence": [],
+      "changeReason": null
+    },
+    {
+      "dimension": "security",
+      "score": 4,
+      "status": "scored",
+      "headline": "The AI can do more than each task needs",
+      "saw": "Every session runs with all permissions. Your `.env` file with live keys is readable.",
+      "impact": "One wrong command could leak a key or delete data.",
+      "tryThis": "Allow only the commands each task needs, and block `.env`.",
+      "evidence": [
+        {
+          "tool": "claude",
+          "sessionId": "cc-demo",
+          "date": "2026-10-08",
+          "note": "All permissions on, .env readable",
+          "project": "acme-api"
+        }
+      ],
+      "changeReason": null
+    },
+    {
+      "dimension": "efficiency_cost",
+      "score": 3,
+      "status": "scored",
+      "headline": "Small tasks run on your biggest model",
+      "saw": "Renames, typo fixes and formatting all ran on your most expensive model. That was about a third of last week's spend.",
+      "impact": "You pay top prices for work a smaller model does just as well.",
+      "tryThis": "Send small edits to a cheaper subagent.",
+      "evidence": [
+        {
+          "tool": "claude",
+          "sessionId": "cc-demo",
+          "date": "2026-10-11",
+          "note": "Typo fix on the top model",
+          "project": "pantry-app"
+        }
+      ],
+      "changeReason": null
+    }
+  ],
+  "improvement": {
+    "title": "Make the AI run your tests after every change",
+    "dimension": "testing_evals",
+    "situation": "The AI changed code 23 times last week. It never ran your tests once. You caught three breakages yourself, a day later.",
+    "impact": "Bugs reach you instead of the tests.",
+    "actions": [
+      "Add a definition of done to CLAUDE.md.",
+      "Ask for the test output before the AI says done.",
+      "If a test fails, have it fix and rerun before stopping."
+    ],
+    "suggestedInstruction": "Add this to CLAUDE.md under \"Definition of done\": After every code change, run `npm test` and show me the output. If anything fails, fix it and run the tests again. Don't say done until they pass.",
+    "signOfSuccess": "Test output appears before every \"done\".",
+    "tryItOn": "Your next change to acme-api.",
+    "evidence": [
+      {
+        "tool": "claude",
+        "sessionId": "cc-demo",
+        "date": "2026-10-12",
+        "note": "23 edits, no test run, then reported done",
+        "project": "acme-api"
+      }
+    ],
+    "count": 23,
+    "countLabel": "code changes never tested"
+  },
+  "followUp": null,
+  "deductions": [],
+  "roadmap": [
+    {
+      "stage": 1,
+      "change": "Tests run after every change.",
+      "result": "Fewer bugs reach you."
+    },
+    {
+      "stage": 2,
+      "change": "Small tasks go to a cheaper model.",
+      "result": "Lower spend, same quality."
+    }
+  ],
+  "scope": {
+    "assessedAt": "2026-10-14",
+    "timeZone": "America/Los_Angeles",
+    "recordDates": [
+      {
+        "tool": "claude",
+        "from": "2026-09-14",
+        "to": "2026-10-14",
+        "sessions": 64
+      }
+    ],
+    "sessionsExamined": 64,
+    "tasksCheckedInDetail": 18,
+    "elapsedMinutes": 0,
+    "limits": []
+  }
+}
