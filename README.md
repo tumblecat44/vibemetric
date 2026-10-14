@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-6e5aff?style=flat-square)](LICENSE)
 [![Site](https://img.shields.io/badge/site-vibemetric.app-d9592a?style=flat-square)](https://www.vibemetric.app)
 
-<a href="https://www.vibemetric.app"><img src="https://firebasestorage.googleapis.com/v0/b/vibemetric-46d39.firebasestorage.app/o/readme%2Fvibemetric-banner.png?alt=media&token=0d0968f4-79c6-47dd-bac3-9ea1d72eaf66" alt="Vibemetric — supercharge your vibe coding. Ship faster, build better, spend less." width="100%" /></a>
+<a href="https://www.vibemetric.app"><img src="https://firebasestorage.googleapis.com/v0/b/vibemetric-46d39.firebasestorage.app/o/readme%2Fvibemetric-banner-2026-10-14.png?alt=media&token=ac7b5105-e446-44c8-a9ad-099ac7bf3d67" alt="Vibemetric — supercharge your vibe coding. Ship faster, build better, spend less." width="100%" /></a>
 
 Tiny native macOS app that reads the **Claude Code and Codex sessions already on your Mac** and tells you, in plain words, **what's holding your AI coding back and how to fix it**. You get a score out of 100 across 10 skills, the problems it found in your real sessions, and a fix you can paste. It lives in your menu bar and rescores every day, so you can see whether a change actually helped.
 
