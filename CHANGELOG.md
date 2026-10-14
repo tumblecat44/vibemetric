@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1 (2026-10-14)
+
+- Each fix in "What to fix" can take an optional module's action under its Solution; the official app shows "Run deep dive" there.
+- Official app: without Pro, "Run deep dive" asks for an API key or links to Pro instead of jumping to Settings, and starts the deep dive once a key is added.
+
 ## 0.3.0 (2026-10-14)
 
 - Every fix and category shows two parts: **Problem**, as short bullets with the sessions it comes from, and **Solution**, with the fix in one line and Prompt and Steps tabs.
