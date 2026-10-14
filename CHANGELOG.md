@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 (2026-10-14)
+
+- Every fix and category shows two parts: **Problem**, as short bullets with the sessions it comes from, and **Solution**, with the fix in one line and Prompt and Steps tabs.
+- The summary at the top of the score is smaller and, on new scores, written as 2–3 plain-language bullets.
+- Menu bar: two problems, each with its fix, and the full problem sentence instead of a count.
+- Main window: what to fix is a carousel, with the next fix showing at the edge.
+- New scores describe problems in plain words: what happened, how often and what it cost, without jargon or praise mixed in.
+
 ## 0.2.0 (2026-10-13)
 
 - Vibemetric is open source under the MIT license. This repository has the complete free app.
