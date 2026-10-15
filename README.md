@@ -1,4 +1,4 @@
-# Vibemetric 🎯 — See what you're doing wrong in AI coding.
+# Vibemetric 🎯 — Find out your biggest mistakes in AI coding.
 
 > Your report card for vibe coding, in your menu bar.
 
@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-6e5aff?style=flat-square)](LICENSE)
 [![Site](https://img.shields.io/badge/site-vibemetric.app-d9592a?style=flat-square)](https://www.vibemetric.app)
 
-<a href="https://www.vibemetric.app"><img src="https://firebasestorage.googleapis.com/v0/b/vibemetric-46d39.firebasestorage.app/o/readme%2Fvibemetric-banner-see-2026-10-14.png?alt=media&token=eae5e8b3-76d1-4504-b693-c2dde13a07c1" alt="Vibemetric — supercharge your vibe coding. Ship faster, build better, spend less." width="100%" /></a>
+<a href="https://www.vibemetric.app"><img src="https://firebasestorage.googleapis.com/v0/b/vibemetric-46d39.firebasestorage.app/o/readme%2Fvibemetric-banner-find-2026-10-14.png?alt=media&token=9cab715a-e843-45d5-9cf3-f95da200709d" alt="Vibemetric — supercharge your vibe coding. Ship faster, build better, spend less." width="100%" /></a>
 
 Tiny native macOS app that reads the **Claude Code and Codex sessions already on your Mac** and tells you, in plain words, **what's holding your AI coding back and how to fix it**. You get a score out of 100 across 10 skills, the problems it found in your real sessions, and a fix you can paste. It lives in your menu bar and rescores every day, so you can see whether a change actually helped.
 
