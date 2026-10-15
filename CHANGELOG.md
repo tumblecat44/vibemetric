@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.2 (2026-10-15)
+
+- Details page: the fixes are headed "Problems (1/9)", with larger previous and next arrows right beside the heading. Section titles are larger and bolder.
+- Menu bar: the popover has a nearly solid background, so its text stays readable over busy windows.
+- Official app: "Run deep dive" opens the Categories tab and shows the deep dive's live progress there, with elapsed time, Cancel and a log of what the engine reads.
+- Official app: the deep dive key sheet leads with "Get Pro: 7-day free trial", with the key field below for people who already have one.
+
 ## 0.3.1 (2026-10-14)
 
 - Each fix in "What to fix" can take an optional module's action under its Solution; the official app shows "Run deep dive" there.
