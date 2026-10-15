@@ -222,10 +222,11 @@ struct FixCarousel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Heading(text: page == 0 ? "Fix this first" : "Also fix")
-                Spacer()
+            // "Problems (1/7)" with the arrows right beside it, so they're found where the eye already is.
+            HStack(alignment: .center, spacing: 10) {
+                Heading(text: count > 1 ? "Problems (\(page + 1)/\(count))" : "Problems")
                 if count > 1 { navigation }
+                Spacer()
             }
             // Measures the row's width; the cards themselves are wider than it in total.
             Color.clear.frame(maxWidth: .infinity).frame(height: 0)
@@ -271,15 +272,16 @@ struct FixCarousel: View {
     }
 
     private var navigation: some View {
-        HStack(spacing: 8) {
-            Text("\(page + 1) of \(count)").scaledFont(12).monospacedDigit().foregroundStyle(Theme.muted)
-            Button { go(-1) } label: { Image(systemName: "chevron.left") }
-                .help("Previous")
-            Button { go(1) } label: { Image(systemName: "chevron.right") }
-                .help("Next")
+        HStack(spacing: 6) {
+            Button { go(-1) } label: { Image(systemName: "chevron.left").fontWeight(.semibold) }
+                .help("Previous problem")
+                .disabled(page == 0)
+            Button { go(1) } label: { Image(systemName: "chevron.right").fontWeight(.semibold) }
+                .help("Next problem")
+                .disabled(page == count - 1)
         }
         .buttonStyle(.bordered)
-        .controlSize(.small)
+        .controlSize(.regular)
     }
 
     private var dots: some View {
@@ -293,7 +295,7 @@ struct FixCarousel: View {
                         .frame(width: i == page ? 18 : 7, height: 7)
                 }
                 .buttonStyle(.plain)
-                .help(i == 0 ? "Fix this first" : others[i - 1].dimension.title)
+                .help(i == 0 ? "Problem 1" : others[i - 1].dimension.title)
             }
         }
         .frame(maxWidth: .infinity)
@@ -413,10 +415,15 @@ struct CategoryRow: View {
 }
 
 /// Small grey section heading.
+/// A section title ("Problems", "Going well", "All 10 categories"): large and dark, with a short accent bar
+/// before it, so the page reads as a few clear sections at a glance.
 private struct Heading: View {
     var text: String
     var body: some View {
-        Text(text.uppercased()).scaledFont(12, weight: .semibold).tracking(0.6).foregroundStyle(Theme.muted)
+        HStack(spacing: 8) {
+            RoundedRectangle(cornerRadius: 2).fill(Theme.accent).frame(width: 4, height: 18)
+            Text(text).scaledFont(18, weight: .bold).foregroundStyle(Theme.ink)
+        }
     }
 }
 
