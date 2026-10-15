@@ -123,8 +123,5 @@ private struct StatusPanelRoot: View {
             .environment(model)
             // The panel drops from the menu bar, so it can't grow with the main window's zoom.
             .environment(\.textScale, min(textScale, Self.maxScale))
-            // NSPopover's own material is very see-through; a nearly solid window color keeps the text readable
-            // over busy windows, in light and dark mode alike.
-            .background(Color(nsColor: .windowBackgroundColor).opacity(0.94).ignoresSafeArea())
     }
 }
