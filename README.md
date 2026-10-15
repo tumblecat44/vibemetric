@@ -14,7 +14,7 @@
 Tiny native macOS app that reads the **Claude Code and Codex sessions already on your Mac** and tells you, in plain words, **what's holding your AI coding back and how to fix it**. You get a score out of 100 across 10 skills, the problems it found in your real sessions, and a fix you can paste. It lives in your menu bar and rescores every day, so you can see whether a change actually helped.
 
 <p align="center">
-  <img src="https://firebasestorage.googleapis.com/v0/b/vibemetric-46d39.firebasestorage.app/o/readme%2Fvibemetric-menubar-2026-10-14.png?alt=media&token=7f552408-da44-4a78-89d9-7cf70ef5b6eb" alt="Vibemetric menu bar popover: the two most urgent problems with their fixes, and the score" width="420" />
+  <img src="https://firebasestorage.googleapis.com/v0/b/vibemetric-46d39.firebasestorage.app/o/readme%2Fvibemetric-menubar-full-2026-10-14.png?alt=media&token=013e2bb8-40f1-43ff-8914-012ac9f41afc" alt="Vibemetric in the Mac menu bar, its popover open: the two most urgent problems with their fixes, and the score" width="420" />
 </p>
 
 <img src="https://firebasestorage.googleapis.com/v0/b/vibemetric-46d39.firebasestorage.app/o/readme%2Fvibemetric-window.png?alt=media&token=8783440e-3935-4cef-8e9c-dc87b12d434f" alt="Vibemetric main window: a plain-language summary, then Fix this first with the Problem and the Solution, ready to paste" width="100%" />
