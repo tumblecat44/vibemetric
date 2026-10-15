@@ -17,7 +17,7 @@ Tiny native macOS app that reads the **Claude Code and Codex sessions already on
   <img src="https://firebasestorage.googleapis.com/v0/b/vibemetric-46d39.firebasestorage.app/o/readme%2Fvibemetric-menubar-full-2026-10-14.png?alt=media&token=013e2bb8-40f1-43ff-8914-012ac9f41afc" alt="Vibemetric in the Mac menu bar, its popover open: the two most urgent problems with their fixes, and the score" width="420" />
 </p>
 
-<img src="https://firebasestorage.googleapis.com/v0/b/vibemetric-46d39.firebasestorage.app/o/readme%2Fvibemetric-window.png?alt=media&token=8783440e-3935-4cef-8e9c-dc87b12d434f" alt="Vibemetric main window: a plain-language summary, then Fix this first with the Problem and the Solution, ready to paste" width="100%" />
+<img src="https://firebasestorage.googleapis.com/v0/b/vibemetric-46d39.firebasestorage.app/o/readme%2Fvibemetric-window-real-2026-10-14.png?alt=media&token=60606b86-8759-41e1-b5d3-dc8c1e49c577" alt="Vibemetric main window: past results in the sidebar, a plain-language summary, then Fix this first with the Problem and the Solution, ready to paste" width="100%" />
 
 <sub>The main window shows a fictional demo score.</sub>
 
