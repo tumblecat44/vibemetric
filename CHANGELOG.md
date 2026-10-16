@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.4 (2026-10-16)
+
+- Details page: the fixes are headed "Issues (1/9)" instead of "Problems".
+- Official app: under each Solution, a "Go deeper" panel says what a deep dive adds (the root cause with examples from your sessions, a step-by-step fix for your projects, and a ready-to-paste prompt) next to Run deep dive. Once a category has a deep dive on that score, it shows "View your deep dive" with a small "Run again".
+
 ## 0.3.3 (2026-10-16)
 
 - Every problem's Solution is now a plain bullet list, laid out like Problem: what to change and where, how to try it on your next task, and how you'll know it worked. New scores write these steps for every category below 10; older scores show the one-line fix.
