@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.3 (2026-10-16)
+
+- Every problem's Solution is now a plain bullet list, laid out like Problem: what to change and where, how to try it on your next task, and how you'll know it worked. New scores write these steps for every category below 10; older scores show the one-line fix.
+- The Prompt and Steps tabs are gone, and every problem card has the same plain border.
+- Official app: deep dives focus on one bottleneck: where you're stuck, why, the fix with text to copy, what to do next time, and the sessions behind it. Cause details fold away, with animation that respects Reduce Motion.
+- Official app: up to five deep dives can run at once.
+- Official app: "Run deep dive again" on the same score asks first, since it reads the same saved evidence; score again to see the effect of your changes.
+
 ## 0.3.2 (2026-10-15)
 
 - Details page: the fixes are headed "Problems (1/9)", with larger previous and next arrows right beside the heading. Section titles are larger and bolder.
