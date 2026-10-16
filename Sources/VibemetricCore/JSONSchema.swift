@@ -26,6 +26,7 @@ enum JSONSchema {
             "saw": str,
             "impact": str,
             "tryThis": ["type": ["string", "null"]],
+            "solutionSteps": array(str, max: 4),
             "evidence": array(evidence, max: 3),
             "changeReason": ["type": ["string", "null"]],
         ])
@@ -36,7 +37,7 @@ enum JSONSchema {
             "dimensions": array(dimension, min: 10, max: 10),
             "improvement": object([
                 "title": str, "situation": str,
-                "actions": array(str, min: 2, max: 3),
+                "actions": array(str, min: 3, max: 4),
                 "suggestedInstruction": ["type": ["string", "null"]],
                 "signOfSuccess": str, "tryItOn": str,
                 "dimension": dimensionID,
