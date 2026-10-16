@@ -109,6 +109,9 @@ public struct ScoreCard: Codable, Sendable {
         public var impact: String?
         /// One action that would move the score up; nil or empty at 10.
         public var tryThis: String?
+        /// The solution explained as 2–4 plain bullets: what to change, where, how to do it in the next task,
+        /// and how to tell it worked. nil on older cards, which show `tryThis` alone.
+        public var solutionSteps: [String]?
 
         /// True when the card carries the short readable fields.
         public var isReadable: Bool { saw?.isEmpty == false }
@@ -151,7 +154,7 @@ public struct ScoreCard: Codable, Sendable {
         public var band: Band? { score.map(Band.init(score:)) }
 
         enum CodingKeys: String, CodingKey {
-            case dimension, score, status, headline, reason, points, conclusion, evidence, changeReason, saw, impact, tryThis
+            case dimension, score, status, headline, reason, points, conclusion, evidence, changeReason, saw, impact, tryThis, solutionSteps
         }
 
         public init(from decoder: Decoder) throws {
@@ -167,17 +170,20 @@ public struct ScoreCard: Codable, Sendable {
             saw = try c.decodeIfPresent(String.self, forKey: .saw)
             impact = try c.decodeIfPresent(String.self, forKey: .impact)
             tryThis = try c.decodeIfPresent(String.self, forKey: .tryThis)
+            solutionSteps = try c.decodeIfPresent([String].self, forKey: .solutionSteps)
             reason = try c.decodeIfPresent(String.self, forKey: .reason)
                 ?? (points?.isEmpty == false || saw == nil
                     ? Self.compose(points: points ?? [], conclusion: conclusion)
-                    : Self.compose(saw: saw, impact: impact, tryThis: tryThis))
+                    : Self.compose(saw: saw, impact: impact, tryThis: tryThis, steps: solutionSteps ?? []))
         }
 
         /// The readable fields as one Markdown text, for the report and other single-block readers.
-        static func compose(saw: String?, impact: String?, tryThis: String?) -> String {
-            [("What we saw", saw), ("Why it matters", impact), ("Try this", tryThis)]
+        static func compose(saw: String?, impact: String?, tryThis: String?, steps: [String] = []) -> String {
+            var text = [("What we saw", saw), ("Why it matters", impact), ("Try this", tryThis)]
                 .compactMap { label, text in text.flatMap { $0.isEmpty ? nil : "**\(label):** \($0)" } }
                 .joined(separator: "\n\n")
+            if !steps.isEmpty { text += "\n\n" + steps.map { "- \($0)" }.joined(separator: "\n") }
+            return text
         }
 
         /// Points and conclusion as one Markdown text, for places that show a single block.

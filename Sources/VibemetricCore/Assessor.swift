@@ -323,7 +323,14 @@ public final class Assessor: Sendable {
         Never start with a label such as "Positive:", "Gap:", or "Problem:".
           - `impact`: why it matters, in one sentence: what it cost or gained in the person's actual work.
           - `tryThis`: one concrete action that reaches the next anchor, in one sentence starting with a verb; null at 10. \
-        For a `not_assessable` dimension, `saw` states the evidence limitation, `impact` says what would make it assessable, and `tryThis` is null.
+        The app shows it as the solution's title.
+          - `solutionSteps`: below 10, the solution explained as 2–4 bullets the app shows under that title. Together they say \
+        what to change and where (the file, setting, tool, or habit, named as in the person's own projects), how to do it in their \
+        next task, why it fixes the problem above, and how they will be able to tell it worked. Each bullet is one full, plain \
+        sentence of at most 25 words with a clear actor, and adds something the title does not already say. No pasted prompts, \
+        rubric terms, or "consider". An empty array at 10.
+        For a `not_assessable` dimension, `saw` states the evidence limitation, `impact` says what would make it assessable, \
+        `tryThis` is null, and `solutionSteps` is empty.
           - `evidence`: up to 3 references you verified: tool, full session id, date (YYYY-MM-DD), `project` (the project's short name; \
         when a session ran in a parent folder such as `Documents` or the home folder, name the project it worked on), \
         and `note`, one short line on what happened there, for example "12 edits, no test run, then reported done".
@@ -337,8 +344,10 @@ public final class Assessor: Sendable {
         For example: "The AI changed code 23 times last week. It never ran your tests once. You caught three breakages \
         yourself, a day later." or "You retyped the same rule, `use pnpm, never npm`, in 9 sessions. The AI still reached for npm \
         twice." `impact` is why it matters, one short sentence; the app adds it as the last bullet. \
-        `actions` are the 2–3 steps, one short sentence each. `suggestedInstruction` is the text to paste into the context file or prompt, \
-        written so it works as is. `tryItOn` names the task from the records to try it on; `signOfSuccess` is the observable sign it \
+        `actions` explain the solution under `title` as 3–4 bullets: what to change and where, how to do it in the next task, \
+        and why it fixes the problem. Each is one full, plain sentence of at most 25 words that adds something the title does \
+        not already say. `suggestedInstruction` is the text to paste into the context file or prompt, written so it works as is; \
+        the app does not show it yet, so put everything the person needs in `actions`. `tryItOn` names the task from the records to try it on; `signOfSuccess` is the observable sign it \
         helped. `evidence`: up to 3 references, as above. `count` and `countLabel` are the headline number the menu bar shows \
         for this problem: a count you verified in the records, and at most 6 words that complete it, for example 23 and \
         "agent edits never tested", or 9 and "times you repeated the same rule". Count the problem, not the good cases. \

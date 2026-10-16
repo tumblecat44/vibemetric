@@ -264,7 +264,7 @@ struct FixCarousel: View {
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(i == 0 ? Theme.accent : Theme.rule, lineWidth: i == 0 ? 1.5 : 1))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.rule, lineWidth: 1))
     }
 
     private func go(_ step: Int) {
@@ -315,7 +315,7 @@ struct FixCarousel: View {
         return VStack(alignment: .leading, spacing: 16) {
             if imp.dimension != nil { label(target, fallback: imp.dimension) }
             ProblemSolution(problem: [imp.situation, imp.impact ?? ""], evidence: imp.evidence ?? [],
-                            solution: imp.title, prompt: imp.suggestedInstruction, steps: imp.actions,
+                            solution: imp.title, steps: imp.actions,
                             tryItOn: imp.tryItOn, signOfSuccess: imp.signOfSuccess)
             if let dimension = imp.dimension, let footer { footer(dimension) }
         }
@@ -324,7 +324,8 @@ struct FixCarousel: View {
     private func categoryPage(_ d: ScoreCard.DimensionResult) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             label(d, fallback: nil)
-            ProblemSolution(problem: [d.saw ?? d.headline, d.impact ?? ""], evidence: d.evidence, solution: d.tryThis ?? "")
+            ProblemSolution(problem: [d.saw ?? d.headline, d.impact ?? ""], evidence: d.evidence, solution: d.tryThis ?? "",
+                            steps: d.solutionSteps ?? [])
             if let footer { footer(d.dimension) }
         }
     }
@@ -387,7 +388,8 @@ struct CategoryRow: View {
                 VStack(alignment: .leading, spacing: 12) {
                     if result.isReadable {
                         ProblemSolution(problem: [result.saw ?? "", result.impact ?? ""], evidence: result.evidence,
-                                        solution: result.tryThis ?? "", strong: result.band == .strong)
+                                        solution: result.tryThis ?? "", steps: result.solutionSteps ?? [],
+                                        strong: result.band == .strong)
                     } else {
                         // A category from an older card inside a readable one: its reason as written.
                         Text(markdown(result.reason)).scaledFont(13).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
@@ -477,10 +479,7 @@ private struct ProblemSolution: View {
                 VStack(alignment: .leading, spacing: 8) {
                     PartLabel(text: strong ? "Next step" : "Solution",
                               symbol: strong ? "arrow.up.right.circle.fill" : "lightbulb.fill", color: solutionColor)
-                    if !solution.isEmpty {
-                        Text(inline(solution)).scaledFont(15, weight: .semibold).foregroundStyle(Theme.ink)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                    if !solution.isEmpty || hasSteps { stepsView }
                     if hasPrompt && hasSteps {
                         // Drawn tabs rather than a segmented Picker, so they also render in snapshots.
                         HStack(spacing: 4) {
@@ -502,8 +501,6 @@ private struct ProblemSolution: View {
                     }
                     if hasPrompt && (tab == .prompt || !hasSteps) {
                         CopyBox(caption: "Paste this into your context file or prompt", text: prompt!)
-                    } else if hasSteps {
-                        stepsView
                     }
                 }
                 .modifier(PartPanel(color: solutionColor))
@@ -514,26 +511,26 @@ private struct ProblemSolution: View {
     private var problemColor: Color { strong ? Theme.color(for: .strong) : Theme.color(for: .bottleneck) }
     private var solutionColor: Color { strong ? Theme.accent : Theme.color(for: .strong) }
 
+    /// The solution as bullets, laid out like the problem's: its title first in bold, then how to do it,
+    /// where to try it, and how to tell it worked.
     private var stepsView: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(Array(steps.enumerated()), id: \.offset) { i, step in
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text("\(i + 1)").scaledFont(13, weight: .bold).foregroundStyle(Theme.accent).frame(width: 14)
-                    Text(inline(step)).scaledFont(14).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            if let tryItOn, !tryItOn.isEmpty {
-                Text(inline("Try it on: " + tryItOn)).scaledFont(13).foregroundStyle(Theme.muted)
-                    .fixedSize(horizontal: false, vertical: true).padding(.top, 2)
-            }
+        VStack(alignment: .leading, spacing: 5) {
+            if !solution.isEmpty { bullet(Text(inline(solution)).fontWeight(.semibold)) }
+            ForEach(Array(steps.enumerated()), id: \.offset) { _, step in bullet(Text(inline(step))) }
+            if let tryItOn, !tryItOn.isEmpty { bullet(Text("Try it on: ").fontWeight(.semibold) + Text(inline(tryItOn))) }
             if let signOfSuccess, !signOfSuccess.isEmpty {
-                Text(inline("You'll know it worked when: " + signOfSuccess)).scaledFont(13).foregroundStyle(Theme.muted)
-                    .fixedSize(horizontal: false, vertical: true)
+                bullet(Text("You'll know it worked when: ").fontWeight(.semibold) + Text(inline(signOfSuccess)))
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 10))
+        .scaledFont(14)
+        .foregroundStyle(Theme.ink)
+    }
+
+    private func bullet(_ text: Text) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("•").foregroundStyle(solutionColor)
+            text.fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 
