@@ -222,9 +222,9 @@ struct FixCarousel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // "Problems (1/7)" with the arrows right beside it, so they're found where the eye already is.
+            // "Issues (1/7)" with the arrows right beside it, so they're found where the eye already is.
             HStack(alignment: .center, spacing: 10) {
-                Heading(text: count > 1 ? "Problems (\(page + 1)/\(count))" : "Problems")
+                Heading(text: count > 1 ? "Issues (\(page + 1)/\(count))" : "Issues")
                 if count > 1 { navigation }
                 Spacer()
             }
@@ -274,10 +274,10 @@ struct FixCarousel: View {
     private var navigation: some View {
         HStack(spacing: 6) {
             Button { go(-1) } label: { Image(systemName: "chevron.left").fontWeight(.semibold) }
-                .help("Previous problem")
+                .help("Previous issue")
                 .disabled(page == 0)
             Button { go(1) } label: { Image(systemName: "chevron.right").fontWeight(.semibold) }
-                .help("Next problem")
+                .help("Next issue")
                 .disabled(page == count - 1)
         }
         .buttonStyle(.bordered)
@@ -295,7 +295,7 @@ struct FixCarousel: View {
                         .frame(width: i == page ? 18 : 7, height: 7)
                 }
                 .buttonStyle(.plain)
-                .help(i == 0 ? "Problem 1" : others[i - 1].dimension.title)
+                .help(i == 0 ? "Issue 1" : others[i - 1].dimension.title)
             }
         }
         .frame(maxWidth: .infinity)
@@ -417,7 +417,7 @@ struct CategoryRow: View {
 }
 
 /// Small grey section heading.
-/// A section title ("Problems", "Going well", "All 10 categories"): large and dark, with a short accent bar
+/// A section title ("Issues", "Going well", "All 10 categories"): large and dark, with a short accent bar
 /// before it, so the page reads as a few clear sections at a glance.
 private struct Heading: View {
     var text: String
