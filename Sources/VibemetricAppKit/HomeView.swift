@@ -184,6 +184,9 @@ struct PrivacyNote: View {
                     bullet("doc.text.magnifyingglass", "Vibemetric builds a short digest on this Mac and removes keys, tokens, and database URLs it recognizes.")
                     bullet("terminal", "Your selected engine sends assessment evidence to Anthropic or OpenAI using your own account. The engine saves the scoring session in its own history; Vibemetric leaves it out of later scores.")
                     bullet("lock", (["Vibemetric’s server never receives your transcripts."] + Extensions.privacyNotes).joined(separator: " "))
+                    if Analytics.isEnabled {
+                        bullet("chart.bar", "Anonymous usage counts, like app opens and each assessment’s engine, duration and score, go to Vibemetric’s analytics with a random ID. Turn them off in Settings → Usage Data.")
+                    }
                 }
                 .padding(.top, 4)
             }
