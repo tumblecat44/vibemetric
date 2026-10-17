@@ -1,10 +1,13 @@
 # Changelog
 
+## 0.3.5 (2026-10-16)
+
+- Scoring: permission bypass now affects Security only through its 1-point deduction, and not following last time's suggestion no longer lowers a score by itself.
+
 ## 0.3.4 (2026-10-16)
 
 - Details page: the fixes are headed "Issues (1/9)" instead of "Problems".
 - Official app: under each Solution, a "Go deeper" panel says what a deep dive adds (the root cause with examples from your sessions, a step-by-step fix for your projects, and a ready-to-paste prompt) next to Run deep dive. Once a category has a deep dive on that score, it shows "View your deep dive" with a small "Run again".
-- Scoring: permission bypass now affects Security only through its 1-point deduction, and not following last time's suggestion no longer lowers a score by itself.
 
 ## 0.3.3 (2026-10-16)
 
