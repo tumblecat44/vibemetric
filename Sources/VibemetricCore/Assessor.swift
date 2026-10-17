@@ -374,7 +374,9 @@ extension Assessor {
 
         A previous assessment from \(previousDate) is in `previous-card.json`, and `changes.md` lists the sessions and settings \
         that are new or changed since then. Score every dimension afresh from the records; do not start from or hold to the previous \
-        scores. A score may go up or down from last time. When it differs, say why in `changeReason`.
+        scores. A score may go up or down from last time. When it differs, say why in `changeReason`. \
+        Whether the person followed the previous improvement never raises or lowers a score by itself: an unchanged practice keeps \
+        the anchor level it earns, and a score moves only when the records show the practice itself changed.
 
         # Choosing the improvement after the previous one
 
