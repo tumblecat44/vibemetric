@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Scores finish within about 8 minutes, even with a long history. The scorer reads about 70 sessions in full: every session since your last score first, then the most telling ones for each category, then a spread across projects and dates. Counts and patterns still cover every session.
+- If a score is still reading at 6.5 minutes, Vibemetric asks it to stop and write the card from what it has read, instead of running until it times out. The card's scope notes when that happened.
+- The "low coverage" note compares the sessions read against that 70-session target.
+
 ## 0.4.0 (2026-10-18)
 
 - Official app: anonymous usage counts (installs, app opens, and each assessment's engine, model, session count, duration and score) help decide what to fix next. No transcripts, prompts, notes, paths or project names are sent. Turn it off in Settings → Usage Data.

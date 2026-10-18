@@ -211,8 +211,14 @@ public final class AppModel {
     var showsRunProgress = false
 
     var assessmentOptions: AssessmentOptions {
-        AssessmentOptions(engine: engine, model: engine == .claude ? model.alias : codexModel.modelID,
-                          instructions: UserDefaults.standard.string(forKey: Self.instructionsKey))
+        var options = AssessmentOptions(engine: engine, model: engine == .claude ? model.alias : codexModel.modelID,
+                                        instructions: UserDefaults.standard.string(forKey: Self.instructionsKey))
+        // Dev builds only: `defaults write app.vibemetric.dev debugWrapUpAfter 90` reaches the reading time limit early,
+        // to try the wrap-up on a short history.
+        if AppVariant.isDev, let seconds = preferences.object(forKey: "debugWrapUpAfter") as? Double, seconds > 0 {
+            options.wrapUpAfter = seconds
+        }
+        return options
     }
     var canStartAssessment: Bool {
         !isRunning && !isScanning && Extensions.currentBusyReason == nil && installations[engine] != nil && (summary?.total ?? 0) > 0
@@ -471,7 +477,7 @@ public final class AppModel {
                 Notifier.shared.scored(record, baseline: baseline)
                 phase = .ready
                 Analytics.capture("assessment_completed", runProperties.merging([
-                    "duration_s": Int(outcome.elapsed), "score": record.card.knownTotal, "sessions": scan.sessions.count,
+                    "duration_s": Int(outcome.elapsed), "wrapped_up": outcome.wrappedUp, "score": record.card.knownTotal, "sessions": scan.sessions.count,
                     "unknown_dimensions": record.card.unknownCount,
                 ]) { _, new in new })
             } catch is CancellationError {

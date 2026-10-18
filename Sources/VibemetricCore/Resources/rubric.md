@@ -4,7 +4,7 @@
 
 Assess how this person uses AI in real work. Return a diagnostic card that helps the person recognize their way of working with AI and choose useful changes to it. An unfamiliar reader, including a developer-tool maker, should understand the person's AI-use practices through concrete examples: how they direct and equip AI, judge its work, and intervene, and what those practices accomplish. Score those practices using the rubric below.
 
-Investigate available local AI conversation and execution records directly, without subagents. Choose your own investigation method. Aim to finish in about five minutes and examine at least 300 unique sessions where available, covering different projects and tools. If the available records or time are insufficient, report the actual scope; do not extend the investigation just to reach a quota. Favor connected evidence of actions and outcomes over large counts of loosely related events.
+Investigate available local AI conversation and execution records directly, without subagents. Choose your own investigation method. Aim to finish in about five minutes and read about 70 unique sessions in full where available, covering different projects, tools, and dates, plus every session since the previous assessment; use the record-wide summaries for counts across the whole history. If the available records or time are insufficient, report the actual scope; do not extend the investigation just to reach a quota. Favor connected evidence of actions and outcomes over large counts of loosely related events.
 
 Use this evidence-search procedure within the available time:
 

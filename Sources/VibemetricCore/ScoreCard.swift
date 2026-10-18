@@ -398,9 +398,9 @@ public struct ScoreCard: Codable, Sendable {
 
     public var unassessed: [DimensionResult] { ordered.filter { $0.score == nil } }
 
-    /// True when the judge read far fewer sessions than were available, so scores may miss evidence.
+    /// True when the judge read far fewer sessions than its reading target, so scores may miss evidence.
     public func isLowCoverage(sessionsAvailable: Int) -> Bool {
-        let expected = min(sessionsAvailable, 300)
+        let expected = min(sessionsAvailable, AssessmentOptions.readingTarget)
         return expected > 0 && Double(scope.sessionsExamined) < Double(expected) * 0.8
     }
 }

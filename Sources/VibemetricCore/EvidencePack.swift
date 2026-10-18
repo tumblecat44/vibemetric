@@ -10,7 +10,8 @@ public enum EvidencePack {
             .appendingPathComponent(isDev ? "Vibemetric Dev/packs" : "Vibemetric/packs", isDirectory: true)
     }
 
-    public static let maxDigests = 450
+    /// Digests written per pack. A score reads `AssessmentOptions.readingTarget` of them; the rest give it room to choose.
+    public static let maxDigests = 150
     static let digestCharLimit = 12_000
 
     /// The last saved assessment, so the judge can keep scores steady unless new evidence moves them.
@@ -28,7 +29,7 @@ public enum EvidencePack {
         try fm.createDirectory(at: dir.appendingPathComponent("sessions"), withIntermediateDirectories: true)
 
         // Only the chosen sessions are parsed again in full; everything else comes from the scan's summaries.
-        let chosen = select(scan.sessions)
+        let chosen = select(scan.sessions, since: previous?.date)
         var digestPaths: [String: String] = [:]
         var firstError: Error?
         let lock = NSLock()
@@ -95,14 +96,21 @@ public enum EvidencePack {
 
     // MARK: Selection
 
-    /// Keeps every session when under the cap; otherwise balances signal-rich, recent, and per-project coverage.
-    static func select(_ sessions: [SessionSummary]) -> [SessionSummary] {
+    /// Keeps every session when under the cap; otherwise sessions since the previous score first (up to half the cap),
+    /// then balances signal-rich, recent, and per-project coverage.
+    static func select(_ sessions: [SessionSummary], since: Date? = nil) -> [SessionSummary] {
         guard sessions.count > maxDigests else { return sessions }
         var picked: [String: SessionSummary] = [:]
+        if let since {
+            for s in sessions.reversed() where (s.end ?? .distantPast) > since && picked.count < maxDigests / 2 { picked[key(s)] = s }
+        }
         let byProject = Dictionary(grouping: sessions, by: { "\($0.tool.rawValue)/\($0.project)" })
-        // Up to 8 richest sessions per project so no project disappears.
-        for (_, group) in byProject {
-            for s in group.sorted(by: { richness($0) > richness($1) }).prefix(8) { picked[key(s)] = s }
+        // The richest sessions of every project so no project disappears: up to 8 each, fewer when there are many projects.
+        let perProject = max(1, min(8, (maxDigests / 2) / max(byProject.count, 1)))
+        for (_, group) in byProject.sorted(by: { $0.key < $1.key }) {
+            for s in group.sorted(by: { (richness($0), $0.file.path) > (richness($1), $1.file.path) }).prefix(perProject) where picked.count < maxDigests {
+                picked[key(s)] = s
+            }
         }
         // Then the richest overall, then the most recent, until the cap.
         for s in sessions.sorted(by: { richness($0) > richness($1) }) where picked.count < maxDigests * 3 / 4 { picked[key(s)] = s }

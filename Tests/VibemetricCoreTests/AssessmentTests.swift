@@ -163,6 +163,46 @@ struct AssessmentTests {
         #expect(Date().timeIntervalSince(started) < 4)
     }
 
+    @Test(arguments: AssessmentEngine.allCases)
+    func aRunPastItsReadingTimeIsFinishedFromItsSavedSession(_ engine: AssessmentEngine) async throws {
+        let fixture = try CLIFixture(mode: "slow-first")
+        defer { fixture.remove() }
+        let assessor = Assessor(installation: CLIInstallation(executable: fixture.command))
+        var options = AssessmentOptions(engine: engine)
+        options.timeout = 10
+        let events = Events()
+        let started = Date()
+        let raw = try await assessor.runStructured(prompt: "Score this", schema: JSONSchema.scoreCard, packDir: fixture.directory,
+                                                   sources: [], options: options, wrapUp: (0.5, Assessor.wrapUpPrompt)) { events.append($0) }
+        #expect(raw.wrappedUp)
+        #expect(raw.sessionID == CLIFixture.forkID)
+        #expect(Date().timeIntervalSince(started) < 5)
+        #expect(events.texts.contains { $0.contains("Time limit reached") })
+        let prompt = try String(contentsOf: fixture.directory.appendingPathComponent("received-prompt.txt"), encoding: .utf8)
+        #expect(prompt.contains("Time is up for reading"))
+        let args = try String(contentsOf: fixture.directory.appendingPathComponent("received-arguments.txt"), encoding: .utf8)
+        #expect(args.contains(engine == .claude ? "--resume\n\(CLIFixture.sessionID)\n--fork-session" : "fork\n\(CLIFixture.sessionID)"))
+    }
+
+    @Test func aRunWithoutASavedSessionStillTimesOut() async throws {
+        let fixture = try CLIFixture(mode: "slow-unsaved")
+        defer { fixture.remove() }
+        let assessor = Assessor(installation: CLIInstallation(executable: fixture.command))
+        var options = AssessmentOptions(engine: .claude)
+        options.timeout = 10
+        await #expect(throws: AssessmentError.self) {
+            try await assessor.runStructured(prompt: "Score this", schema: JSONSchema.scoreCard, packDir: fixture.directory,
+                                             sources: [], options: options, wrapUp: (0.5, Assessor.wrapUpPrompt)) { _ in }
+        }
+    }
+
+    @Test func scoresHaveATimeLimitUnderTenMinutes() {
+        #expect(AssessmentOptions().wrapUpAfter < AssessmentOptions.scoreTimeLimit)
+        #expect(AssessmentOptions.scoreTimeLimit <= 9 * 60)
+        #expect(Assessor.prompt(sources: [], now: Date(), digestCount: 150).contains("about 70 of them"))
+        #expect(Assessor.prompt(sources: [], now: Date(), digestCount: 12).contains("Read all of them"))
+    }
+
     @Test func incompatibleCodexGetsAnActionableError() {
         #expect(throws: AssessmentError.self) { try CLILocator.validateCodexHelp("--json --sandbox --output-schema") }
     }
@@ -189,13 +229,22 @@ private struct CLIFixture {
         #!/bin/sh
         printf '%s\n' "$@" > received-arguments.txt
         session_id="\#(Self.sessionID)"
+        is_fork=0
         for arg in "$@"; do
-          if [ "$arg" = "fork" ] || [ "$arg" = "--fork-session" ]; then session_id="\#(Self.forkID)"; fi
+          if [ "$arg" = "fork" ] || [ "$arg" = "--fork-session" ]; then session_id="\#(Self.forkID)"; is_fork=1; fi
         done
         if [ "\#(mode)" = "same-session" ]; then session_id="\#(Self.sessionID)"; fi
         if [ "\#(mode)" = "no-session" ]; then session_id=""; fi
         cat > received-prompt.txt
         if [ "\#(mode)" = "sleep" ]; then sleep 30; exit 1; fi
+        # A first run that is still reading at its time limit, after saving its session (or not).
+        if [ "$is_fork" = 0 ] && { [ "\#(mode)" = "slow-first" ] || [ "\#(mode)" = "slow-unsaved" ]; }; then
+          if [ "\#(mode)" = "slow-first" ]; then
+            if [ "$1" = "-p" ]; then printf '{"type":"system","subtype":"init","session_id":"%s"}\n' "$session_id"
+            else printf '{"type":"thread.started","thread_id":"%s"}\n' "$session_id"; fi
+          fi
+          sleep 30; exit 1
+        fi
         if [ "$1" = "-p" ]; then
           printf '{"type":"system","subtype":"init","session_id":"%s"}\n' "$session_id"
           printf '{"type":"result","is_error":false,"total_cost_usd":0.02,"structured_output":'
