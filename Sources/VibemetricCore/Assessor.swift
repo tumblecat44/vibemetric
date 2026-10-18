@@ -318,10 +318,14 @@ public final class Assessor: Sendable {
         "Start by asking it to run your tests before it finishes."
         - `dimensions`: all 10 in rubric order. `score` is an integer 0–10, or null with `status` `not_assessable` only under the rubric's Not assessable rule; never use `not_reviewed`.
           - `headline`: the verdict, at most 10 words, for example "You rarely make the AI prove its work".
-          - `saw`: below 8, only the problem, as it happened in the person's sessions and written as `situation` below asks; \
-        the app shows it under "Problem:", so leave out what went well. At 8 or above, what went well, the same way. \
-        Never start with a label such as "Positive:", "Gap:", or "Problem:".
-          - `impact`: why it matters, in one sentence: what it cost or gained in the person's actual work.
+          - `strengths`: up to 3 things the person already does well in this dimension, one short sentence each, as it happened \
+        in their sessions, with a number where one exists, for example "Commits and pushes go to a cheaper subagent, 12 times in two sessions." \
+        The app shows them under "What's working:" above the problem. An empty array when nothing stands out. Group related habits \
+        into one sentence rather than listing them separately.
+          - `saw`: only the problem: what keeps this dimension from 10, as it happened in the person's sessions and written as \
+        `situation` below asks. The app shows it under "Problem:" and in the list of issues, so it must contain no praise, \
+        no "but", and nothing from `strengths`. An empty string at 10. Never start with a label such as "Positive:", "Gap:", or "Problem:".
+          - `impact`: why the problem matters, in one sentence: what it costs in the person's actual work. No praise. An empty string at 10.
           - `tryThis`: one concrete action that reaches the next anchor, in one sentence starting with a verb; null at 10. \
         The app shows it as the solution's title.
           - `solutionSteps`: below 10, the solution explained as 2–4 bullets the app shows under that title. Together they say \
@@ -329,7 +333,7 @@ public final class Assessor: Sendable {
         next task, why it fixes the problem above, and how they will be able to tell it worked. Each bullet is one full, plain \
         sentence of at most 25 words with a clear actor, and adds something the title does not already say. No pasted prompts, \
         rubric terms, or "consider". An empty array at 10.
-        For a `not_assessable` dimension, `saw` states the evidence limitation, `impact` says what would make it assessable, \
+        For a `not_assessable` dimension, `strengths` is empty, `saw` states the evidence limitation, `impact` says what would make it assessable, \
         `tryThis` is null, and `solutionSteps` is empty.
           - `evidence`: up to 3 references you verified: tool, full session id, date (YYYY-MM-DD), `project` (the project's short name; \
         when a session ran in a parent folder such as `Documents` or the home folder, name the project it worked on), \

@@ -103,8 +103,12 @@ public struct ScoreCard: Codable, Sendable {
         public var changeReason: String?
         /// Readable cards (rubric 4 output): short plain-text fields the app lays out. nil on older cards,
         /// which show `points` or `reason` instead.
-        /// What the records show, with a number where one exists.
+        /// What the records show, with a number where one exists. On cards with `strengths`, only the gap that
+        /// keeps the score below 10 (empty at 10); older cards may mix in what went well.
         public var saw: String?
+        /// What the person already does well in this dimension, one short sentence each. nil on cards from
+        /// before strengths were split out of `saw`.
+        public var strengths: [String]?
         /// Why it matters: the effect on the person's work.
         public var impact: String?
         /// One action that would move the score up; nil or empty at 10.
@@ -114,7 +118,7 @@ public struct ScoreCard: Codable, Sendable {
         public var solutionSteps: [String]?
 
         /// True when the card carries the short readable fields.
-        public var isReadable: Bool { saw?.isEmpty == false }
+        public var isReadable: Bool { saw?.isEmpty == false || strengths != nil }
 
         public struct Point: Codable, Sendable {
             public var heading: String
@@ -154,7 +158,7 @@ public struct ScoreCard: Codable, Sendable {
         public var band: Band? { score.map(Band.init(score:)) }
 
         enum CodingKeys: String, CodingKey {
-            case dimension, score, status, headline, reason, points, conclusion, evidence, changeReason, saw, impact, tryThis, solutionSteps
+            case dimension, score, status, headline, reason, points, conclusion, evidence, changeReason, saw, strengths, impact, tryThis, solutionSteps
         }
 
         public init(from decoder: Decoder) throws {
@@ -168,20 +172,22 @@ public struct ScoreCard: Codable, Sendable {
             evidence = try c.decodeIfPresent([Evidence].self, forKey: .evidence) ?? []
             changeReason = try c.decodeIfPresent(String.self, forKey: .changeReason)
             saw = try c.decodeIfPresent(String.self, forKey: .saw)
+            strengths = try c.decodeIfPresent([String].self, forKey: .strengths)
             impact = try c.decodeIfPresent(String.self, forKey: .impact)
             tryThis = try c.decodeIfPresent(String.self, forKey: .tryThis)
             solutionSteps = try c.decodeIfPresent([String].self, forKey: .solutionSteps)
             reason = try c.decodeIfPresent(String.self, forKey: .reason)
-                ?? (points?.isEmpty == false || saw == nil
+                ?? (points?.isEmpty == false || (saw == nil && strengths == nil)
                     ? Self.compose(points: points ?? [], conclusion: conclusion)
-                    : Self.compose(saw: saw, impact: impact, tryThis: tryThis, steps: solutionSteps ?? []))
+                    : Self.compose(strengths: strengths ?? [], saw: saw, impact: impact, tryThis: tryThis, steps: solutionSteps ?? []))
         }
 
         /// The readable fields as one Markdown text, for the report and other single-block readers.
-        static func compose(saw: String?, impact: String?, tryThis: String?, steps: [String] = []) -> String {
-            var text = [("What we saw", saw), ("Why it matters", impact), ("Try this", tryThis)]
+        static func compose(strengths: [String] = [], saw: String?, impact: String?, tryThis: String?, steps: [String] = []) -> String {
+            var parts = strengths.isEmpty ? [] : ["**What's working:**\n" + strengths.map { "- \($0)" }.joined(separator: "\n")]
+            parts += [("What we saw", saw), ("Why it matters", impact), ("Try this", tryThis)]
                 .compactMap { label, text in text.flatMap { $0.isEmpty ? nil : "**\(label):** \($0)" } }
-                .joined(separator: "\n\n")
+            var text = parts.joined(separator: "\n\n")
             if !steps.isEmpty { text += "\n\n" + steps.map { "- \($0)" }.joined(separator: "\n") }
             return text
         }

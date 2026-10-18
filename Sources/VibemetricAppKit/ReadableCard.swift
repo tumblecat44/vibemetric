@@ -387,9 +387,18 @@ struct CategoryRow: View {
             if expanded {
                 VStack(alignment: .leading, spacing: 12) {
                     if result.isReadable {
-                        ProblemSolution(problem: [result.saw ?? "", result.impact ?? ""], evidence: result.evidence,
-                                        solution: result.tryThis ?? "", steps: result.solutionSteps ?? [],
-                                        strong: result.band == .strong)
+                        if let strengths = result.strengths {
+                            // Newer cards: what works on its own, above a problem that holds only the gap.
+                            if !strengths.isEmpty { WhatsWorking(points: strengths) }
+                            ProblemSolution(problem: [result.saw ?? "", result.impact ?? ""], evidence: result.evidence,
+                                            solution: result.tryThis ?? "", steps: result.solutionSteps ?? [],
+                                            nextStep: result.band == .strong)
+                        } else {
+                            // Older cards: a strong category's text is what went well.
+                            ProblemSolution(problem: [result.saw ?? "", result.impact ?? ""], evidence: result.evidence,
+                                            solution: result.tryThis ?? "", steps: result.solutionSteps ?? [],
+                                            goodNews: result.band == .strong, nextStep: result.band == .strong)
+                        }
                     } else {
                         // A category from an older card inside a readable one: its reason as written.
                         Text(markdown(result.reason)).scaledFont(13).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
@@ -432,7 +441,8 @@ private struct Heading: View {
 /// Problem and Solution: the one structure every fix and category uses.
 /// Problem is what happened and what it cost, as one paragraph, with the sessions it comes from.
 /// Solution is the fix in one line; when there is more, tabs hold the prompt to paste and the steps.
-/// For a strong category the labels read "What's working" and "Next step".
+/// `goodNews` labels the first part "What's working" (older cards, whose strong categories describe what went well);
+/// `nextStep` labels the second part "Next step", for a strong category.
 private struct ProblemSolution: View {
     /// Sentences joined into one paragraph; empty ones are left out.
     var problem: [String]
@@ -442,7 +452,8 @@ private struct ProblemSolution: View {
     var steps: [String] = []
     var tryItOn: String? = nil
     var signOfSuccess: String? = nil
-    var strong = false
+    var goodNews = false
+    var nextStep = false
 
     private enum Tab: String, CaseIterable { case prompt = "Prompt", steps = "Steps" }
     @State private var tab: Tab = .prompt
@@ -459,8 +470,8 @@ private struct ProblemSolution: View {
         VStack(alignment: .leading, spacing: 16) {
             if !problemText.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    PartLabel(text: strong ? "What's working" : "Problem",
-                              symbol: strong ? "checkmark.circle.fill" : "exclamationmark.triangle.fill", color: problemColor)
+                    PartLabel(text: goodNews ? "What's working" : "Problem",
+                              symbol: goodNews ? "checkmark.circle.fill" : "exclamationmark.triangle.fill", color: problemColor)
                     VStack(alignment: .leading, spacing: 5) {
                         ForEach(Array(problemPoints.enumerated()), id: \.offset) { _, point in
                             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -477,8 +488,8 @@ private struct ProblemSolution: View {
             }
             if !solution.isEmpty || hasPrompt || hasSteps {
                 VStack(alignment: .leading, spacing: 8) {
-                    PartLabel(text: strong ? "Next step" : "Solution",
-                              symbol: strong ? "arrow.up.right.circle.fill" : "lightbulb.fill", color: solutionColor)
+                    PartLabel(text: nextStep ? "Next step" : "Solution",
+                              symbol: nextStep ? "arrow.up.right.circle.fill" : "lightbulb.fill", color: solutionColor)
                     if !solution.isEmpty || hasSteps { stepsView }
                     if hasPrompt && hasSteps {
                         // Drawn tabs rather than a segmented Picker, so they also render in snapshots.
@@ -508,8 +519,8 @@ private struct ProblemSolution: View {
         }
     }
 
-    private var problemColor: Color { strong ? Theme.color(for: .strong) : Theme.color(for: .bottleneck) }
-    private var solutionColor: Color { strong ? Theme.accent : Theme.color(for: .strong) }
+    private var problemColor: Color { goodNews ? Theme.color(for: .strong) : Theme.color(for: .bottleneck) }
+    private var solutionColor: Color { nextStep ? Theme.accent : Theme.color(for: .strong) }
 
     /// The solution as bullets, laid out like the problem's: its title first in bold, then how to do it,
     /// where to try it, and how to tell it worked.
@@ -531,6 +542,29 @@ private struct ProblemSolution: View {
             Text("•").foregroundStyle(solutionColor)
             text.fixedSize(horizontal: false, vertical: true)
         }
+    }
+}
+
+/// What the person already does well in a category, shown above its Problem in the category details.
+private struct WhatsWorking: View {
+    var points: [String]
+    private var color: Color { Theme.color(for: .strong) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            PartLabel(text: "What's working", symbol: "checkmark.circle.fill", color: color)
+            VStack(alignment: .leading, spacing: 5) {
+                ForEach(Array(points.enumerated()), id: \.offset) { _, point in
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text("•").foregroundStyle(color)
+                        Text(inline(point)).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .scaledFont(14)
+            .foregroundStyle(Theme.ink)
+        }
+        .modifier(PartPanel(color: color))
     }
 }
 

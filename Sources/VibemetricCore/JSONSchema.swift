@@ -24,6 +24,7 @@ enum JSONSchema {
             "status": ["type": "string", "enum": ["scored", "not_assessable", "not_reviewed"]],
             "headline": str,
             "saw": str,
+            "strengths": array(str, max: 3),
             "impact": str,
             "tryThis": ["type": ["string", "null"]],
             "solutionSteps": array(str, max: 4),

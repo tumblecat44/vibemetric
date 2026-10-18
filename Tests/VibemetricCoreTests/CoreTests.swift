@@ -389,7 +389,7 @@ final class ReasonPointsTests: XCTestCase {
         let props = obj["properties"] as! [String: Any]
         let item = (props["dimensions"] as! [String: Any])["items"] as! [String: Any]
         let required = Set(item["required"] as! [String])
-        XCTAssertTrue(required.isSuperset(of: ["headline", "saw", "impact", "tryThis", "evidence"]))
+        XCTAssertTrue(required.isSuperset(of: ["headline", "strengths", "saw", "impact", "tryThis", "evidence"]))
         XCTAssertFalse(required.contains("points"))
         XCTAssertFalse(required.contains("reason"))
         let evidence = ((item["properties"] as! [String: Any])["evidence"] as! [String: Any])["items"] as! [String: Any]
@@ -429,6 +429,28 @@ final class ReadableCardTests: XCTestCase {
         let again = try JSONDecoder().decode(ScoreCard.self, from: JSONEncoder().encode(card))
         XCTAssertTrue(again.isReadable)
         XCTAssertEqual(again.dimensions[0].tryThis, d.tryThis)
+    }
+
+    func testStrengthsAreKeptApartFromTheProblem() throws {
+        let json = Self.readableCard.replacingOccurrences(
+            of: #""saw":"Tests ran after 8 of 31 code changes.""#,
+            with: #""strengths":["Commits go to a cheaper subagent, 12 times in two sessions."],"saw":"Tests ran after 8 of 31 code changes.""#)
+        let card = try JSONDecoder().decode(ScoreCard.self, from: Data(json.utf8))
+        let d = card.dimensions[0]
+        XCTAssertEqual(d.strengths, ["Commits go to a cheaper subagent, 12 times in two sessions."])
+        XCTAssertEqual(d.saw, "Tests ran after 8 of 31 code changes.")
+        XCTAssertTrue(d.reason.hasPrefix("**What's working:**\n- Commits go to a cheaper subagent"))
+        XCTAssertTrue(d.reason.contains("**What we saw:** Tests ran"))
+        let again = try JSONDecoder().decode(ScoreCard.self, from: JSONEncoder().encode(card))
+        XCTAssertEqual(again.dimensions[0].strengths, d.strengths)
+        // Cards scored before the split have no strengths and keep their mixed text as it was.
+        XCTAssertNil(try JSONDecoder().decode(ScoreCard.self, from: Data(Self.readableCard.utf8)).dimensions[0].strengths)
+    }
+
+    func testAPerfectCategoryWithNothingToFixIsStillReadable() throws {
+        let json = Self.readableCard.replacingOccurrences(
+            of: #""saw":"Tests ran after 8 of 31 code changes.""#, with: #""strengths":["Tests run after every change."],"saw":"""#)
+        XCTAssertTrue(try JSONDecoder().decode(ScoreCard.self, from: Data(json.utf8)).isReadable)
     }
 
     func testOlderCardsAreNotReadable() throws {

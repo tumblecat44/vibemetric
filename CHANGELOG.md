@@ -2,6 +2,7 @@
 
 ## 0.4.0 (unreleased)
 
+- Details page: Issues and each category's Problem now list only problems. What you already do well in a category appears in its own "What's working" box above the Problem. Applies to new scores; older results show as before.
 - Faster scans for long histories: Vibemetric keeps a small summary of each session (counts, signals and token use, no conversation text beyond a short title) and parses only transcripts that are new or have changed. Scores still cover your whole history, and the evidence the scorer reads is unchanged.
 - Each score scans again first, so a manual score includes sessions from since the app opened, not only since the last daily score.
 - Scoring with token usage no longer reads every transcript a second time.
