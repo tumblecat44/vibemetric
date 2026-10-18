@@ -27,17 +27,30 @@ public enum EvidencePack {
         try? fm.removeItem(at: dir)
         try fm.createDirectory(at: dir.appendingPathComponent("sessions"), withIntermediateDirectories: true)
 
+        // Only the chosen sessions are parsed again in full; everything else comes from the scan's summaries.
         let chosen = select(scan.sessions)
         var digestPaths: [String: String] = [:]
-        for s in chosen {
-            let rel = "sessions/\(slug(s.tool))-\(s.id.suffix(12)).md"
-            digestPaths[key(s)] = rel
-            try Redactor.scrub(timeline(s)).write(to: dir.appendingPathComponent(rel), atomically: true, encoding: .utf8)
+        var firstError: Error?
+        let lock = NSLock()
+        DispatchQueue.concurrentPerform(iterations: chosen.count) { i in
+            autoreleasepool {
+                let summary = chosen[i]
+                // A transcript deleted since the scan keeps its index row, without a digest.
+                guard let session = Scanner.fullSession(for: summary) else { return }
+                let rel = "sessions/\(slug(summary.tool))-\(summary.id.suffix(12)).md"
+                do {
+                    try Redactor.scrub(timeline(session)).write(to: dir.appendingPathComponent(rel), atomically: true, encoding: .utf8)
+                    lock.lock(); digestPaths[key(summary)] = rel; lock.unlock()
+                } catch {
+                    lock.lock(); firstError = firstError ?? error; lock.unlock()
+                }
+            }
         }
+        if let firstError { throw firstError }
 
         try Redactor.scrub(sessionIndex(scan.sessions, digestPaths: digestPaths))
             .write(to: dir.appendingPathComponent("sessions.tsv"), atomically: true, encoding: .utf8)
-        try Redactor.scrub(overview(scan, digests: chosen.count, now: now))
+        try Redactor.scrub(overview(scan, digests: digestPaths.count, now: now))
             .write(to: dir.appendingPathComponent("overview.md"), atomically: true, encoding: .utf8)
         try Redactor.scrub(leads(scan.sessions, digestPaths: digestPaths))
             .write(to: dir.appendingPathComponent("leads.md"), atomically: true, encoding: .utf8)
@@ -83,9 +96,9 @@ public enum EvidencePack {
     // MARK: Selection
 
     /// Keeps every session when under the cap; otherwise balances signal-rich, recent, and per-project coverage.
-    static func select(_ sessions: [Session]) -> [Session] {
+    static func select(_ sessions: [SessionSummary]) -> [SessionSummary] {
         guard sessions.count > maxDigests else { return sessions }
-        var picked: [String: Session] = [:]
+        var picked: [String: SessionSummary] = [:]
         let byProject = Dictionary(grouping: sessions, by: { "\($0.tool.rawValue)/\($0.project)" })
         // Up to 8 richest sessions per project so no project disappears.
         for (_, group) in byProject {
@@ -97,11 +110,11 @@ public enum EvidencePack {
         return picked.values.sorted { ($0.start ?? .distantPast) < ($1.start ?? .distantPast) }
     }
 
-    static func richness(_ s: Session) -> Int {
+    static func richness(_ s: SessionSummary) -> Int {
         s.signals.tags.count * 10 + min(s.userTurns, 30) + min(s.toolCalls / 5, 20)
     }
 
-    private static func key(_ s: Session) -> String { "\(s.tool.rawValue)|\(s.id)" }
+    private static func key(_ s: SessionSummary) -> String { "\(s.tool.rawValue)|\(s.id)" }
     private static func slug(_ t: AgentTool) -> String { t == .claudeCode ? "cc" : "codex" }
 
     // MARK: Files
@@ -158,7 +171,7 @@ public enum EvidencePack {
         return head + body + "\n"
     }
 
-    static func sessionIndex(_ sessions: [Session], digestPaths: [String: String]) -> String {
+    static func sessionIndex(_ sessions: [SessionSummary], digestPaths: [String: String]) -> String {
         var out = "tool\tsession\tproject\tstart\tend\tuser_turns\ttool_calls\tfailed\tsubagents\tmodels\tpermission_modes\tsignals\tdigest\ttitle\n"
         for s in sessions {
             out += [
@@ -182,43 +195,38 @@ public enum EvidencePack {
         }
 
         md += "\n## Projects (sessions, first → last)\n\n"
-        for (project, ss) in Dictionary(grouping: scan.sessions, by: \.project).sorted(by: { $0.value.count > $1.value.count }) {
+        for (project, ss) in Dictionary(grouping: scan.sessions, by: \.project).sorted(by: { ($1.value.count, $0.key) < ($0.value.count, $1.key) }) {
             let tools = Set(ss.map(\.tool.rawValue)).sorted().joined(separator: "+")
             md += "- \(project) [\(tools)]: \(ss.count), \(day(ss.compactMap(\.start).min())) → \(day(ss.compactMap(\.end).max()))\n"
         }
 
         let modes = scan.sessions.flatMap(\.permissionModes).reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
-        md += "\n## Permission modes (sessions using each)\n\n" + modes.sorted { $0.value > $1.value }.map { "- \($0.key): \($0.value)" }.joined(separator: "\n") + "\n"
+        md += "\n## Permission modes (sessions using each)\n\n" + modes.sorted { ($1.value, $0.key) < ($0.value, $1.key) }.map { "- \($0.key): \($0.value)" }.joined(separator: "\n") + "\n"
         let models = scan.sessions.flatMap(\.models).reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
-        md += "\n## Models (sessions using each)\n\n" + models.sorted { $0.value > $1.value }.map { "- \($0.key): \($0.value)" }.joined(separator: "\n") + "\n"
+        md += "\n## Models (sessions using each)\n\n" + models.sorted { ($1.value, $0.key) < ($0.value, $1.key) }.map { "- \($0.key): \($0.value)" }.joined(separator: "\n") + "\n"
 
         md += "\n## Memory and rule files across sessions (chronological)\n\n"
         md += "Shows which sessions wrote a memory/rule/skill file and which later sessions read it or had it injected. Injection alone does not prove use.\n\n"
         var memory: [String: [String]] = [:]
         for s in scan.sessions {
-            for e in s.events {
-                switch e.kind {
-                case let .tool(name, input, _, _) where SignalExtractor.memoryPath.firstMatch(in: input, range: NSRange(input.startIndex..., in: input)) != nil:
-                    let shellWrite = SignalExtractor.shellWrite.firstMatch(in: input, range: NSRange(input.startIndex..., in: input)) != nil
-                    let verb = SignalExtractor.writeTools.contains(name) || shellWrite ? "WRITE" : "read/use"
-                    memory[input.clipped(120), default: []].append("\(day(e.time)) \(verb) by \(s.tool.rawValue) \(s.id.suffix(12))")
-                case let .system(text) where text.hasPrefix("memory injected"):
-                    for path in text.dropFirst("memory injected: ".count).components(separatedBy: ", ") {
-                        memory[path, default: []].append("\(day(e.time)) injected into \(s.tool.rawValue) \(s.id.suffix(12))")
-                    }
-                default: continue
+            for use in s.memoryUses {
+                let what = switch use.kind {
+                case .write: "WRITE by"
+                case .read: "read/use by"
+                case .injected: "injected into"
                 }
+                memory[use.path, default: []].append("\(day(use.time)) \(what) \(s.tool.rawValue) \(s.id.suffix(12))")
             }
         }
-        for (path, uses) in memory.sorted(by: { $0.value.count > $1.value.count }).prefix(40) {
+        for (path, uses) in memory.sorted(by: { ($1.value.count, $0.key) < ($0.value.count, $1.key) }).prefix(40) {
             let deduped = uses.reduce(into: [String]()) { if $0.last != $1 { $0.append($1) } }
             md += "- `\(path)`: " + deduped.prefix(12).joined(separator: "; ") + (deduped.count > 12 ? "; … \(deduped.count - 12) more" : "") + "\n"
         }
         return md
     }
 
-    static func leads(_ sessions: [Session], digestPaths: [String: String]) -> String {
-        let criteria: [(Dimension, (Session) -> Int)] = [
+    static func leads(_ sessions: [SessionSummary], digestPaths: [String: String]) -> String {
+        let criteria: [(Dimension, (SessionSummary) -> Int)] = [
             (.planningSpecs, { $0.signals.specLanguage * 3 + $0.signals.planMode * 2 }),
             (.contextEngineering, { $0.signals.compactions * 3 + $0.signals.memoryInjected + $0.childCount * 2 }),
             (.memory, { $0.signals.memoryWrites * 3 + $0.signals.memoryReads }),

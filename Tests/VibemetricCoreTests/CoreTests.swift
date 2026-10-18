@@ -10,7 +10,7 @@ final class CoreTests: XCTestCase {
         XCTAssertThrowsError(try JSONDecoder().decode([VibemetricCore.Dimension].self, from: Data(#"["unknown"]"#.utf8)))
     }
 
-    func testScannerPreservesClaudeEventsAndSignalsAfterFileProcessing() throws {
+    func testScannerSummarizesClaudeSessionsAndReparsesEvents() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let project = dir.appendingPathComponent("-Users-me-app")
         try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
@@ -36,10 +36,10 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(s.permissionModes, ["acceptEdits"])
         XCTAssertEqual(s.signals.verifyAfterEdit, 1)
         XCTAssertEqual(s.signals.specLanguage, 1)
-        // The scanner drains an autorelease pool after each file. Check that the event text stored
-        // in the returned session is still complete after that drain. The prompt text is fixture data.
-        let first = try XCTUnwrap(s.events.first)
-        let last = try XCTUnwrap(s.events.last)
+        // The full session, parsed again for a digest, keeps every event's text. The prompt text is fixture data.
+        let full = try XCTUnwrap(Scanner.fullSession(for: s))
+        let first = try XCTUnwrap(full.events.first)
+        let last = try XCTUnwrap(full.events.last)
         guard case let .user(prompt) = first.kind,
               case let .tool(name, input, failed, result) = last.kind else {
             return XCTFail("Expected the user prompt and the final tool result")
@@ -389,7 +389,7 @@ final class ReasonPointsTests: XCTestCase {
         let props = obj["properties"] as! [String: Any]
         let item = (props["dimensions"] as! [String: Any])["items"] as! [String: Any]
         let required = Set(item["required"] as! [String])
-        XCTAssertTrue(required.isSuperset(of: ["headline", "saw", "impact", "tryThis", "evidence"]))
+        XCTAssertTrue(required.isSuperset(of: ["headline", "strengths", "saw", "impact", "tryThis", "evidence"]))
         XCTAssertFalse(required.contains("points"))
         XCTAssertFalse(required.contains("reason"))
         let evidence = ((item["properties"] as! [String: Any])["evidence"] as! [String: Any])["items"] as! [String: Any]
@@ -429,6 +429,28 @@ final class ReadableCardTests: XCTestCase {
         let again = try JSONDecoder().decode(ScoreCard.self, from: JSONEncoder().encode(card))
         XCTAssertTrue(again.isReadable)
         XCTAssertEqual(again.dimensions[0].tryThis, d.tryThis)
+    }
+
+    func testStrengthsAreKeptApartFromTheProblem() throws {
+        let json = Self.readableCard.replacingOccurrences(
+            of: #""saw":"Tests ran after 8 of 31 code changes.""#,
+            with: #""strengths":["Commits go to a cheaper subagent, 12 times in two sessions."],"saw":"Tests ran after 8 of 31 code changes.""#)
+        let card = try JSONDecoder().decode(ScoreCard.self, from: Data(json.utf8))
+        let d = card.dimensions[0]
+        XCTAssertEqual(d.strengths, ["Commits go to a cheaper subagent, 12 times in two sessions."])
+        XCTAssertEqual(d.saw, "Tests ran after 8 of 31 code changes.")
+        XCTAssertTrue(d.reason.hasPrefix("**What's working:**\n- Commits go to a cheaper subagent"))
+        XCTAssertTrue(d.reason.contains("**What we saw:** Tests ran"))
+        let again = try JSONDecoder().decode(ScoreCard.self, from: JSONEncoder().encode(card))
+        XCTAssertEqual(again.dimensions[0].strengths, d.strengths)
+        // Cards scored before the split have no strengths and keep their mixed text as it was.
+        XCTAssertNil(try JSONDecoder().decode(ScoreCard.self, from: Data(Self.readableCard.utf8)).dimensions[0].strengths)
+    }
+
+    func testAPerfectCategoryWithNothingToFixIsStillReadable() throws {
+        let json = Self.readableCard.replacingOccurrences(
+            of: #""saw":"Tests ran after 8 of 31 code changes.""#, with: #""strengths":["Tests run after every change."],"saw":"""#)
+        XCTAssertTrue(try JSONDecoder().decode(ScoreCard.self, from: Data(json.utf8)).isReadable)
     }
 
     func testOlderCardsAreNotReadable() throws {

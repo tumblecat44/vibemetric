@@ -106,6 +106,14 @@ else
   echo "Sparkle updates are off in this build (dev variant, no Pro/, or no $SPARKLE_KEY_FILE)."
 fi
 
+# Anonymous usage counts (Sources/VibemetricAppKit/Analytics.swift) only in official release builds.
+POSTHOG_KEY_FILE="Resources/posthog-project-key.txt"
+if [ "${VARIANT:-prod}" = "prod" ] && [ "$HAS_PRO" = "1" ] && [ -s "$POSTHOG_KEY_FILE" ]; then
+  /usr/libexec/PlistBuddy -c "Add :VMPostHogKey string $(tr -d '[:space:]' < "$POSTHOG_KEY_FILE")" "$APP/Contents/Info.plist"
+else
+  echo "Usage analytics are off in this build (dev variant, no Pro/, or no $POSTHOG_KEY_FILE)."
+fi
+
 IDENTITY="${SIGN_IDENTITY:-$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -1)}"
 if [ -n "$IDENTITY" ]; then
   # Hardened runtime + secure timestamp are required for notarization. Sign Sparkle's helpers from the

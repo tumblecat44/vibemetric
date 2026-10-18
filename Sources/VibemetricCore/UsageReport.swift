@@ -22,30 +22,43 @@ public enum UsageReport {
                           "cache_read_tokens", "cache_write_tokens", "assistant_messages", "user_turns", "tool_calls",
                           "failed_tool_calls", "wall_minutes"]
 
-    public static func tsv(_ sessions: [Session]) -> String {
+    /// Token use for one parsed session, in the order `tsv` lists it: the main thread, then each subagent.
+    static func usage(for s: Session) -> [SessionSummary.TokenUsage] {
+        switch s.tool {
+        case .claudeCode:
+            let subagents = (try? FileManager.default.contentsOfDirectory(
+                at: s.file.deletingPathExtension().appendingPathComponent("subagents"), includingPropertiesForKeys: nil)) ?? []
+            var rows: [SessionSummary.TokenUsage] = []
+            for (file, thread) in [(s.file, "main")] + subagents.filter({ $0.pathExtension == "jsonl" }).map({ ($0, "subagent") }) {
+                for (model, u) in claudeUsage(file).sorted(by: { $0.key < $1.key }) {
+                    rows.append(.init(thread: thread, model: model, effort: "not recorded", input: u.input, output: u.output,
+                                      cacheRead: u.cacheRead, cacheWrite: u.cacheWrite, messages: u.messages))
+                }
+            }
+            return rows
+        case .codex:
+            guard let u = codexUsage(s.file) else { return [] }
+            return [.init(thread: "main", model: u.model ?? "?", effort: u.effort ?? "?", input: max(u.input - u.cacheRead, 0),
+                          output: u.output, cacheRead: u.cacheRead, cacheWrite: u.cacheWrite, messages: nil)]
+        }
+    }
+
+    public static func tsv(_ sessions: [Session]) -> String { tsv(sessions.map(SessionSummary.init)) }
+
+    public static func tsv(_ sessions: [SessionSummary]) -> String {
         var rows: [[String]] = []
         let day = DateFormatter()
         day.dateFormat = "yyyy-MM-dd"
         for s in sessions {
             let date = s.start.map(day.string(from:)) ?? ""
             let minutes = (s.start != nil && s.end != nil) ? String(format: "%.1f", s.end!.timeIntervalSince(s.start!) / 60) : ""
-            switch s.tool {
-            case .claudeCode:
-                let subagents = (try? FileManager.default.contentsOfDirectory(
-                    at: s.file.deletingPathExtension().appendingPathComponent("subagents"), includingPropertiesForKeys: nil)) ?? []
-                for (file, thread) in [(s.file, "main")] + subagents.filter { $0.pathExtension == "jsonl" }.map({ ($0, "subagent") }) {
-                    for (model, u) in claudeUsage(file).sorted(by: { $0.key < $1.key }) {
-                        rows.append(["claude-code", s.project, date, String(s.id.prefix(8)), thread, model, "not recorded",
-                                     "\(u.input)", "\(u.output)", "\(u.cacheRead)", "\(u.cacheWrite)", "\(u.messages)",
-                                     thread == "main" ? "\(s.userTurns)" : "", thread == "main" ? "\(s.toolCalls)" : "",
-                                     thread == "main" ? "\(s.failedToolCalls)" : "", thread == "main" ? minutes : ""])
-                    }
-                }
-            case .codex:
-                guard let u = codexUsage(s.file) else { continue }
-                rows.append(["codex", s.project, date, String(s.id.prefix(8)), "main", u.model ?? "?", u.effort ?? "?",
-                             "\(max(u.input - u.cacheRead, 0))", "\(u.output)", "\(u.cacheRead)", "\(u.cacheWrite)", "",
-                             "\(s.userTurns)", "\(s.toolCalls)", "\(s.failedToolCalls)", minutes])
+            for u in s.usage {
+                let main = u.thread == "main"
+                rows.append([s.tool == .claudeCode ? "claude-code" : "codex", s.project, date, String(s.id.prefix(8)), u.thread,
+                             u.model, u.effort, "\(u.input)", "\(u.output)", "\(u.cacheRead)", "\(u.cacheWrite)",
+                             u.messages.map(String.init) ?? "",
+                             main ? "\(s.userTurns)" : "", main ? "\(s.toolCalls)" : "",
+                             main ? "\(s.failedToolCalls)" : "", main ? minutes : ""])
             }
         }
         rows.sort { ($0[2], $0[0], $0[3]) < ($1[2], $1[0], $1[3]) }
