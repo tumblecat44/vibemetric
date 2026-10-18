@@ -61,6 +61,10 @@ public enum Store {
 
     static let packs = EvidencePack.savedPacksDirectory(isDev: AppVariant.isDev)
 
+    /// One summary per transcript, so a scan only parses new or changed transcripts (`Scanner.scan(cache:)`).
+    static let scanCache = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("\(directoryName)/scan-cache.json")
+
     public static func newPackDir(id: String) -> URL {
         packs.appendingPathComponent(id, isDirectory: true)
     }
@@ -246,6 +250,8 @@ public final class AppModel {
     private var assessor: Assessor?
     private var runTask: Task<Void, Never>?
     private var autoTimer: Timer?
+    /// Reads the transcripts. Replaced in tests.
+    @ObservationIgnored var scanRecords: @Sendable () async -> ScanResult = { Scanner.scan(cache: Store.scanCache) }
 
     init(preferences: UserDefaults = .standard, startAutomatically: Bool = true, history: [CardRecord]? = nil) {
         self.preferences = preferences
@@ -370,7 +376,7 @@ public final class AppModel {
     }
 
     func rescan() async {
-        await rescan { Scanner.scan() }
+        await rescan(using: scanRecords)
     }
 
     /// Existing scan data remains visible until its replacement is ready.
@@ -391,7 +397,7 @@ public final class AppModel {
 
     @discardableResult
     func startAssessment(automatic: Bool = false) -> Bool {
-        guard canStartAssessment, let scan, let installation = installations[engine] else { return false }
+        guard canStartAssessment, scan != nil, let installation = installations[engine] else { return false }
         preferences.set(engine.rawValue, forKey: Self.engineKey)
         // An automatic run shouldn't pull the window away from a result the user is reading.
         let wasViewingLatest = selected == nil || selected?.id == history.first?.id
@@ -413,8 +419,15 @@ public final class AppModel {
         let baseline = history.first { $0.isComparable(to: options) }
         let previous = baseline.map { EvidencePack.Previous(card: $0.card, date: $0.scannedAt) }
 
+        let scanRecords = self.scanRecords
         runTask = Task {
             do {
+                // Scan again so the score includes sessions since the last scan. With the cache this only
+                // parses what's new; the app may have been open in the menu bar for days.
+                let scan = await Task.detached(priority: .userInitiated) { await scanRecords() }.value
+                try Task.checkCancellation()
+                self.scan = scan
+                summary = ScanSummary(scan)
                 let baselineId = baseline?.id
                 let rules = try await Task.detached { () throws -> RuleSnapshot in
                     let snapshot = RuleFiles.snapshot(scan: scan)

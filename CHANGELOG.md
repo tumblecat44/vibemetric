@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0 (unreleased)
+
+- Faster scans for long histories: Vibemetric keeps a small summary of each session (counts, signals and token use, no conversation text beyond a short title) and parses only transcripts that are new or have changed. Scores still cover your whole history, and the evidence the scorer reads is unchanged.
+- Each score scans again first, so a manual score includes sessions from since the app opened, not only since the last daily score.
+- Scoring with token usage no longer reads every transcript a second time.
+- Less memory while Vibemetric sits in the menu bar: full session timelines are read only for the sessions picked as evidence.
+- `vibemetric scan` and `pack` take `--home DIR` and `--cache FILE`; `pack` also writes `usage.tsv` and `model-settings.md`, like the app.
+
 ## 0.3.5 (2026-10-16)
 
 - Scoring: permission bypass now affects Security only through its 1-point deduction, and not following last time's suggestion no longer lowers a score by itself.

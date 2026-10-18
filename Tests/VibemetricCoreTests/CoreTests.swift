@@ -10,7 +10,7 @@ final class CoreTests: XCTestCase {
         XCTAssertThrowsError(try JSONDecoder().decode([VibemetricCore.Dimension].self, from: Data(#"["unknown"]"#.utf8)))
     }
 
-    func testScannerPreservesClaudeEventsAndSignalsAfterFileProcessing() throws {
+    func testScannerSummarizesClaudeSessionsAndReparsesEvents() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let project = dir.appendingPathComponent("-Users-me-app")
         try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
@@ -36,10 +36,10 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(s.permissionModes, ["acceptEdits"])
         XCTAssertEqual(s.signals.verifyAfterEdit, 1)
         XCTAssertEqual(s.signals.specLanguage, 1)
-        // The scanner drains an autorelease pool after each file. Check that the event text stored
-        // in the returned session is still complete after that drain. The prompt text is fixture data.
-        let first = try XCTUnwrap(s.events.first)
-        let last = try XCTUnwrap(s.events.last)
+        // The full session, parsed again for a digest, keeps every event's text. The prompt text is fixture data.
+        let full = try XCTUnwrap(Scanner.fullSession(for: s))
+        let first = try XCTUnwrap(full.events.first)
+        let last = try XCTUnwrap(full.events.last)
         guard case let .user(prompt) = first.kind,
               case let .tool(name, input, failed, result) = last.kind else {
             return XCTFail("Expected the user prompt and the final tool result")

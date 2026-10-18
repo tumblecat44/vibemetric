@@ -9,10 +9,15 @@ func value(_ flag: String) -> String? {
     return args[i + 1]
 }
 
+/// `--home DIR` reads transcripts from DIR/.claude/projects and DIR/.codex/sessions instead of your own.
+let sources = TranscriptSource.defaults(home: value("--home").map { URL(fileURLWithPath: $0) } ?? FileManager.default.homeDirectoryForCurrentUser)
+/// `--cache FILE` keeps per-transcript summaries there, so later scans parse only new or changed transcripts.
+let cache = value("--cache").map { URL(fileURLWithPath: $0) }
+
 switch command {
 case "scan":
-    let scan = Scanner.scan()
-    print("Scanned \(scan.sessions.count) sessions in \(String(format: "%.2f", scan.duration))s")
+    let scan = Scanner.scan(sources: sources, cache: cache)
+    print("Scanned \(scan.sessions.count) sessions in \(String(format: "%.2f", scan.duration))s (\(scan.parsedFiles) transcripts parsed)")
     for tool in AgentTool.allCases {
         print("  \(tool.rawValue): \(scan.sessions(for: tool).count)")
     }
@@ -20,8 +25,10 @@ case "scan":
 
 case "pack":
     let dir = URL(fileURLWithPath: value("--out") ?? "vibemetric-evidence")
-    let scan = Scanner.scan()
+    let scan = Scanner.scan(sources: sources, cache: cache)
     try EvidencePack.write(scan, to: dir, contextFiles: RuleFiles.snapshot(scan: scan))
+    // The same extra inputs the app adds to every assessment.
+    try EvidencePack.writeSupplementary(scan, to: dir, inputs: ["usage", "model_settings"])
     print("Wrote evidence pack for \(scan.sessions.count) sessions to \(dir.path)")
 
 case "assess":
@@ -64,8 +71,10 @@ default:
     print("""
     usage: vibemetric <command>
 
-      scan                 Parse local transcripts and print counts
-      pack [--out DIR]     Write the redacted evidence pack the assessor reads
+      scan [--home DIR] [--cache FILE]
+                           Parse local transcripts and print counts
+      pack [--out DIR] [--home DIR] [--cache FILE]
+                           Write the redacted evidence pack the assessor reads
       assess [--engine claude|codex] [--model M] [--out DIR] [--previous card.json]
                            Build the pack, run the selected local CLI, and print the card
     """)
