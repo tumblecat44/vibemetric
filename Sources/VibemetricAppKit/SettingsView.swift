@@ -11,6 +11,7 @@ struct SettingsView: View {
     @Environment(\.textScale) private var scale
     @State private var openAtLogin = LaunchAtLogin.isEnabled
     @State private var loginError: String?
+    @State private var shareUsage = Analytics.isEnabled
 
     var body: some View {
         ScrollView {
@@ -89,6 +90,19 @@ struct SettingsView: View {
                     }
                     if let loginError {
                         Text(loginError).scaledFont(12).foregroundStyle(.red)
+                    }
+                }
+
+                if Analytics.isAvailable {
+                    SettingsSection("Usage Data", systemImage: "chart.bar",
+                                    footer: "Anonymous counts help decide what to fix next: installs, app opens, and each assessment’s engine, model, session count, duration, total score, and whether it failed. A random ID groups them; no transcripts, prompts, notes, file paths, project names, or error messages are sent.") {
+                        FieldRow("Share") {
+                            HStack(spacing: 10) {
+                                Toggle("", isOn: $shareUsage).toggleStyle(.switch).labelsHidden()
+                                    .onChange(of: shareUsage) { _, wanted in Analytics.isEnabled = wanted }
+                                Text("Send anonymous usage counts").scaledFont(13).foregroundStyle(Theme.ink)
+                            }
+                        }
                     }
                 }
             }

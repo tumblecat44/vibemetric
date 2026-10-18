@@ -250,6 +250,7 @@ public final class AppModel {
     private var assessor: Assessor?
     private var runTask: Task<Void, Never>?
     private var autoTimer: Timer?
+    private var reportedEngines = false
     /// Reads the transcripts. Replaced in tests.
     @ObservationIgnored var scanRecords: @Sendable () async -> ScanResult = { Scanner.scan(cache: Store.scanCache) }
 
@@ -271,6 +272,7 @@ public final class AppModel {
         // Check once a minute and right after the Mac wakes, so a slot missed while asleep runs on wake.
         autoTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
             Task { @MainActor [weak self] in self?.checkAutoRun() }
+            Task { @MainActor in Analytics.markActiveDay() }
         }
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { _ in
             Task { @MainActor [weak self] in self?.checkAutoRun() }
@@ -391,13 +393,18 @@ public final class AppModel {
         scan = result
         summary = ScanSummary(result)
         phase = .ready
+        if !reportedEngines {
+            reportedEngines = true
+            Analytics.capture("engines_found", ["claude": installations[.claude] != nil, "codex": installations[.codex] != nil,
+                                                "sessions": result.sessions.count, "has_results": !history.isEmpty])
+        }
     }
 
     public var isRunning: Bool { if case .running = phase { return true }; return false }
 
     @discardableResult
     func startAssessment(automatic: Bool = false) -> Bool {
-        guard canStartAssessment, scan != nil, let installation = installations[engine] else { return false }
+        guard canStartAssessment, let lastScan = scan, let installation = installations[engine] else { return false }
         preferences.set(engine.rawValue, forKey: Self.engineKey)
         // An automatic run shouldn't pull the window away from a result the user is reading.
         let wasViewingLatest = selected == nil || selected?.id == history.first?.id
@@ -415,6 +422,10 @@ public final class AppModel {
         Notifier.shared.requestPermissionIfNeeded()
         let options = assessmentOptions
         let modelName = options.model
+        let runProperties: [String: Any] = ["engine": options.engine.rawValue, "model": modelName ?? "default",
+                                            "automatic": automatic, "sessions": lastScan.sessions.count,
+                                            "first_result": history.isEmpty, "has_notes": options.instructions != nil]
+        Analytics.capture("assessment_started", runProperties)
         // Anchor to the latest result so scores only move when new evidence justifies it.
         let baseline = history.first { $0.isComparable(to: options) }
         let previous = baseline.map { EvidencePack.Previous(card: $0.card, date: $0.scannedAt) }
@@ -459,11 +470,19 @@ public final class AppModel {
                 if automatic { setAutoStatus("Scored \(record.card.totalLabel ?? "—")") }
                 Notifier.shared.scored(record, baseline: baseline)
                 phase = .ready
+                Analytics.capture("assessment_completed", runProperties.merging([
+                    "duration_s": Int(outcome.elapsed), "score": record.card.knownTotal, "sessions": scan.sessions.count,
+                    "unknown_dimensions": record.card.unknownCount,
+                ]) { _, new in new })
             } catch is CancellationError {
                 phase = .ready
                 selected = history.first
+                Analytics.capture("assessment_cancelled", runProperties)
             } catch {
                 phase = Task.isCancelled ? .ready : .failed(error.localizedDescription)
+                // The error's type only: messages can contain paths and command output.
+                Analytics.capture(Task.isCancelled ? "assessment_cancelled" : "assessment_failed",
+                                  runProperties.merging(["error_type": String(describing: type(of: error))]) { _, new in new })
                 if automatic && !Task.isCancelled { setAutoStatus("Failed: \(error.localizedDescription)") }
                 if !Task.isCancelled { Notifier.shared.failed(error.localizedDescription, automatic: automatic) }
             }

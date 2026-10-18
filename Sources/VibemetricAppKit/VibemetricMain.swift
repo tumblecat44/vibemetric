@@ -40,6 +40,8 @@ public struct VibemetricMain: App {
         TextScaleCommands.installEqualsShortcut()
         LaunchAtLogin.enableOnFirstLaunch()
         MainActor.assumeIsolated { Notifier.shared.install() }
+        // Before the updater starts, so its first check can't be mistaken for an earlier version's.
+        MainActor.assumeIsolated { Analytics.start() }
         _ = MainActor.assumeIsolated { AppUpdater.shared }
         let model = MainActor.assumeIsolated { AppModel() }
         MainActor.assumeIsolated {
