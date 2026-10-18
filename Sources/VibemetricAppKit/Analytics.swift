@@ -14,8 +14,9 @@ public enum Analytics {
 
     /// The public `phc_` project key, present only in official builds.
     static var projectKey = Bundle.main.object(forInfoDictionaryKey: "VMPostHogKey") as? String
-    /// Goes through the website's /ingest proxy (vibemetric-web `next.config.ts`) to PostHog.
-    static let host = Bundle.main.object(forInfoDictionaryKey: "VMPostHogHost") as? String ?? "https://vibemetric.app/ingest"
+    /// Goes through the website's /ingest proxy (vibemetric-web `next.config.ts`) to PostHog. The www host: the bare
+    /// domain answers with a redirect, which a POST should not depend on.
+    static let host = Bundle.main.object(forInfoDictionaryKey: "VMPostHogHost") as? String ?? "https://www.vibemetric.app/ingest"
 
     static var defaults = UserDefaults.standard
     /// Replaced in tests to see what would be sent.

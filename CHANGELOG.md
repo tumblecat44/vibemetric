@@ -1,7 +1,8 @@
 # Changelog
 
-## 0.4.0 (unreleased)
+## 0.4.0 (2026-10-18)
 
+- Official app: anonymous usage counts (installs, app opens, and each assessment's engine, model, session count, duration and score) help decide what to fix next. No transcripts, prompts, notes, paths or project names are sent. Turn it off in Settings → Usage Data.
 - Details page: Issues and each category's Problem now list only problems. What you already do well in a category appears in its own "What's working" box above the Problem. Applies to new scores; older results show as before.
 - Faster scans for long histories: Vibemetric keeps a small summary of each session (counts, signals and token use, no conversation text beyond a short title) and parses only transcripts that are new or have changed. Scores still cover your whole history, and the evidence the scorer reads is unchanged.
 - Each score scans again first, so a manual score includes sessions from since the app opened, not only since the last daily score.
