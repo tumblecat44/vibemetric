@@ -4,8 +4,9 @@ public struct AssessmentOptions: Sendable {
     public var engine: AssessmentEngine
     public var model: String?
     public var timeout: TimeInterval = 20 * 60
-    /// A score stops reading at `wrapUpAfter` and is written from what was read, so it ends within `scoreTimeLimit`.
-    public static let scoreTimeLimit: TimeInterval = 9 * 60
+    /// A score stops reading at `wrapUpAfter` and is written from what was read; `scoreTimeLimit` is its hard limit.
+    /// `Assessor.run` caps `timeout` at it, so a score asks for it by setting `timeout` (the default suits deep dives).
+    public static let scoreTimeLimit: TimeInterval = 30 * 60
     public var wrapUpAfter: TimeInterval = 6.5 * 60
     /// The digests a score reads in full: every session since the last score first, then leads, then a spread.
     public static let readingTarget = 70

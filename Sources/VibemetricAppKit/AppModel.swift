@@ -213,6 +213,7 @@ public final class AppModel {
     var assessmentOptions: AssessmentOptions {
         var options = AssessmentOptions(engine: engine, model: engine == .claude ? model.alias : codexModel.modelID,
                                         instructions: UserDefaults.standard.string(forKey: Self.instructionsKey))
+        options.timeout = AssessmentOptions.scoreTimeLimit
         // Dev builds only: `defaults write app.vibemetric.dev debugWrapUpAfter 90` reaches the reading time limit early,
         // to try the wrap-up on a short history.
         if AppVariant.isDev, let seconds = preferences.object(forKey: "debugWrapUpAfter") as? Double, seconds > 0 {

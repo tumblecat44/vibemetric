@@ -196,9 +196,9 @@ struct AssessmentTests {
         }
     }
 
-    @Test func scoresHaveATimeLimitUnderTenMinutes() {
+    @Test func scoresStopReadingEarlyWithinAThirtyMinuteLimit() {
         #expect(AssessmentOptions().wrapUpAfter < AssessmentOptions.scoreTimeLimit)
-        #expect(AssessmentOptions.scoreTimeLimit <= 9 * 60)
+        #expect(AssessmentOptions.scoreTimeLimit == 30 * 60)
         #expect(Assessor.prompt(sources: [], now: Date(), digestCount: 150).contains("about 70 of them"))
         #expect(Assessor.prompt(sources: [], now: Date(), digestCount: 12).contains("Read all of them"))
     }

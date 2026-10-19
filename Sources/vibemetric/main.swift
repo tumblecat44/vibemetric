@@ -51,7 +51,9 @@ case "assess":
     let ruleChanges = previous.map { RuleFiles.changesReport(current: rules, previous: nil, since: $0.date) }
     try EvidencePack.write(scan, to: dir, previous: previous, ruleChanges: ruleChanges, contextFiles: rules)
     FileHandle.standardError.write(Data("Evidence pack: \(dir.path) (\(scan.sessions.count) sessions). Running \(engine.name)…\n".utf8))
-    let outcome = try await Assessor().run(packDir: dir, sources: scan.sources, options: AssessmentOptions(engine: engine, model: value("--model")),
+    var options = AssessmentOptions(engine: engine, model: value("--model"))
+    options.timeout = AssessmentOptions.scoreTimeLimit
+    let outcome = try await Assessor().run(packDir: dir, sources: scan.sources, options: options,
                                            previousDate: previous?.date) { event in
         switch event {
         case .started: FileHandle.standardError.write(Data("  started\n".utf8))
