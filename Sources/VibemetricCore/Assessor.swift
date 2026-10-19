@@ -4,6 +4,12 @@ public struct AssessmentOptions: Sendable {
     public var engine: AssessmentEngine
     public var model: String?
     public var timeout: TimeInterval = 20 * 60
+    /// A score stops reading at `wrapUpAfter` and is written from what was read; `scoreTimeLimit` is its hard limit.
+    /// `Assessor.run` caps `timeout` at it, so a score asks for it by setting `timeout` (the default suits deep dives).
+    public static let scoreTimeLimit: TimeInterval = 30 * 60
+    public var wrapUpAfter: TimeInterval = 6.5 * 60
+    /// The digests a score reads in full: every session since the last score first, then leads, then a spread.
+    public static let readingTarget = 70
     /// The person's own notes for the judge, e.g. "the demo-skill sessions were only a test".
     public var instructions: String?
     public static let rubricVersion = "3"
@@ -28,6 +34,8 @@ public struct AssessmentOutcome: Sendable {
     public var cliVersion: String?
     public var actualModel: String?
     public var sessionID: String
+    /// True when the run reached its reading time limit and the card was written from what it had read.
+    public var wrappedUp = false
 }
 
 public enum AssessmentError: LocalizedError {
@@ -78,8 +86,11 @@ public final class Assessor: Sendable {
         let started = Date()
         let prompt = Self.prompt(sources: sources, now: started, previousDate: previousDate,
                                  digestCount: Self.digestCount(packDir), engine: options.engine, instructions: options.instructions)
+        var options = options
+        options.timeout = min(options.timeout, AssessmentOptions.scoreTimeLimit)
         let raw = try await runStructured(prompt: prompt, schema: JSONSchema.scoreCard, packDir: packDir, sources: sources,
-                                          options: options, onProgress: onProgress)
+                                          options: options, wrapUp: (options.wrapUpAfter, Self.wrapUpPrompt),
+                                          onProgress: onProgress)
         var card: ScoreCard
         do {
             card = try JSONDecoder().decode(ScoreCard.self, from: raw.data)
@@ -93,7 +104,8 @@ public final class Assessor: Sendable {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         return AssessmentOutcome(card: card, rawJSON: try encoder.encode(card), elapsed: raw.elapsed,
                                  costUSD: raw.costUSD, turns: raw.turns,
-                                 engine: options.engine, cliVersion: raw.cliVersion, actualModel: raw.actualModel, sessionID: raw.sessionID)
+                                 engine: options.engine, cliVersion: raw.cliVersion, actualModel: raw.actualModel, sessionID: raw.sessionID,
+                                 wrappedUp: raw.wrappedUp)
     }
 
     /// What one structured CLI run returned: the JSON that matched the schema, plus how the run went.
@@ -105,16 +117,56 @@ public final class Assessor: Sendable {
         public var cliVersion: String?
         public var actualModel: String?
         public var sessionID: String
+        /// True when the run hit its reading time limit and the output was written from what it had read.
+        public var wrappedUp = false
     }
 
     /// Runs the selected CLI on `prompt` inside the evidence pack and returns output matching `schema`.
     /// Read-only local tools always; `webAccess` adds web search and pages from `webFetchDomains`.
     /// `forkSessionID` continues a saved session in a new one. With `workingDirectory`, the CLI starts there
     /// instead and `packDir` is added as a readable folder; the run's own files still go in `packDir`.
+    /// With `wrapUp`, a run still going after `wrapUp.after` seconds is stopped and its saved session continued with
+    /// `wrapUp.prompt`, which asks for the output from what it has read so far, within the rest of `options.timeout`.
     public func runStructured(prompt: String, schema: String, packDir: URL, sources: [TranscriptSource],
                               options: AssessmentOptions, webAccess: Bool = false, forkSessionID: String? = nil,
-                              workingDirectory: URL? = nil,
+                              workingDirectory: URL? = nil, wrapUp: (after: TimeInterval, prompt: String)? = nil,
                               onProgress: @escaping @Sendable (Progress) -> Void) async throws -> StructuredOutput {
+        guard let wrapUp, wrapUp.after < options.timeout else {
+            return try await runOnce(prompt: prompt, schema: schema, packDir: packDir, sources: sources, options: options,
+                                     webAccess: webAccess, forkSessionID: forkSessionID, workingDirectory: workingDirectory,
+                                     onProgress: onProgress)
+        }
+        let started = Date()
+        var first = options
+        first.timeout = wrapUp.after
+        do {
+            return try await runOnce(prompt: prompt, schema: schema, packDir: packDir, sources: sources, options: first,
+                                     webAccess: webAccess, forkSessionID: forkSessionID, workingDirectory: workingDirectory,
+                                     resumable: true, onProgress: onProgress)
+        } catch let stopped as DeadlineReached {
+            // Without a saved session there is nothing to continue.
+            guard let sessionID = stopped.sessionID, UUID(uuidString: sessionID) != nil else { throw AssessmentError.timedOut }
+            onProgress(.thinking(Self.wrapUpNotice))
+            var rest = options
+            rest.timeout = max(options.timeout - Date().timeIntervalSince(started), 30)
+            var output = try await runOnce(prompt: wrapUp.prompt, schema: schema, packDir: packDir, sources: sources, options: rest,
+                                           webAccess: webAccess, forkSessionID: sessionID, workingDirectory: workingDirectory,
+                                           onProgress: onProgress)
+            output.elapsed = Date().timeIntervalSince(started)
+            output.wrappedUp = true
+            return output
+        }
+    }
+
+    /// Shown in the activity log when a run reaches its reading time limit and is asked to write the card.
+    public static let wrapUpNotice = "Time limit reached. Writing the score from what was read so far."
+
+    /// A run stopped at its time limit, with the session it had saved so far.
+    struct DeadlineReached: Error { var sessionID: String? }
+
+    private func runOnce(prompt: String, schema: String, packDir: URL, sources: [TranscriptSource],
+                         options: AssessmentOptions, webAccess: Bool, forkSessionID: String?, workingDirectory: URL?,
+                         resumable: Bool = false, onProgress: @escaping @Sendable (Progress) -> Void) async throws -> StructuredOutput {
         try Task.checkCancellation()
         let engine = options.engine
         let installed: CLIInstallation
@@ -139,9 +191,15 @@ public final class Assessor: Sendable {
                                        webAccess: webAccess, forkSessionID: forkSessionID, readableDirectories: workingDirectory == nil ? [] : [packDir])
         let reader = AssessmentStream(engine: engine, onProgress: onProgress)
         onProgress(.started)
-        let output = try await process.run(executable: installed.executable, arguments: arguments,
+        let output: CLIProcess.Output
+        do {
+            output = try await process.run(executable: installed.executable, arguments: arguments,
                                            directory: workingDirectory ?? packDir, environment: installed.environment, input: promptFile,
                                            timeout: options.timeout) { reader.consume($0) }
+        } catch AssessmentError.timedOut where resumable {
+            reader.finish()
+            throw DeadlineReached(sessionID: reader.snapshot.sessionID)
+        }
         reader.finish()
         try Task.checkCancellation()
         let snapshot = reader.snapshot
@@ -254,6 +312,13 @@ public final class Assessor: Sendable {
         return text
     }
 
+    /// Sent to the stopped scoring session when its reading time runs out.
+    static let wrapUpPrompt = """
+        Time is up for reading. Do not read any more files. Return the complete score card now, matching the schema, \
+        from the evidence you have already read. Score every dimension you have evidence for. Set `sessionsExamined` to the \
+        digests and transcripts you actually read, and add a line to `scope.limits` saying the run stopped reading at its time limit.
+        """
+
     static func prompt(sources: [TranscriptSource], now: Date, previousDate: Date? = nil, digestCount: Int = 0, engine: AssessmentEngine = .claude,
                        instructions: String? = nil) -> String {
         let f = DateFormatter()
@@ -292,9 +357,12 @@ public final class Assessor: Sendable {
         Method: start with `overview.md` and `leads.md`, then read digests across projects, tools, and dates, following connections between sessions \
         (for example, a rule written in one session and applied in a later one). \(readingInstructions) Aim to finish in about five minutes. \
         Count a session as examined only if you read its digest or transcript body; the index row alone does not count. \
-        Coverage matters: this pack has \(digestCount) digests in `sessions/`. If that is fewer than 300, read every one of them \
-        (batch independent reads when possible); otherwise read at least 300 spread across tools, projects, and dates. \
-        Do this even when a previous card exists. `sessionsExamined` must equal the digests and transcripts you actually read.
+        Reading budget: this pack has \(digestCount) digests in `sessions/`. Read \(min(digestCount, AssessmentOptions.readingTarget) == digestCount ? "all of them" : "about \(AssessmentOptions.readingTarget) of them"), \
+        several per turn (batch independent reads in one turn), in this order: every session listed in `changes.md` when it exists, \
+        then the top sessions in `leads.md` for each dimension, then a spread across tools, projects, and dates. `overview.md`, \
+        `sessions.tsv`, and `leads.md` already cover every session, so use them for counts and patterns across the whole history. \
+        Then stop reading and write the card. The run has a hard time limit; if it is reached you will be asked to return the card \
+        from what you have read. `sessionsExamined` must equal the digests and transcripts you actually read.
         \(previousDate.map { Self.followUpRules(previousDate: f.string(from: $0)) } ?? "")\(instructions.map(Self.personNotes) ?? "")
         # Return format
 
@@ -363,7 +431,7 @@ public final class Assessor: Sendable {
         In `previous-card.json`, Security already includes any earlier deduction; `scoreBeforeDeduction` holds the score before it.
         - `roadmap`: up to 3 stages from "AI-use improvement roadmap"; `change` and `result` are one short sentence each.
         - `scope`: `assessedAt` is today's date; `recordDates` covers each tool with records; `sessionsExamined` and `tasksCheckedInDetail` are honest counts; \
-        set `elapsedMinutes` to 0 (the app measures it); `limits` holds the important investigation limits, including any shortfall against 300 sessions, the project screening results the rubric asks for in the Scope note, and the evidence limitation behind each Not assessable dimension.
+        set `elapsedMinutes` to 0 (the app measures it); `limits` holds the important investigation limits, including any shortfall against the reading budget, the project screening results the rubric asks for in the Scope note, and the evidence limitation behind each Not assessable dimension.
         """
     }
 }

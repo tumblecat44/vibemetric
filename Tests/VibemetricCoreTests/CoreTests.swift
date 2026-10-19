@@ -248,8 +248,10 @@ final class FollowUpTests: XCTestCase {
         XCTAssertTrue(card.isLowCoverage(sessionsAvailable: 45))
         card.scope.sessionsExamined = 40
         XCTAssertFalse(card.isLowCoverage(sessionsAvailable: 45))
-        card.scope.sessionsExamined = 260
-        XCTAssertFalse(card.isLowCoverage(sessionsAvailable: 1000)) // the target caps at 300
+        card.scope.sessionsExamined = 60
+        XCTAssertFalse(card.isLowCoverage(sessionsAvailable: 1000)) // the target caps at the reading target (70)
+        card.scope.sessionsExamined = 40
+        XCTAssertTrue(card.isLowCoverage(sessionsAvailable: 1000))
     }
 
     func testShellWritesToRuleFilesCountAsWrites() {

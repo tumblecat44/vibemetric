@@ -55,6 +55,19 @@ enum Snapshot {
                         .environment(\.colorScheme, scheme)
                     try render(panel, scheme: scheme).write(to: dir.appendingPathComponent("menubar-\(scheme == .light ? "light" : "dark").png"))
                 }
+                // The running screen partway through reading: 23 of 70 digests, 3 minutes in.
+                let now = Date()
+                model.runStarted = now.addingTimeInterval(-185)
+                model.progress = ScoreProgress(started: now.addingTimeInterval(-185))
+                model.progress.startReading(digests: 150, at: now.addingTimeInterval(-170))
+                for i in 0..<23 { model.progress.noteRead("Read cc-\(i)a1b2c3d4.md") }
+                model.activity = ["Claude Code is reading your evidence pack…", "Read overview.md", "Read leads.md", "Read cc-0a1b2c3d4.md"]
+                    .enumerated().map { AppModel.Activity(text: $0.element, isThought: $0.offset == 0) }
+                for scheme in [ColorScheme.light, .dark] {
+                    let running = RunningView().environment(model).frame(width: 860, height: 520).background(Theme.paper)
+                        .environment(\.colorScheme, scheme)
+                    try render(running, scheme: scheme).write(to: dir.appendingPathComponent("running-\(scheme == .light ? "light" : "dark").png"))
+                }
                 defaults.removePersistentDomain(forName: suite)
             }
             print("Snapshots written to \(dir.path)")

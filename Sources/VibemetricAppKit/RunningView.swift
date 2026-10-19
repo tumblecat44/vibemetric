@@ -6,21 +6,34 @@ struct RunningView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack(alignment: .center, spacing: 14) {
-                ProgressView().controlSize(.regular)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(model.isPreparingAssessment ? "Preparing your session" : "Scoring your AI practice")
-                        .scaledFont(24, weight: .bold, design: .serif)
-                        .foregroundStyle(Theme.ink)
-                    TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                        Text(model.isPreparingAssessment
-                             ? "\(elapsed(ctx.date)) elapsed · preparing evidence"
-                             : "\(elapsed(ctx.date)) elapsed · \(model.readsSoFar) reading steps")
-                            .scaledFont(12, design: .monospaced)
-                            .foregroundStyle(Theme.muted)
-                    }
-                }
+                Text(model.isPreparingAssessment ? "Preparing your session" : "Scoring your AI practice")
+                    .scaledFont(24, weight: .bold, design: .serif)
+                    .foregroundStyle(Theme.ink)
                 Spacer()
                 Button("Cancel", role: .cancel) { model.cancel() }
+            }
+
+            // Moves with time as well as reads, so it is redrawn every second.
+            TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                let percent = model.progress.percent(at: ctx.date)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(model.progress.label)
+                            .scaledFont(13, weight: .semibold)
+                            .foregroundStyle(Theme.ink)
+                        Spacer()
+                        Text("\(percent)%")
+                            .scaledFont(15, weight: .bold)
+                            .monospacedDigit()
+                            .foregroundStyle(Theme.accent)
+                    }
+                    ProgressBar(fraction: Double(percent) / 100)
+                    Text("\(elapsed(ctx.date)) elapsed · usually done within 8 minutes")
+                        .scaledFont(12, design: .monospaced)
+                        .foregroundStyle(Theme.muted)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(model.progress.label), \(percent) percent")
             }
 
             Panel(padding: 0) {
@@ -61,5 +74,22 @@ struct RunningView: View {
     private func elapsed(_ now: Date) -> String {
         let s = Int(now.timeIntervalSince(model.runStarted ?? now))
         return String(format: "%d:%02d", s / 60, s % 60)
+    }
+}
+
+/// A thin rounded bar in the accent color. Drawn rather than a ProgressView, so it also renders in snapshots.
+private struct ProgressBar: View {
+    var fraction: Double
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Theme.rule.opacity(0.6))
+                Capsule().fill(Theme.accent)
+                    .frame(width: max(8, geo.size.width * min(max(fraction, 0), 1)))
+                    .animation(.easeOut(duration: 0.4), value: fraction)
+            }
+        }
+        .frame(height: 8)
     }
 }

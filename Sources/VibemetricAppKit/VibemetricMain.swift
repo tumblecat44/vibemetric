@@ -209,7 +209,7 @@ struct InProgressRow: View {
                 Text("Scoring…").scaledFont(13, weight: .semibold)
                 TimelineView(.periodic(from: .now, by: 1)) { ctx in
                     let s = Int(ctx.date.timeIntervalSince(model.runStarted ?? ctx.date))
-                    Text(String(format: "%d:%02d elapsed", s / 60, s % 60))
+                    Text(String(format: "%d%% · %d:%02d elapsed", model.progress.percent(at: ctx.date), s / 60, s % 60))
                         .scaledFont(10, design: .monospaced)
                         .foregroundStyle(.secondary)
                 }

@@ -52,7 +52,7 @@ struct MenuBarPanel: View {
                     ProgressView().controlSize(.small)
                     TimelineView(.periodic(from: .now, by: 1)) { ctx in
                         let s = Int(ctx.date.timeIntervalSince(model.runStarted ?? ctx.date))
-                        Text(String(format: "Scoring… %d:%02d", s / 60, s % 60))
+                        Text(String(format: "Scoring… %d%% · %d:%02d", model.progress.percent(at: ctx.date), s / 60, s % 60))
                             .scaledFont(12, design: .monospaced)
                     }
                 }
