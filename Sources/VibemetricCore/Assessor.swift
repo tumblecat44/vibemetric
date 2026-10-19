@@ -145,7 +145,7 @@ public final class Assessor: Sendable {
         } catch let stopped as DeadlineReached {
             // Without a saved session there is nothing to continue.
             guard let sessionID = stopped.sessionID, UUID(uuidString: sessionID) != nil else { throw AssessmentError.timedOut }
-            onProgress(.thinking("Time limit reached. Writing the score from what was read so far."))
+            onProgress(.thinking(Self.wrapUpNotice))
             var rest = options
             rest.timeout = max(options.timeout - Date().timeIntervalSince(started), 30)
             var output = try await runOnce(prompt: wrapUp.prompt, schema: schema, packDir: packDir, sources: sources, options: rest,
@@ -156,6 +156,9 @@ public final class Assessor: Sendable {
             return output
         }
     }
+
+    /// Shown in the activity log when a run reaches its reading time limit and is asked to write the card.
+    public static let wrapUpNotice = "Time limit reached. Writing the score from what was read so far."
 
     /// A run stopped at its time limit, with the session it had saved so far.
     struct DeadlineReached: Error { var sessionID: String? }

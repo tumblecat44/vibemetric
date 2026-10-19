@@ -248,6 +248,7 @@ public final class AppModel {
     var activity: [Activity] = []
     var runStarted: Date?
     var readsSoFar = 0
+    var progress = ScoreProgress()
     var isPreparingAssessment = false
 
     /// What the last automatic check did, e.g. "Skipped: no new sessions since the last score".
@@ -427,6 +428,7 @@ public final class AppModel {
         runningEngine = engine
         Notifier.shared.requestPermissionIfNeeded()
         let options = assessmentOptions
+        progress = ScoreProgress(started: runStarted ?? Date(), wrapUpAfter: options.wrapUpAfter)
         let modelName = options.model
         let runProperties: [String: Any] = ["engine": options.engine.rawValue, "model": modelName ?? "default",
                                             "automatic": automatic, "sessions": lastScan.sessions.count,
@@ -459,6 +461,7 @@ public final class AppModel {
                     throw CocoaError(.fileWriteUnknown)
                 }
                 isPreparingAssessment = false
+                progress.startReading(digests: Assessor.digestCount(packDir))
                 let outcome = try await assessor.run(packDir: packDir, sources: scan.sources, options: options,
                                                      previousDate: previous?.date) { event in
                     Task { @MainActor [weak self] in self?.record(event) }
@@ -475,6 +478,7 @@ public final class AppModel {
                 if !automatic || wasViewingLatest { selected = record }
                 if automatic { setAutoStatus("Scored \(record.card.totalLabel ?? "—")") }
                 Notifier.shared.scored(record, baseline: baseline)
+                progress.finish()
                 phase = .ready
                 Analytics.capture("assessment_completed", runProperties.merging([
                     "duration_s": Int(outcome.elapsed), "wrapped_up": outcome.wrappedUp, "score": record.card.knownTotal, "sessions": scan.sessions.count,
@@ -530,8 +534,10 @@ public final class AppModel {
             activity.append(Activity(text: "\((runningEngine ?? engine).name) is reading your evidence pack…", isThought: true))
         case let .reading(what):
             readsSoFar += 1
+            progress.noteRead(what)
             activity.append(Activity(text: what, isThought: false))
         case let .thinking(text):
+            if text == Assessor.wrapUpNotice { progress.startWriting() }
             activity.append(Activity(text: text, isThought: true))
         }
         if activity.count > 200 { activity.removeFirst(activity.count - 200) }
