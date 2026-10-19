@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Scoring (rubric 4): running with a permission-bypass mode no longer costs a point. Security is scored only on the restrictions, hooks, isolation and checks your records show. Because the rules changed, your next score starts a new baseline instead of being compared with older scores. Older results keep the deduction they were scored with.
+
 ## 0.4.2 (2026-10-19)
 
 - Official app: a deep dive now sees your earlier deep dives, up to ten from the same score and ten in the same category from other scores, so running one again finds a different bottleneck instead of repeating the last one.

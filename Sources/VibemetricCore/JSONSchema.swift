@@ -56,11 +56,6 @@ enum JSONSchema {
                 ]),
                 ["type": "null"],
             ]],
-            "deductions": array(object([
-                "points": ["type": "integer", "enum": [1]],
-                "reason": str,
-                "evidence": array(evidence, max: 4),
-            ]), max: 1),
             "roadmap": array(object(["stage": int, "change": str, "result": str]), min: 1, max: 3),
             "scope": object([
                 "assessedAt": str, "timeZone": str,

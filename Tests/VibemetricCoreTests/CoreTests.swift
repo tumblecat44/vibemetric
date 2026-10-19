@@ -75,7 +75,7 @@ final class CoreTests: XCTestCase {
 
     func testSchemaIsValidJSON() throws {
         let obj = try JSONSerialization.jsonObject(with: Data(JSONSchema.scoreCard.utf8)) as? [String: Any]
-        XCTAssertEqual((obj?["required"] as? [String])?.count, 9)
+        XCTAssertEqual((obj?["required"] as? [String])?.count, 8) // rubric 4 dropped `deductions`
         XCTAssertTrue((obj?["required"] as? [String])?.contains("summary") == true)
     }
 
@@ -315,10 +315,12 @@ final class RubricTwoTests: XCTestCase {
         XCTAssertEqual(card.knownTotal, 49)
     }
 
-    func testSchemaAllowsOneDeductionEntry() throws {
+    func testRubricFourHasNoBypassDeduction() throws {
         let obj = try JSONSerialization.jsonObject(with: Data(JSONSchema.scoreCard.utf8)) as! [String: Any]
-        let deductions = (obj["properties"] as! [String: Any])["deductions"] as! [String: Any]
-        XCTAssertEqual(deductions["maxItems"] as? Int, 1)
+        XCTAssertNil((obj["properties"] as! [String: Any])["deductions"], "New cards have no deduction to report")
+        XCTAssertFalse(Assessor.rubric.contains("Permission-bypass deduction"))
+        XCTAssertTrue(Assessor.rubric.contains("is not penalized by itself"))
+        XCTAssertFalse(Assessor.prompt(sources: [], now: Date()).contains("`deductions`"))
     }
 
     func testPromptIncludesNotesAndScoresAfresh() {
@@ -342,12 +344,11 @@ final class RubricTwoTests: XCTestCase {
         XCTAssertEqual(Dimension.efficiencyCost.rawValue, "efficiency_cost")
     }
 
-    func testRubricIsVersionThree() {
-        XCTAssertEqual(AssessmentOptions.rubricVersion, "3")
+    func testRubricIsVersionFour() {
+        XCTAssertEqual(AssessmentOptions.rubricVersion, "4")
         XCTAssertTrue(Assessor.rubric.contains("### 5. Orchestration I: Task Mapping"))
         XCTAssertTrue(Assessor.rubric.contains("### 6. Orchestration II: Feedback Loops"))
         XCTAssertTrue(Assessor.rubric.contains("### 10. Efficiency & Cost"))
-        XCTAssertTrue(Assessor.rubric.contains("Permission-bypass deduction"))
     }
 }
 
