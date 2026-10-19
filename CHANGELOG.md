@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.2 (2026-10-19)
+
+- Official app: a deep dive now sees your earlier deep dives, up to ten from the same score and ten in the same category from other scores, so running one again finds a different bottleneck instead of repeating the last one.
+
 ## 0.4.1 (2026-10-18)
 
 - While scoring, a progress bar shows the percentage and the stage: preparing, reading sessions ("23 of 70"), then writing your score. The menu bar and the sidebar show the percentage too.
