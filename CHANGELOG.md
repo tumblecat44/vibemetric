@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.1 (2026-10-18)
 
 - While scoring, a progress bar shows the percentage and the stage: preparing, reading sessions ("23 of 70"), then writing your score. The menu bar and the sidebar show the percentage too.
 - Scores finish within about 8 minutes, even with a long history. The scorer reads about 70 sessions in full: every session since your last score first, then the most telling ones for each category, then a spread across projects and dates. Counts and patterns still cover every session.
