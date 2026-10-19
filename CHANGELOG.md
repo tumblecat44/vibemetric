@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.3 (2026-10-19)
 
 - Scoring (rubric 4): running with a permission-bypass mode no longer costs a point. Security is scored only on the restrictions, hooks, isolation and checks your records show. Because the rules changed, your next score starts a new baseline instead of being compared with older scores. Older results keep the deduction they were scored with.
 
