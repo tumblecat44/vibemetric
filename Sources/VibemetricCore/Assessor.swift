@@ -370,11 +370,29 @@ public final class Assessor: Sendable {
         itself and computes the total, bands, and progress bars.
 
         The card is read in a small window by a busy developer. Section 3 still decides what to judge and which evidence counts; \
-        this section decides how to write it down. Write every field as short, plain sentences of at most 20 words, in the active \
-        voice, addressed to the person as "you". No Markdown: no asterisks, headings, bullets, tables, or emoji. Put commands, file \
+        this section decides how to write it down. Use Section 3's reasoning to decide the scores, then write the app fields \
+        for their stated purpose instead of copying the full scoring argument into them. Keep anchor numbers, score \
+        requirements, and commentary about your assessment process out of the problem and solution text. Explain the \
+        concrete practice or result instead. Explain the person's work as a colleague speaking directly to them, using \
+        everyday language, concrete verbs, and one point per sentence. Address them as "you", but name the actual actor: \
+        work the AI performed, skipped, or reported belongs to the AI, not to the person. Keep sentences concise without \
+        deleting the context or causal connections needed to understand them. No Markdown: no asterisks, headings, bullets, tables, or emoji. Put commands, file \
         names, and settings in backticks, for example `CLAUDE.md` or `npm test`. Use a concrete number from the records whenever one \
         exists ("8 of 31 code changes", "in 9 prompts"), and never invent one. Name a project by the name the records use. \
         Write dates in sentences as month and day, for example "Oct 4", never as 2026-10-04.
+
+        Before writing each problem, connect the intended outcome, any work the person entrusted to AI, what each actor \
+        actually did, and the work or risk left with the person. Explain what their approach was meant to achieve only when \
+        the records support it. Lead with what those facts mean for the person, then use the case to explain that meaning. \
+        Connect actions with results instead of listing events or reporting an unexplained status. Explain what was missing \
+        and why it mattered in that task, so the person does not have to infer why the situation is a problem. Preserve the \
+        technical detail needed to understand it. Do not invent intentions, causes, recurrence, or costs.
+
+        Connect the solution to that supported problem and cause. Say who changes what and why it reduces the person's \
+        burden. Account for procedures already in place and subsequent repairs. Keep the burden already experienced separate \
+        from the benefit expected after the fix. Before returning, reread each problem and solution together: check that \
+        every action belongs to the correct actor, each sentence follows from the previous one, and the proposed change \
+        addresses the problem just explained. Shorten repetition after making the explanation clear.
 
         - `language`: BCP-47 code of the person's primary language in the records.
         - `diagnosis`: one plain sentence of at most 20 words that names the main strength and the main gap, for example \
@@ -390,16 +408,20 @@ public final class Assessor: Sendable {
         in their sessions, with a number where one exists, for example "Commits and pushes go to a cheaper subagent, 12 times in two sessions." \
         The app shows them under "What's working:" above the problem. An empty array when nothing stands out. Group related habits \
         into one sentence rather than listing them separately.
-          - `saw`: only the problem: what keeps this dimension from 10, as it happened in the person's sessions and written as \
-        `situation` below asks. The app shows it under "Problem:" and in the list of issues, so it must contain no praise, \
-        no "but", and nothing from `strengths`. An empty string at 10. Never start with a label such as "Positive:", "Gap:", or "Problem:".
-          - `impact`: why the problem matters, in one sentence: what it costs in the person's actual work. No praise. An empty string at 10.
+          - `saw`: the supported problem or limitation in this dimension, written as `situation` below asks. The app shows \
+        it under "Problem:" and in the list of issues. Start with the problem, not a list of what already works. Include \
+        setup only where it explains how the problem arose; put strengths in `strengths`. If the limitation is missing \
+        records rather than an observed failure, name the specific practice or result the records do not establish without \
+        inventing a failure or burden. Do not retell the scoring argument or name a target score. An empty string at 10. \
+        Never start with a label such as "Positive:", "Gap:", or "Problem:".
+          - `impact`: the supported burden or risk left with the person, in one sentence. This appears under Problem, \
+        so do not put advice or the expected benefit of the solution here. No praise. An empty string at 10.
           - `tryThis`: one concrete action that reaches the next anchor, in one sentence starting with a verb; null at 10. \
         The app shows it as the solution's title.
           - `solutionSteps`: below 10, the solution explained as 2–4 bullets the app shows under that title. Together they say \
         what to change and where (the file, setting, tool, or habit, named as in the person's own projects), how to do it in their \
         next task, why it fixes the problem above, and how they will be able to tell it worked. Each bullet is one full, plain \
-        sentence of at most 25 words with a clear actor, and adds something the title does not already say. No pasted prompts, \
+        sentence with a clear actor, and adds something the title does not already say. No pasted prompts, \
         rubric terms, or "consider". An empty array at 10.
         For a `not_assessable` dimension, `strengths` is empty, `saw` states the evidence limitation, `impact` says what would make it assessable, \
         `tryThis` is null, and `solutionSteps` is empty.
@@ -409,15 +431,17 @@ public final class Assessor: Sendable {
           - `changeReason`: null when there is no previous card or the score is unchanged; otherwise one sentence on what in the records \
         led to a different score than last time.
         - `improvement`: "One improvement to make first". `title` is the task, at most 10 words, starting with a verb. `dimension` is the \
-        dimension it raises. `situation` is the problem, told the way you would tell a friend: what the person or their AI actually did, \
-        how often, and what it cost them, as 2 or 3 short plain sentences of at most 15 words each, one point per sentence, \
-        because the app shows each sentence as its own bullet. Name the real thing (the command, the rule, \
+        dimension it raises. `situation` explains one problem through 2 or 3 connected, plain sentences. Lead with the \
+        consequence for the person, then explain what the person and AI did that produced it. Include the task and intended \
+        outcome where needed to understand that connection. Keep one point per sentence because the app shows each sentence \
+        as its own bullet. Name the real thing (the command, the rule, \
         the kind of task), not the rubric's terms: no "anchor", "completion criteria", "evidence", "dimension", or "the user". \
         For example: "The AI changed code 23 times last week. It never ran your tests once. You caught three breakages \
         yourself, a day later." or "You retyped the same rule, `use pnpm, never npm`, in 9 sessions. The AI still reached for npm \
-        twice." `impact` is why it matters, one short sentence; the app adds it as the last bullet. \
+        twice." `impact` names the supported burden or risk that remained, without repeating `situation`; the app adds it \
+        as the last Problem bullet. Do not put the solution's expected benefit here; put the observable improvement in `signOfSuccess`. \
         `actions` explain the solution under `title` as 3–4 bullets: what to change and where, how to do it in the next task, \
-        and why it fixes the problem. Each is one full, plain sentence of at most 25 words that adds something the title does \
+        and why it fixes the problem. Each is one full, plain sentence that adds something the title does \
         not already say. `suggestedInstruction` is the text to paste into the context file or prompt, written so it works as is; \
         the app does not show it yet, so put everything the person needs in `actions`. `tryItOn` names the task from the records to try it on; `signOfSuccess` is the observable sign it \
         helped. `evidence`: up to 3 references, as above. `count` and `countLabel` are the headline number the menu bar shows \
