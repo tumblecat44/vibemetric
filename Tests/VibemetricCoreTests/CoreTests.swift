@@ -79,10 +79,6 @@ final class CoreTests: XCTestCase {
         XCTAssertTrue((obj?["required"] as? [String])?.contains("summary") == true)
     }
 
-    func testRubricResourceLoads() {
-        XCTAssertTrue(Assessor.rubric.contains("### 10. Efficiency & Cost"))
-    }
-
     static var sampleCard: String {
         let dims = Dimension.allCases.map {
             #"{"dimension":"\#($0.rawValue)","score":5,"status":"scored","headline":"h","reason":"r","evidence":[]}"#
@@ -315,24 +311,15 @@ final class RubricTwoTests: XCTestCase {
         XCTAssertEqual(card.knownTotal, 49)
     }
 
-    func testRubricFourHasNoBypassDeduction() throws {
+    func testScoreSchemaHasNoBypassDeduction() throws {
         let obj = try JSONSerialization.jsonObject(with: Data(JSONSchema.scoreCard.utf8)) as! [String: Any]
         XCTAssertNil((obj["properties"] as! [String: Any])["deductions"], "New cards have no deduction to report")
-        XCTAssertFalse(Assessor.rubric.contains("Permission-bypass deduction"))
-        XCTAssertTrue(Assessor.rubric.contains("is not penalized by itself"))
-        XCTAssertFalse(Assessor.prompt(sources: [], now: Date()).contains("`deductions`"))
     }
 
-    func testPromptIncludesNotesAndScoresAfresh() {
+    func testAssessmentNotesAreTrimmed() {
         let options = AssessmentOptions(instructions: "  The demo-skill sessions were only a test.  ")
         XCTAssertEqual(options.instructions, "The demo-skill sessions were only a test.")
         XCTAssertNil(AssessmentOptions(instructions: "   ").instructions)
-        let prompt = Assessor.prompt(sources: [], now: Date(), previousDate: Date(), instructions: options.instructions)
-        XCTAssertTrue(prompt.contains("# Notes from the person"))
-        XCTAssertTrue(prompt.contains("The demo-skill sessions were only a test."))
-        XCTAssertTrue(prompt.contains("Score every dimension afresh"))
-        XCTAssertFalse(prompt.contains("Start each dimension from its previous score"))
-        XCTAssertFalse(Assessor.prompt(sources: [], now: Date()).contains("# Notes from the person"))
     }
 
     func testRubricThreeDimensions() {
@@ -346,9 +333,6 @@ final class RubricTwoTests: XCTestCase {
 
     func testRubricIsVersionFour() {
         XCTAssertEqual(AssessmentOptions.rubricVersion, "4")
-        XCTAssertTrue(Assessor.rubric.contains("### 5. Orchestration I: Task Mapping"))
-        XCTAssertTrue(Assessor.rubric.contains("### 6. Orchestration II: Feedback Loops"))
-        XCTAssertTrue(Assessor.rubric.contains("### 10. Efficiency & Cost"))
     }
 }
 

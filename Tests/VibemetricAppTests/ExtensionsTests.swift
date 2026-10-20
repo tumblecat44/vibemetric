@@ -22,6 +22,10 @@ struct ExtensionsTests {
         #expect(Extensions.settingsSections.isEmpty)
         #expect(Extensions.privacyNotes.isEmpty)
         #expect(Extensions.currentBusyReason == nil)
+        #expect(Extensions.evidencePackContributors.isEmpty)
+        Extensions.evidencePackContributors.append { _ in throw CocoaError(.fileWriteUnknown) }
+        Extensions.reset()
+        #expect(Extensions.evidencePackContributors.isEmpty)
     }
 
     @Test func busyModuleBlocksANewAssessmentAndKeepsItsCard() throws {

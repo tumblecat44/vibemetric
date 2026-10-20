@@ -461,6 +461,8 @@ public final class AppModel {
                 guard FileManager.default.fileExists(atPath: packDir.appendingPathComponent("overview.md").path) else {
                     throw CocoaError(.fileWriteUnknown)
                 }
+                let context = EvidencePackContext(packDirectory: packDir, baseline: baseline, options: options, sources: scan.sources)
+                for contribute in Extensions.evidencePackContributors { try contribute(context) }
                 isPreparingAssessment = false
                 progress.startReading(digests: Assessor.digestCount(packDir))
                 let outcome = try await assessor.run(packDir: packDir, sources: scan.sources, options: options,
