@@ -24,6 +24,8 @@ public enum Extensions {
     public static var isCardInUse: [@MainActor (CardRecord) -> Bool] = []
     /// Work in progress that blocks a new scan; returns a short reason, or nil when idle.
     public static var busyReason: [@MainActor () -> String?] = []
+    /// Adds local evidence files after a pack is prepared and before its assessment starts.
+    public static var evidencePackContributors: [@MainActor (URL) throws -> Void] = []
     /// Handlers for notification clicks, keyed by the userInfo key they own. The value is that key's string.
     public static var notificationHandlers: [String: @MainActor (String) -> Void] = [:]
 
@@ -31,6 +33,7 @@ public enum Extensions {
     static func reset() {
         sidebarTabs = []; categoryFooter = nil; cardSections = []; settingsSections = []; privacyNotes = []
         onCardSelected = []; onCardDeleted = []; isCardInUse = []; busyReason = []; notificationHandlers = [:]
+        evidencePackContributors = []
     }
 
     /// The first reason any module is busy, or nil.
