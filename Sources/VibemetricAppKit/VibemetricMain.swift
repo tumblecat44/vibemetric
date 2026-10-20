@@ -57,7 +57,8 @@ public struct VibemetricMain: App {
             RootView()
                 .environment(model)
                 .environment(\.textScale, textScale)
-                .frame(minWidth: RootView.sidebarMinWidth + RootView.detailMinWidth, minHeight: 640)
+                // Width comes from RootView, which follows the sidebar; an outer minWidth here would override it.
+                .frame(minHeight: 640)
         }
         .windowToolbarStyle(.unified(showsTitle: false))
         .commands {
@@ -84,6 +85,9 @@ struct RootView: View {
     @Environment(\.openWindow) private var openWindow
     /// Always both columns: the sidebar is never folded away, even when the window gets narrow.
     @State private var columns = NavigationSplitViewVisibility.all
+    /// The sidebar's current width. The window's minimum is this plus the detail column's minimum, so dragging
+    /// the window's edge in stops before it would take space from the sidebar.
+    @State private var sidebarWidth = RootView.sidebarIdealWidth
 
     /// Sidebar widths: it never gets narrower than the minimum, and people can drag it out to the maximum.
     static let sidebarMinWidth: CGFloat = 220
@@ -92,6 +96,9 @@ struct RootView: View {
     /// The detail column absorbs window resizing down to this width; the window's minimum is both minimums added,
     /// so shrinking the window never squeezes the sidebar.
     static let detailMinWidth: CGFloat = 640
+    /// Some macOS versions report the sidebar's content 8 points narrower than its column (CI's runner does), so the
+    /// window's minimum allows for that much column chrome rather than squeeze the sidebar by it.
+    static let sidebarChromeAllowance: CGFloat = 8
 
     var body: some View {
         @Bindable var model = model
@@ -137,6 +144,7 @@ struct RootView: View {
             // The toggle would fold the sidebar away; remove it before setting the widths, because a toolbar modifier
             // applied after `navigationSplitViewColumnWidth` hides the widths from the split view.
             .toolbar(removing: .sidebarToggle)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { sidebarWidth = $0 }
             .navigationSplitViewColumnWidth(min: Self.sidebarMinWidth, ideal: Self.sidebarIdealWidth, max: Self.sidebarMaxWidth)
         } detail: {
             ZStack {
@@ -153,8 +161,11 @@ struct RootView: View {
                     HomeView()
                 }
             }
+            // A small ideal width, so the split view lets the detail shrink to its minimum before anything else.
+            .frame(minWidth: Self.detailMinWidth, idealWidth: Self.detailMinWidth, maxWidth: .infinity)
             .navigationSplitViewColumnWidth(min: Self.detailMinWidth, ideal: 860)
         }
+        .frame(minWidth: max(sidebarWidth, Self.sidebarMinWidth) + Self.sidebarChromeAllowance + Self.detailMinWidth)
         .onChange(of: columns) { _, visibility in
             if visibility != .all { columns = .all }
         }
