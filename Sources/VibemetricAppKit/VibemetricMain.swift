@@ -96,6 +96,9 @@ struct RootView: View {
     /// The detail column absorbs window resizing down to this width; the window's minimum is both minimums added,
     /// so shrinking the window never squeezes the sidebar.
     static let detailMinWidth: CGFloat = 640
+    /// Some macOS versions report the sidebar's content 8 points narrower than its column (CI's runner does), so the
+    /// window's minimum allows for that much column chrome rather than squeeze the sidebar by it.
+    static let sidebarChromeAllowance: CGFloat = 8
 
     var body: some View {
         @Bindable var model = model
@@ -162,7 +165,7 @@ struct RootView: View {
             .frame(minWidth: Self.detailMinWidth, idealWidth: Self.detailMinWidth, maxWidth: .infinity)
             .navigationSplitViewColumnWidth(min: Self.detailMinWidth, ideal: 860)
         }
-        .frame(minWidth: max(sidebarWidth, Self.sidebarMinWidth) + Self.detailMinWidth)
+        .frame(minWidth: max(sidebarWidth, Self.sidebarMinWidth) + Self.sidebarChromeAllowance + Self.detailMinWidth)
         .onChange(of: columns) { _, visibility in
             if visibility != .all { columns = .all }
         }
