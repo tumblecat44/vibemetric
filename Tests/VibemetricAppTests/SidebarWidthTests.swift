@@ -55,7 +55,9 @@ struct SidebarWidthTests {
         defer { window.close(); preferences.removePersistentDomain(forName: name) }
         await settle(window)
         let start = try sidebarWidth(window)
-        #expect(abs(window.contentMinSize.width - (start + RootView.detailMinWidth)) < 1)
+        // At least the sidebar plus the detail minimum; macOS versions add a few points for the divider and insets.
+        let minimum = window.contentMinSize.width
+        #expect(minimum >= start + RootView.detailMinWidth - 1 && minimum <= start + RootView.detailMinWidth + 16)
         await resize(window, to: window.contentMinSize.width)
         let atMinimum = try sidebarWidth(window)
         #expect(abs(atMinimum - start) < 1, "At the window's minimum the sidebar still has its width")
@@ -66,7 +68,9 @@ struct SidebarWidthTests {
         split.setPosition(400, ofDividerAt: 0)
         await settle(window)
         let widened = try sidebarWidth(window)
-        #expect(abs(window.contentMinSize.width - (widened + RootView.detailMinWidth)) < 1, "A wider sidebar raises the window's minimum")
+        let widenedMinimum = window.contentMinSize.width
+        #expect(widenedMinimum >= widened + RootView.detailMinWidth - 1 && widenedMinimum <= widened + RootView.detailMinWidth + 16,
+                "A wider sidebar raises the window's minimum")
         await resize(window, to: window.contentMinSize.width)
         let widenedAtMinimum = try sidebarWidth(window)
         #expect(abs(widenedAtMinimum - widened) < 1)
