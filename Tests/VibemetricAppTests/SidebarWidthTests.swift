@@ -19,7 +19,7 @@ struct SidebarWidthTests {
         // A hosting controller, as the app's Window scene uses: NavigationSplitView applies its column widths
         // through the split view controller it creates there.
         window.contentViewController = NSHostingController(rootView: RootView().environment(model)
-            .frame(minWidth: RootView.sidebarMinWidth + RootView.detailMinWidth, minHeight: 640))
+            .frame(minHeight: 640))
         window.setContentSize(NSSize(width: width, height: 700))
         return (window, preferences, name)
     }
@@ -46,6 +46,30 @@ struct SidebarWidthTests {
     private func resize(_ window: NSWindow, to width: CGFloat) async {
         window.setContentSize(NSSize(width: width, height: 700))
         await settle(window)
+    }
+
+    /// Dragging the window's edge in can't go below its minimum, which is the sidebar's current width plus the
+    /// detail column's minimum, so the sidebar keeps its width all the way down.
+    @Test func windowMinimumFollowsTheSidebar() async throws {
+        let (window, preferences, name) = try makeWindow(width: 1300)
+        defer { window.close(); preferences.removePersistentDomain(forName: name) }
+        await settle(window)
+        let start = try sidebarWidth(window)
+        #expect(abs(window.contentMinSize.width - (start + RootView.detailMinWidth)) < 1)
+        await resize(window, to: window.contentMinSize.width)
+        let atMinimum = try sidebarWidth(window)
+        #expect(abs(atMinimum - start) < 1, "At the window's minimum the sidebar still has its width")
+
+        await resize(window, to: 1300)
+        let content = try #require(window.contentView)
+        let split = try #require(splitView(in: content))
+        split.setPosition(400, ofDividerAt: 0)
+        await settle(window)
+        let widened = try sidebarWidth(window)
+        #expect(abs(window.contentMinSize.width - (widened + RootView.detailMinWidth)) < 1, "A wider sidebar raises the window's minimum")
+        await resize(window, to: window.contentMinSize.width)
+        let widenedAtMinimum = try sidebarWidth(window)
+        #expect(abs(widenedAtMinimum - widened) < 1)
     }
 
     @Test func sidebarKeepsItsWidthWhenTheWindowShrinks() async throws {

@@ -242,7 +242,9 @@ struct FixCarousel: View {
             }
             .fixedSize(horizontal: true, vertical: false)
             .offset(x: -CGFloat(page) * (cardWidth + spacing))
-            .frame(width: width, alignment: .leading)
+            // minWidth 0, not `width: width`: a fixed width set from the last measurement kept the whole detail column
+            // from getting narrower, so shrinking the window took space from the sidebar instead.
+            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
             .clipped()
             .gesture(DragGesture(minimumDistance: 24).onEnded { drag in
                 if drag.translation.width < -60 { go(1) } else if drag.translation.width > 60 { go(-1) }
