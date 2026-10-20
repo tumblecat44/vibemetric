@@ -25,7 +25,7 @@ public enum Extensions {
     /// Work in progress that blocks a new scan; returns a short reason, or nil when idle.
     public static var busyReason: [@MainActor () -> String?] = []
     /// Adds local evidence files after a pack is prepared and before its assessment starts.
-    public static var evidencePackContributors: [@MainActor (URL) throws -> Void] = []
+    public static var evidencePackContributors: [@MainActor (EvidencePackContext) throws -> Void] = []
     /// Handlers for notification clicks, keyed by the userInfo key they own. The value is that key's string.
     public static var notificationHandlers: [String: @MainActor (String) -> Void] = [:]
 
@@ -51,5 +51,20 @@ public struct SidebarTabExtension: Identifiable {
         self.id = id
         self.sidebar = sidebar
         self.detail = detail
+    }
+}
+
+/// Prepared inputs available to modules that add local evidence before an assessment.
+public struct EvidencePackContext {
+    public let packDirectory: URL
+    public let baseline: CardRecord?
+    public let options: AssessmentOptions
+    public let sources: [TranscriptSource]
+
+    public init(packDirectory: URL, baseline: CardRecord?, options: AssessmentOptions, sources: [TranscriptSource]) {
+        self.packDirectory = packDirectory
+        self.baseline = baseline
+        self.options = options
+        self.sources = sources
     }
 }
