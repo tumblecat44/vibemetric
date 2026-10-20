@@ -432,18 +432,22 @@ public final class Assessor: Sendable {
 }
 
 extension Assessor {
-    /// Each run scores afresh from the records; the previous card is only used to choose the next
-    /// improvement and to explain score differences.
+    /// Uses the previous assessment and records to trace current practices, then scores them against the rubric.
     static func followUpRules(previousDate: String) -> String {
         """
 
         # The previous assessment
 
         A previous assessment from \(previousDate) is in `previous-card.json`, and `changes.md` lists the sessions and settings \
-        that are new or changed since then. Score every dimension afresh from the records; do not start from or hold to the previous \
-        scores. A score may go up or down from last time. When it differs, say why in `changeReason`. \
-        Whether the person followed the previous improvement never raises or lowers a score by itself: an unchanged practice keeps \
-        the anchor level it earns, and a score moves only when the records show the practice itself changed.
+        that are new or changed since then. Use `previous-card.json` together with the supplied session records and summaries to \
+        understand how the person's ways of working have changed over time. Determine which practices remain in use at the \
+        assessment time, accounting for documented changes that replaced earlier practices.
+
+        For each dimension, compare those current practices with the rubric's criteria and assign the score those criteria support, \
+        following the rubric's scoring rules.
+
+        When a score differs from the previous assessment, explain in `changeReason` which current practice and rubric criteria \
+        support the new score.
 
         # Choosing the improvement after the previous one
 

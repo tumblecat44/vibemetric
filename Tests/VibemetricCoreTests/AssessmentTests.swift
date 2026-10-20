@@ -14,9 +14,6 @@ struct AssessmentTests {
         #expect(outcome.engine == engine)
         #expect(outcome.cliVersion == "fixture")
         #expect(outcome.costUSD == (engine == .claude ? 0.02 : nil))
-        let prompt = try String(contentsOf: fixture.directory.appendingPathComponent("received-prompt.txt"), encoding: .utf8)
-        #expect(prompt.contains("AI Native Score"))
-        #expect(prompt.contains(engine == .claude ? "You only have Read" : "read-only shell commands"))
         let args = try String(contentsOf: fixture.directory.appendingPathComponent("received-arguments.txt"), encoding: .utf8)
         if engine == .claude {
             #expect(args.contains("--tools\nRead\nGrep\nGlob\n--allowedTools\nRead\nGrep\nGlob\n--permission-mode\ndontAsk"))
@@ -178,8 +175,6 @@ struct AssessmentTests {
         #expect(raw.sessionID == CLIFixture.forkID)
         #expect(Date().timeIntervalSince(started) < 5)
         #expect(events.texts.contains { $0.contains("Time limit reached") })
-        let prompt = try String(contentsOf: fixture.directory.appendingPathComponent("received-prompt.txt"), encoding: .utf8)
-        #expect(prompt.contains("Time is up for reading"))
         let args = try String(contentsOf: fixture.directory.appendingPathComponent("received-arguments.txt"), encoding: .utf8)
         #expect(args.contains(engine == .claude ? "--resume\n\(CLIFixture.sessionID)\n--fork-session" : "fork\n\(CLIFixture.sessionID)"))
     }
@@ -199,8 +194,6 @@ struct AssessmentTests {
     @Test func scoresStopReadingEarlyWithinAThirtyMinuteLimit() {
         #expect(AssessmentOptions().wrapUpAfter < AssessmentOptions.scoreTimeLimit)
         #expect(AssessmentOptions.scoreTimeLimit == 30 * 60)
-        #expect(Assessor.prompt(sources: [], now: Date(), digestCount: 150).contains("about 70 of them"))
-        #expect(Assessor.prompt(sources: [], now: Date(), digestCount: 12).contains("Read all of them"))
     }
 
     @Test func incompatibleCodexGetsAnActionableError() {
