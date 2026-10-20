@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Details page: each category in "All 10 categories" starts with its own icon in a round badge (black in light mode, white in dark mode). The verdict under each name is a single line, and the question each category answers is no longer shown.
+
 ## 0.4.4 (2026-10-20)
 
 - Scores judge the habits you use now: a habit you've since corrected no longer counts against you.
