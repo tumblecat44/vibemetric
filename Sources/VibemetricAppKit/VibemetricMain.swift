@@ -57,7 +57,7 @@ public struct VibemetricMain: App {
             RootView()
                 .environment(model)
                 .environment(\.textScale, textScale)
-                .frame(minWidth: 860, minHeight: 640)
+                .frame(minWidth: RootView.sidebarMinWidth + RootView.detailMinWidth, minHeight: 640)
         }
         .windowToolbarStyle(.unified(showsTitle: false))
         .commands {
@@ -82,10 +82,20 @@ public struct VibemetricMain: App {
 struct RootView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
+    /// Always both columns: the sidebar is never folded away, even when the window gets narrow.
+    @State private var columns = NavigationSplitViewVisibility.all
+
+    /// Sidebar widths: it never gets narrower than the minimum, and people can drag it out to the maximum.
+    static let sidebarMinWidth: CGFloat = 220
+    static let sidebarIdealWidth: CGFloat = 260
+    static let sidebarMaxWidth: CGFloat = 520
+    /// The detail column absorbs window resizing down to this width; the window's minimum is both minimums added,
+    /// so shrinking the window never squeezes the sidebar.
+    static let detailMinWidth: CGFloat = 640
 
     var body: some View {
         @Bindable var model = model
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columns) {
             VStack(spacing: 0) {
                 if !Extensions.sidebarTabs.isEmpty {
                     Picker("View", selection: $model.sidebarTab) {
@@ -124,7 +134,10 @@ struct RootView: View {
                 // Opaque, so result rows scrolling underneath don't show through the button.
                 .background(.bar)
             }
-            .navigationSplitViewColumnWidth(min: 200, ideal: 220)
+            // The toggle would fold the sidebar away; remove it before setting the widths, because a toolbar modifier
+            // applied after `navigationSplitViewColumnWidth` hides the widths from the split view.
+            .toolbar(removing: .sidebarToggle)
+            .navigationSplitViewColumnWidth(min: Self.sidebarMinWidth, ideal: Self.sidebarIdealWidth, max: Self.sidebarMaxWidth)
         } detail: {
             ZStack {
                 Theme.paper.ignoresSafeArea()
@@ -140,6 +153,10 @@ struct RootView: View {
                     HomeView()
                 }
             }
+            .navigationSplitViewColumnWidth(min: Self.detailMinWidth, ideal: 860)
+        }
+        .onChange(of: columns) { _, visibility in
+            if visibility != .all { columns = .all }
         }
         // Lets the menu bar item (AppKit) reopen this window after it's been closed.
         .onAppear { model.openMainWindow = { openWindow(id: "main") } }

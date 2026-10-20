@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The sidebar keeps its width when you make the window smaller, never gets narrower than its minimum, and can be dragged much wider than before.
+
 ## 0.4.5 (2026-10-20)
 
 - Details page: each category in "All 10 categories" starts with its own icon in a round badge (black in light mode, white in dark mode). The verdict under each name is a single line, and the question each category answers is no longer shown.
