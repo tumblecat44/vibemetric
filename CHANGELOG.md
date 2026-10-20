@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.4 (2026-10-20)
+
+- Scores judge the habits you use now: a habit you've since corrected no longer counts against you.
+- Score cards explain each problem more clearly: what you set out to do, what you and the AI each did, and what was left for you to handle. Each solution says who changes what, and why that fixes the problem.
+- Official app: after you apply a deep dive's fix with its copied request, the report shows the verified result, with what changed, how it was checked, and an "Applied" tag. Later scores can take that verified change into account.
+- Official app: a deep dive's web research only looks up the setup instructions for the tools it recommends.
+
 ## 0.4.3 (2026-10-19)
 
 - Scoring (rubric 4): running with a permission-bypass mode no longer costs a point. Security is scored only on the restrictions, hooks, isolation and checks your records show. Because the rules changed, your next score starts a new baseline instead of being compared with older scores. Older results keep the deduction they were scored with.
