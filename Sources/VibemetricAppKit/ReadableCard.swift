@@ -331,7 +331,7 @@ struct FixCarousel: View {
     }
 }
 
-/// One category: name, plain question, verdict and score; a click opens what we saw, why it matters, what to try,
+/// One category: icon and name, verdict and score; a click opens what we saw, why it matters, what to try,
 /// and the evidence.
 struct CategoryRow: View {
     var result: ScoreCard.DimensionResult
@@ -339,6 +339,7 @@ struct CategoryRow: View {
     var note: String?
     var deductions: [ScoreCard.Deduction] = []
     var footer: AnyView?
+    @Environment(\.textScale) private var scale
     @State private var expanded: Bool
 
     init(result: ScoreCard.DimensionResult, change: ScoreChange?, note: String?, deductions: [ScoreCard.Deduction],
@@ -359,12 +360,25 @@ struct CategoryRow: View {
                 withAnimation(.easeOut(duration: 0.15)) { expanded.toggle() }
             } label: {
                 HStack(alignment: .center, spacing: 14) {
-                    VStack(alignment: .leading, spacing: 2) {
+                    // The category's icon in the same round badge for every category: black with a white icon in light
+                    // mode, white with a dark icon in dark mode.
+                    ZStack {
+                        Circle().fill(Theme.ink)
+                        Image(systemName: result.dimension.symbol)
+                            .font(.system(size: 13 * scale, weight: .semibold))
+                            .foregroundStyle(Theme.paper)
+                    }
+                    .frame(width: 30 * scale, height: 30 * scale)
+                    .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 3) {
                         Text(result.dimension.title).scaledFont(14, weight: .semibold).foregroundStyle(Theme.ink)
-                        Text(result.dimension.question).scaledFont(12).foregroundStyle(Theme.muted)
-                        Text(inline(result.headline)).scaledFont(13).foregroundStyle(Theme.ink)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 2)
+                        // The verdict as a one-line summary: a single muted line, the full text on hover.
+                        Text(inline(result.headline))
+                            .scaledFont(13)
+                            .foregroundStyle(Theme.muted)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .help(result.headline)
                     }
                     Spacer(minLength: 10)
                     if let change { DeltaBadge(change: change) }

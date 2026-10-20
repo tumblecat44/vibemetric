@@ -44,6 +44,10 @@ enum Snapshot {
                     .environment(\.colorScheme, scheme)
                 try render(view, scheme: scheme).write(to: dir.appendingPathComponent("card-\(scheme == .light ? "light" : "dark").png"))
             }
+            // The same card with every category collapsed, as people first see it.
+            let collapsed = CardContent(record: record, baseline: baseline, expandAll: false)
+                .frame(width: 860).background(Theme.paper).environment(\.colorScheme, .light)
+            try render(collapsed, scheme: .light).write(to: dir.appendingPathComponent("card-collapsed-light.png"))
             if let share = ShareCard.png(card: card, date: Date()) { try share.write(to: dir.appendingPathComponent("share.png")) }
             // The menu bar panel for the same card, in a throwaway preferences domain.
             let suite = "vibemetric-snapshot-\(UUID())"

@@ -31,7 +31,23 @@ public enum Dimension: String, Codable, CaseIterable, Sendable, Identifiable {
         self = value
     }
 
-    /// The plain question each dimension answers, shown under its name.
+    /// The SF Symbol shown before the dimension's name.
+    public var symbol: String {
+        switch self {
+        case .planningSpecs: "checklist"
+        case .contextEngineering: "doc.text"
+        case .memory: "brain.head.profile"
+        case .toolIntegration: "wrench.and.screwdriver"
+        case .taskMapping: "square.split.2x2"
+        case .feedbackLoops: "arrow.triangle.2.circlepath"
+        case .testingEvals: "checkmark.seal"
+        case .humanSteering: "steeringwheel"
+        case .security: "lock.shield"
+        case .efficiencyCost: "dollarsign.circle"
+        }
+    }
+
+    /// The plain question each dimension answers, shown in its expanded details.
     public var question: String {
         switch self {
         case .planningSpecs: "Do you agree on the goal and the checks before work starts?"
