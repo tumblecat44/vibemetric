@@ -383,8 +383,9 @@ public final class Assessor: Sendable {
         or a weak user habit as the cause. Do not inherit, compare, or invent numeric scores. Set `followUp` to null.
         The schema still requires an `improvement` object and at least one `roadmap` entry. Fill these with neutral \
         authoring-limit notices in the person's language, not advice about their practices: an unavailable-recommendation \
-        title and situation, three `actions` sentences naming unfinished evidence definitions, rationale, and examples, \
-        null instruction and counts, empty evidence, and no claimed personal outcome. Use the first dimension ID only as \
+        title and situation, three `actions` sentences naming only definitions the loaded rubric explicitly leaves unfinished, \
+        such as checklist grouping, weights, or numeric scoring policy, null instruction and counts, empty evidence, and no \
+        claimed personal outcome. Use the first dimension ID only as \
         the required schema placeholder and make clear no dimension has been diagnosed. Return one roadmap entry with \
         stage 1 and text stating that this draft establishes no improvement plan. Record the unfinished rubric in \
         `scope.limits`. The field guidance below applies normally only after the loaded rubric defines a scoring policy.
