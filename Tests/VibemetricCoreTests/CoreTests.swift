@@ -331,8 +331,8 @@ final class RubricTwoTests: XCTestCase {
         XCTAssertEqual(Dimension.efficiencyCost.rawValue, "efficiency_cost")
     }
 
-    func testRubricIsVersionSix() {
-        XCTAssertEqual(AssessmentOptions.rubricVersion, "6")
+    func testRubricIsVersionSeven() {
+        XCTAssertEqual(AssessmentOptions.rubricVersion, "7")
     }
 }
 
