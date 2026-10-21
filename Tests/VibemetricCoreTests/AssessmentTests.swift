@@ -128,6 +128,19 @@ struct AssessmentTests {
         #expect(throws: AssessmentError.self) { try Assessor.validate(card) }
     }
 
+    @Test func rejectsNotReviewedInNewAssessmentResults() async throws {
+        let fixture = try CLIFixture()
+        defer { fixture.remove() }
+        var card = try JSONDecoder().decode(ScoreCard.self, from: Data(CoreTests.sampleCard.utf8))
+        card.dimensions[0].status = .notReviewed
+        card.dimensions[0].score = nil
+        try JSONEncoder().encode(card).write(to: fixture.directory.appendingPathComponent("fixture-card.json"))
+        await #expect(throws: AssessmentError.self) {
+            try await Assessor(installation: CLIInstallation(executable: fixture.command))
+                .run(packDir: fixture.directory, sources: [], options: AssessmentOptions(engine: .codex)) { _ in }
+        }
+    }
+
     @Test func cancellationBeforeLaunchNeverStartsTheCLI() async throws {
         let fixture = try CLIFixture()
         defer { fixture.remove() }

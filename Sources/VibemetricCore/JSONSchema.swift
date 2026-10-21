@@ -21,7 +21,7 @@ enum JSONSchema {
         let dimension = object([
             "dimension": dimensionID,
             "score": ["type": ["integer", "null"], "minimum": 0, "maximum": 10],
-            "status": ["type": "string", "enum": ["scored", "not_assessable", "not_reviewed"]],
+            "status": ["type": "string", "enum": ["scored", "not_assessable"]],
             "headline": str,
             "saw": str,
             "strengths": array(str, max: 3),

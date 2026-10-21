@@ -12,7 +12,7 @@ public struct AssessmentOptions: Sendable {
     public static let readingTarget = 70
     /// The person's own notes for the judge, e.g. "the demo-skill sessions were only a test".
     public var instructions: String?
-    public static let rubricVersion = "5"
+    public static let rubricVersion = "6"
     public static let maxInstructionsLength = 2000
 
     public init(engine: AssessmentEngine = .claude, model: String? = nil, instructions: String? = nil) {
@@ -283,7 +283,7 @@ public final class Assessor: Sendable {
         guard card.dimensions.count == Dimension.allCases.count,
               Set(card.dimensions.map(\.dimension)) == Set(Dimension.allCases),
               card.dimensions.allSatisfy({ d in
-                  d.status == .scored ? d.score.map { (0...10).contains($0) } == true : d.score == nil
+                  d.status == .scored ? d.score.map { (0...10).contains($0) } == true : d.status == .notAssessable && d.score == nil
               }), card.scope.sessionsExamined >= 0, card.scope.tasksCheckedInDetail >= 0 else {
             throw AssessmentError.noStructuredOutput(.claude, "Invalid dimensions, scores, or coverage.")
         }
@@ -314,7 +314,8 @@ public final class Assessor: Sendable {
     /// Sent to the stopped scoring session when its reading time runs out.
     static let wrapUpPrompt = """
         Time is up for reading. Do not read any more files. Return the complete score card now, matching the schema, \
-        from the evidence you have already read. Score every dimension you have evidence for. Set `sessionsExamined` to the \
+        from the evidence you have already read. Complete every dimension using the rubric's row statuses and equal-weight \
+        calculation, retaining its calculation audits in `scope.limits`. Set `sessionsExamined` to the \
         digests and transcripts you actually read, and add a line to `scope.limits` saying the run stopped reading at its time limit.
         """
 
@@ -375,23 +376,22 @@ public final class Assessor: Sendable {
         Return the card as structured output that matches the provided JSON schema instead of Markdown. The app lays out the card \
         itself and computes the total, bands, and progress bars.
 
-        When the loaded rubric declares an unfinished authoring draft without a scoring policy, that state overrides all \
-        score, diagnosis, recommendation, and previous-assessment instructions below. Return all 10 dimensions with \
-        `status` `not_assessable`, `score` null, empty `strengths` and `evidence`, null `tryThis` and `changeReason`, and empty \
-        `solutionSteps`. Use each `headline` and `saw`, plus the card's `diagnosis` and `summary`, to explain that the rubric \
-        is unfinished. Use `impact` to state which rubric definitions are needed. Do not describe missing user evidence \
-        or a weak user habit as the cause. Do not inherit, compare, or invent numeric scores. Set `followUp` to null.
-        The schema still requires an `improvement` object and at least one `roadmap` entry. Fill these with neutral \
-        authoring-limit notices in the person's language, not advice about their practices: an unavailable-recommendation \
-        title and situation, three `actions` sentences naming only definitions the loaded rubric explicitly leaves unfinished, \
-        such as checklist grouping, weights, or numeric scoring policy, null instruction and counts, empty evidence, and no \
-        claimed personal outcome. Use the first dimension ID only as \
-        the required schema placeholder and make clear no dimension has been diagnosed. Return one roadmap entry with \
-        stage 1 and text stating that this draft establishes no improvement plan. Record the unfinished rubric in \
-        `scope.limits`. The field guidance below applies normally only after the loaded rubric defines a scoring policy.
+        Classify every checklist row once using section 2. Calculate each dimension's score from its confirmed share of \
+        applicable rows, with equal weight per row and half points rounded up to an integer. Unknown rows remain in the \
+        denominator and earn no points, but do not establish failed behavior. Only a dimension with no applicable rows \
+        receives `not_assessable` and null. Put each dimension's row-number status lists, exclusion reasons, confirmed count, \
+        denominator, exact fraction, raw score, and rounded score in `scope.limits`. These audits explain the numbers. \
+        The complete row audit belongs there even though each dimension's `evidence` field holds at most three references.
+        Recalculate from current observations. Previous grades from another policy and unfinished-draft cards do not \
+        establish current scores or personal weaknesses. Do not reuse their neutral authoring notices as improvement advice.
+        If only unknown records remain and no observed problem supports a corrective change, any proposed next action \
+        must be an explicitly limited verification task. If no useful action is supported, fill the required `improvement` \
+        with a neutral explanation and three actions that preserve valid practices and state what remains unverified, \
+        null instruction and counts, empty evidence, and no claimed personal failure or outcome. Use the first dimension \
+        only as the schema placeholder in that case. Return one roadmap entry stating that no change plan is established.
 
-        The card is read in a small window by a busy developer. Section 3 still decides what to judge and which evidence counts; \
-        this section decides how to write it down. Use Section 3's reasoning to decide the scores, then write the app fields \
+        The card is read in a small window by a busy developer. Section 2 decides what to judge, which evidence counts, and \
+        how to calculate scores. This section decides how to write it down. Apply that policy, then write the app fields \
         for their stated purpose instead of copying the full scoring argument into them. Keep checklist item numbers, score \
         requirements, and commentary about your assessment process out of the problem and solution text. Explain the \
         concrete practice or result instead. Explain the person's work as a colleague speaking directly to them, using \
@@ -416,14 +416,15 @@ public final class Assessor: Sendable {
         addresses the problem just explained. Shorten repetition after making the explanation clear.
 
         - `language`: BCP-47 code of the person's primary language in the records.
-        - `diagnosis`: one plain sentence of at most 20 words that names the main strength and the main gap, for example \
-        "Your AI does solid work, but you rarely make it prove the work is done."
+        - `diagnosis`: one plain sentence of at most 20 words that names the main confirmed strength and observed problem. \
+        If the remaining limitation is unknown records, state what is unverified without inventing a weakness.
         - `summary`: the summary shown at the top of the card, as 2 or 3 bullet points, one string each, without a bullet \
         character. Write for someone who is not technical: everyday words, no jargon or rubric terms, at most 15 words each. \
-        First what is going well, then the biggest thing holding the person back, then the one thing to do first. For example: \
+        First what is going well, then an observed problem or clearly identified coverage limit, then a supported next action. For example: \
         "Your AI does careful, solid work." / "But it often says done without testing anything." / \
         "Start by asking it to run your tests before it finishes."
-        - `dimensions`: all 10 in rubric order. `score` is an integer 0–10, or null with `status` `not_assessable` only under the rubric's Not assessable rule; never use `not_reviewed`.
+        - `dimensions`: all 10 in rubric order. `score` is the calculated integer 0–10 with `status` `scored` whenever the \
+        applicable denominator is positive. Use null and `not_assessable` only when that denominator is zero. Never use `not_reviewed`.
           - `headline`: the verdict, at most 10 words, for example "You rarely make the AI prove its work".
           - `strengths`: up to 3 things the person already does well in this dimension, one short sentence each, as it happened \
         in their sessions, with a number where one exists, for example "Commits and pushes go to a cheaper subagent, 12 times in two sessions." \
@@ -436,23 +437,25 @@ public final class Assessor: Sendable {
         inventing a failure or burden. Do not retell the scoring argument or name a target score. An empty string at 10. \
         Never start with a label such as "Positive:", "Gap:", or "Problem:".
           - `impact`: the supported burden or risk left with the person, in one sentence. This appears under Problem, \
-        so do not put advice or the expected benefit of the solution here. No praise. An empty string at 10.
-          - `tryThis`: one concrete action addressing the first observed unmet checklist condition, in one sentence starting with a verb; null at 10. \
+        so do not put advice or the expected benefit of the solution here. Do not infer a burden from unknown records. \
+        An empty string when no burden is established or at 10.
+          - `tryThis`: one concrete action addressing the first observed unmet checklist condition, in one sentence starting with a verb. \
+        When only records are unknown, use a clearly limited verification action if useful. Null when no action is supported or at 10. \
         The app shows it as the solution's title.
-          - `solutionSteps`: below 10, the solution explained as 2–4 bullets the app shows under that title. Together they say \
+          - `solutionSteps`: when a supported action is proposed, explain it as 2–4 bullets the app shows under that title. Together they say \
         what to change and where (the file, setting, tool, or habit, named as in the person's own projects), how to do it in their \
         next task, why it fixes the problem above, and how they will be able to tell it worked. Each bullet is one full, plain \
         sentence with a clear actor, and adds something the title does not already say. No pasted prompts, \
-        rubric terms, or "consider". An empty array at 10.
-        For a `not_assessable` dimension, `strengths` is empty, `saw` states the evidence limitation, `impact` says what would make it assessable, \
+        rubric terms, or "consider". An empty array when no action is supported or at 10.
+        For a `not_assessable` dimension, `strengths` is empty, `saw` explains why no rows apply, `impact` is empty, \
         `tryThis` is null, and `solutionSteps` is empty.
           - `evidence`: up to 3 references you verified: tool, full session id, date (YYYY-MM-DD), `project` (the project's short name; \
         when a session ran in a parent folder such as `Documents` or the home folder, name the project it worked on), \
         and `note`, one short line on what happened there, for example "12 edits, no test run, then reported done".
           - `changeReason`: null when there is no previous card or the score is unchanged; otherwise one sentence on what in the records \
-        led to a different score than last time.
+        led to a different score than last time. Identify a scoring-policy change separately from a change in observed practice.
         - `improvement`: "One improvement to make first". `title` is the task, at most 10 words, starting with a verb. `dimension` is the \
-        dimension it raises. `situation` explains one problem through 2 or 3 connected, plain sentences. Lead with the \
+        dimension the task addresses. `situation` explains one problem through 2 or 3 connected, plain sentences. Lead with the \
         consequence for the person, then explain what the person and AI did that produced it. Include the task and intended \
         outcome where needed to understand that connection. Keep one point per sentence because the app shows each sentence \
         as its own bullet. Name the real thing (the command, the rule, \
@@ -472,7 +475,8 @@ public final class Assessor: Sendable {
         - `followUp`: always null.
         - `roadmap`: up to 3 stages from "AI-use improvement roadmap"; `change` and `result` are one short sentence each.
         - `scope`: `assessedAt` is today's date; `recordDates` covers each tool with records; `sessionsExamined` and `tasksCheckedInDetail` are honest counts; \
-        set `elapsedMinutes` to 0 (the app measures it); `limits` holds the important investigation limits, including any shortfall against the reading budget, the project screening results the rubric asks for in the Scope note, and the evidence limitation behind each Not assessable dimension.
+        set `elapsedMinutes` to 0 (the app measures it). `limits` holds each dimension's complete row classification and calculation audit, \
+        any shortfall against the reading budget, project screening results, and the scope reason behind each Not assessable dimension.
         """
     }
 }
@@ -483,11 +487,10 @@ extension Assessor {
 
         # The previous assessment
 
-        If the loaded rubric is an unfinished authoring draft without a scoring policy, use earlier records only as \
-        observational context. Do not inherit, assign, or compare scores, choose the next improvement, or advance a \
-        roadmap. Return `not_assessable` dimensions with null scores, null `changeReason` and `followUp`, and the neutral \
-        authoring-limit fields described in the return-format override. The remaining instructions in this section apply \
-        only when the loaded rubric defines a scoring policy.
+        Use earlier records as observational context and recalculate current row classifications under the equal-weight policy. \
+        Do not inherit numeric grades from another policy or unavailable scores from an unfinished-draft card. Explain the \
+        method change separately from any change in the person's practices. Ignore a draft card's neutral authoring notices \
+        when choosing an improvement or roadmap. They are not recommendations about the person's work.
 
         A previous assessment from \(previousDate) is in `previous-card.json`, and `changes.md` lists the sessions and settings \
         that are new or changed since then. Use `previous-card.json` together with the supplied session records and summaries to \
@@ -497,8 +500,8 @@ extension Assessor {
         For each dimension, compare those current practices with the rubric's criteria and assign the score those criteria support, \
         following the rubric's scoring rules.
 
-        When a score differs from the previous assessment, explain in `changeReason` which current practice and rubric criteria \
-        support the new score.
+        When a score differs from the previous assessment, explain in `changeReason` which current observations and calculation \
+        support the new score, and whether the difference reflects a scoring-policy change.
 
         # Choosing the improvement after the previous one
 
