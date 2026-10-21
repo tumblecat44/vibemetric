@@ -375,6 +375,20 @@ public final class Assessor: Sendable {
         Return the card as structured output that matches the provided JSON schema instead of Markdown. The app lays out the card \
         itself and computes the total, bands, and progress bars.
 
+        When the loaded rubric declares an unfinished authoring draft without a scoring policy, that state overrides all \
+        score, diagnosis, recommendation, and previous-assessment instructions below. Return all 10 dimensions with \
+        `status` `not_assessable`, `score` null, empty `strengths` and `evidence`, null `tryThis` and `changeReason`, and empty \
+        `solutionSteps`. Use each `headline` and `saw`, plus the card's `diagnosis` and `summary`, to explain that the rubric \
+        is unfinished. Use `impact` to state which rubric definitions are needed. Do not describe missing user evidence \
+        or a weak user habit as the cause. Do not inherit, compare, or invent numeric scores. Set `followUp` to null.
+        The schema still requires an `improvement` object and at least one `roadmap` entry. Fill these with neutral \
+        authoring-limit notices in the person's language, not advice about their practices: an unavailable-recommendation \
+        title and situation, three `actions` sentences naming unfinished evidence definitions, rationale, and examples, \
+        null instruction and counts, empty evidence, and no claimed personal outcome. Use the first dimension ID only as \
+        the required schema placeholder and make clear no dimension has been diagnosed. Return one roadmap entry with \
+        stage 1 and text stating that this draft establishes no improvement plan. Record the unfinished rubric in \
+        `scope.limits`. The field guidance below applies normally only after the loaded rubric defines a scoring policy.
+
         The card is read in a small window by a busy developer. Section 3 still decides what to judge and which evidence counts; \
         this section decides how to write it down. Use Section 3's reasoning to decide the scores, then write the app fields \
         for their stated purpose instead of copying the full scoring argument into them. Keep checklist item numbers, score \
@@ -412,17 +426,17 @@ public final class Assessor: Sendable {
           - `headline`: the verdict, at most 10 words, for example "You rarely make the AI prove its work".
           - `strengths`: up to 3 things the person already does well in this dimension, one short sentence each, as it happened \
         in their sessions, with a number where one exists, for example "Commits and pushes go to a cheaper subagent, 12 times in two sessions." \
-        Draw them from Met checklist items in checklist order. The app shows them under "What's working:" above the problem. An empty array when no item is Met. Group related habits \
+        Draw them from supported checklist conditions in checklist order. The app shows them under "What's working:" above the problem. An empty array when no condition is supported. Group related habits \
         into one sentence rather than listing them separately.
           - `saw`: the supported problem or limitation in this dimension, written as `situation` below asks. The app shows \
-        it under "Problem:" and in the list of issues. Write about the first Not met checklist item in checklist order. Start with the problem, not a list of what already works. Include \
+        it under "Problem:" and in the list of issues. Write about the first observed unmet checklist condition in checklist order. Start with the problem, not a list of what already works. Include \
         setup only where it explains how the problem arose; put strengths in `strengths`. If the limitation is missing \
         records rather than an observed failure, name the specific practice or result the records do not establish without \
         inventing a failure or burden. Do not retell the scoring argument or name a target score. An empty string at 10. \
         Never start with a label such as "Positive:", "Gap:", or "Problem:".
           - `impact`: the supported burden or risk left with the person, in one sentence. This appears under Problem, \
         so do not put advice or the expected benefit of the solution here. No praise. An empty string at 10.
-          - `tryThis`: one concrete action that would make the first Not met checklist item Met, in one sentence starting with a verb; null at 10. \
+          - `tryThis`: one concrete action addressing the first observed unmet checklist condition, in one sentence starting with a verb; null at 10. \
         The app shows it as the solution's title.
           - `solutionSteps`: below 10, the solution explained as 2–4 bullets the app shows under that title. Together they say \
         what to change and where (the file, setting, tool, or habit, named as in the person's own projects), how to do it in their \
@@ -431,12 +445,6 @@ public final class Assessor: Sendable {
         rubric terms, or "consider". An empty array at 10.
         For a `not_assessable` dimension, `strengths` is empty, `saw` states the evidence limitation, `impact` says what would make it assessable, \
         `tryThis` is null, and `solutionSteps` is empty.
-        For Planning only, if `status` is `scored`, `score` is below 10, and no checklist item is Not met, \
-        override the below-10 advice requirements: keep `strengths` from Met items, describe the exact coverage limitation in `saw`, \
-        and use `impact` to name the evidence needed to judge the remaining items without inventing harm. Set `tryThis` to null \
-        and `solutionSteps` to an empty array. Retain the partial score and the per-item audit in `scope.limits`. \
-        If any Planning item is Not met, use the ordinary advice rules for the first Not met item. If all four items are unjudged, \
-        use the ordinary `not_assessable` rule.
           - `evidence`: up to 3 references you verified: tool, full session id, date (YYYY-MM-DD), `project` (the project's short name; \
         when a session ran in a parent folder such as `Documents` or the home folder, name the project it worked on), \
         and `note`, one short line on what happened there, for example "12 edits, no test run, then reported done".
@@ -469,11 +477,16 @@ public final class Assessor: Sendable {
 }
 
 extension Assessor {
-    /// Uses the previous assessment and records to trace current practices, then scores them against the rubric.
     static func followUpRules(previousDate: String) -> String {
         """
 
         # The previous assessment
+
+        If the loaded rubric is an unfinished authoring draft without a scoring policy, use earlier records only as \
+        observational context. Do not inherit, assign, or compare scores, choose the next improvement, or advance a \
+        roadmap. Return `not_assessable` dimensions with null scores, null `changeReason` and `followUp`, and the neutral \
+        authoring-limit fields described in the return-format override. The remaining instructions in this section apply \
+        only when the loaded rubric defines a scoring policy.
 
         A previous assessment from \(previousDate) is in `previous-card.json`, and `changes.md` lists the sessions and settings \
         that are new or changed since then. Use `previous-card.json` together with the supplied session records and summaries to \
