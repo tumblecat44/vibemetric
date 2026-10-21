@@ -78,7 +78,7 @@ Shortcuts: **⌘N** starts a new assessment; **⌘+ / ⌘- / ⌘0** change the t
 | Security | Is the agent limited to what each task needs? |
 | Efficiency & Cost | Do models and effort match each task's difficulty? |
 
-Each is scored 0–10 from what you actually did, not from how many prompts you sent. The full rubric is in [`rubric.md`](Sources/VibemetricCore/Resources/rubric.md).
+Each category uses an evidence checklist. Its score is `10 × confirmed items / applicable items`, rounded to the nearest integer with half points rounded up. All applicable items have equal weight. Confirming an item requires evidence for all of its required parts. Unknown items remain in the denominator and are reported separately from observed failures; established not-applicable items are excluded. The ten displayed category scores add up to a total out of 100. The full checklist and calculation rules are in [`rubric.md`](Sources/VibemetricCore/Resources/rubric.md).
 
 ## Privacy note
 

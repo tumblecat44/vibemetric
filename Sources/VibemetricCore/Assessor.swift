@@ -378,7 +378,9 @@ public final class Assessor: Sendable {
 
         Classify every checklist row once using section 2. Calculate each dimension's score from its confirmed share of \
         applicable rows, with equal weight per row and half points rounded up to an integer. Unknown rows remain in the \
-        denominator and earn no points, but do not establish failed behavior. Only a dimension with no applicable rows \
+        denominator and earn no points, but do not establish failed behavior. A confirmed row requires evidence for every \
+        required component. Check each confirmed row against the explanation and scope notes; if a required component is \
+        described as unverified, classify that whole row as unknown before calculating the count. Only a dimension with no applicable rows \
         receives `not_assessable` and null. Put each dimension's row-number status lists, exclusion reasons, confirmed count, \
         denominator, exact fraction, raw score, and rounded score in `scope.limits`. These audits explain the numbers. \
         The complete row audit belongs there even though each dimension's `evidence` field holds at most three references.
