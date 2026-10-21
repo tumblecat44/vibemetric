@@ -132,4 +132,6 @@ The summaries below report selected findings, not universal effects. None direct
 
 The operational definitions and ownership rules have been reviewed as a draft. Independent assessor agreement, sensitivity to missing records, calibration of weights and bands, and the relationship between these scores and later rework, errors, or resource use remain unvalidated.
 
-Running the scoring feature on fictional records can reveal interpretation and arithmetic errors. It cannot establish those measurement properties or prove long-term skill improvement. A later validation should compare independent judgments on the same records, investigate disagreements, and measure subsequent outcomes without inventing an unsupported sample minimum or pass rate.
+Running the desktop scoring feature on real history can reveal interpretation and arithmetic errors. It cannot establish those measurement properties or prove long-term skill improvement. Because unknown items are omitted from the score denominator, a dimension can receive 10 while some of its items remain unjudgeable. Read the item audit and evidence coverage with the score; 10 does not mean every item was established.
+
+A later validation should compare independent judgments on the same records, investigate disagreements, and measure subsequent outcomes without inventing an unsupported sample minimum or pass rate.
