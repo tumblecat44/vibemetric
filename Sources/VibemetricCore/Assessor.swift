@@ -431,6 +431,12 @@ public final class Assessor: Sendable {
         rubric terms, or "consider". An empty array at 10.
         For a `not_assessable` dimension, `strengths` is empty, `saw` states the evidence limitation, `impact` says what would make it assessable, \
         `tryThis` is null, and `solutionSteps` is empty.
+        For Planning only, if `status` is `scored`, `score` is below 10, and no checklist item is Not met, \
+        override the below-10 advice requirements: keep `strengths` from Met items, describe the exact coverage limitation in `saw`, \
+        and use `impact` to name the evidence needed to judge the remaining items without inventing harm. Set `tryThis` to null \
+        and `solutionSteps` to an empty array. Retain the partial score and the per-item audit in `scope.limits`. \
+        If any Planning item is Not met, use the ordinary advice rules for the first Not met item. If all four items are unjudged, \
+        use the ordinary `not_assessable` rule.
           - `evidence`: up to 3 references you verified: tool, full session id, date (YYYY-MM-DD), `project` (the project's short name; \
         when a session ran in a parent folder such as `Documents` or the home folder, name the project it worked on), \
         and `note`, one short line on what happened there, for example "12 edits, no test run, then reported done".
