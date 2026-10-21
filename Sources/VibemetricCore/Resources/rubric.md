@@ -48,7 +48,7 @@ Review the person's current practices across exactly 10 dimensions. The tables p
 
 ### Project screening: small-scale, one-off projects
 
-Screen projects before interpreting observations so that intentionally lightweight work is not mistaken for evidence of weak ability. For example, a game made for fun in one sitting need not demonstrate the practices expected of a maintained service. Use **small-scale, one-off project (소규모·단발성 프로젝트)** as the classification; do not infer eligibility from labels such as "side project" or "toy project."
+Screen projects before interpreting observations so that intentionally lightweight work is not mistaken for evidence of weak ability. For example, a game made for fun in one sitting need not demonstrate the practices expected of a maintained service. Use **small-scale, one-off project** as the classification; do not infer eligibility from labels such as "side project" or "toy project."
 
 For each project used as evidence, inspect and record the following four indicators together. These are contextual screening guides, not independent pass/fail tests or validated measures of ability or quality. Do not use fixed file-count or duration cutoffs, or classify by counting how many signals match.
 
