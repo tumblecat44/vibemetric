@@ -408,8 +408,18 @@ public final class Assessor: Sendable {
         First what is going well, then the biggest thing holding the person back, then the one thing to do first. For example: \
         "Your AI does careful, solid work." / "But it often says done without testing anything." / \
         "Start by asking it to run your tests before it finishes."
+        - `highlights`: 2 to 4 things the person already does well, across all dimensions, shown as bullets on the first screen \
+        of the result. One line each, at most 10 words, everyday words, no rubric terms, no numbers unless essential, and no \
+        "but". For example "Releases run through a saved skill and agents".
         - `dimensions`: all 10 in rubric order. `score` is an integer 0–10, or null with `status` `not_assessable` only under the rubric's Not assessable rule; never use `not_reviewed`.
           - `headline`: the verdict, at most 10 words, for example "You rarely make the AI prove its work".
+          - `issueLine`: below 8, the problem as one sentence of about 12 to 18 words, shown in this dimension's box on the \
+        first screen. It must make sense on its own: say what happens, where or how often, and what it causes. Plain words, \
+        no rubric terms, no praise. For example "Build requests rarely say how to check the result, so AI decides when \
+        it's done". An empty string at 8 or above.
+          - `fixLine`: below 8, the fix as one sentence of about 10 to 16 words, starting with a verb and naming where the \
+        change goes, for example "Add a done-when line and one failure case to every build request". An empty string at \
+        8 or above.
           - `strengths`: up to 3 things the person already does well in this dimension, one short sentence each, as it happened \
         in their sessions, with a number where one exists, for example "Commits and pushes go to a cheaper subagent, 12 times in two sessions." \
         The app shows them under "What's working:" above the problem. An empty array when nothing stands out. Group related habits \
