@@ -3,9 +3,10 @@ import NaturalLanguage
 import SwiftUI
 import VibemetricCore
 
-/// The score card for readable cards (short plain-text fields): the one fix first, then the categories as
-/// rows that open on a click, and the technical details folded away at the end. Older cards keep `CardContent`'s
-/// original layout.
+/// The score card for readable cards (short plain-text fields). First a short summary (`ResultSummary`): the score,
+/// what's going well, and one box per category that opens on a click to its full explanation. The technical
+/// details sit folded at the end.
+/// Older cards keep `CardContent`'s original layout.
 struct ReadableCardContent: View {
     @Environment(\.textScale) private var scale
     var record: CardRecord
@@ -15,167 +16,17 @@ struct ReadableCardContent: View {
 
     private var card: ScoreCard { record.card }
     private var changes: [ScoreChange] { baseline.map { ScoreChanges.compare(card, to: $0.card) } ?? [] }
-    private func change(for d: VibemetricCore.Dimension) -> ScoreChange? { changes.first { $0.dimension == d } }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 30) {
-            header.id("header")
-            fixFirst.id("improvement")
-            if !glanceGood.isEmpty { glance }
-            categories.id("dimensions")
-            if let baseline, !changes.isEmpty { changesSection(baseline) }
-            if !card.roadmap.isEmpty { roadmap.id("roadmap") }
+            ResultSummary(record: record, baseline: baseline, changes: changes, expandAll: expandAll,
+                          deepDiveFooter: deepDiveFooter).id("header")
             about.id("scope")
         }
         .scrollTargetLayout()
         .textSelection(.enabled)
         .padding(32)
         .frame(maxWidth: 820 * max(1, scale), alignment: .leading)
-    }
-
-    // MARK: Header: when, how much, and the one-sentence summary
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            TimelineView(.periodic(from: .now, by: 60)) { context in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text("\(RelativeDate.format(record.createdAt, now: context.date)) · from \(card.scope.sessionsExamined) sessions")
-                        .foregroundStyle(Theme.muted)
-                    Text("·").foregroundStyle(Theme.muted)
-                    Text("Score \(card.totalLabel ?? "—") / 100").fontWeight(.semibold).foregroundStyle(Theme.ink)
-                    if let baseline, let delta = ScoreChanges.totalDelta(card, to: baseline.card), delta != 0 {
-                        Text("\(delta > 0 ? "↗ +" : "↘ ")\(delta) since \(baseline.createdAt.formatted(.dateTime.month(.abbreviated).day()))")
-                            .fontWeight(.semibold)
-                            .foregroundStyle(delta > 0 ? Theme.color(for: .strong) : Theme.color(for: .bottleneck))
-                    }
-                }
-                .scaledFont(13)
-            }
-            // The summary in plain words: bullets when the card has them, else the one-sentence diagnosis.
-            if let summary = card.summary, !summary.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(Array(summary.enumerated()), id: \.offset) { _, line in
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text("•").foregroundStyle(Theme.muted)
-                            Text(line).fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                }
-                .scaledFont(16)
-                .foregroundStyle(Theme.ink)
-                .padding(.top, 2)
-            } else {
-                Text(card.diagnosis)
-                    .scaledFont(16, weight: .medium)
-                    .foregroundStyle(Theme.ink)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if card.isLowCoverage(sessionsAvailable: record.sessionsScanned) {
-                Label("Few sessions were examined, so this score may miss evidence.", systemImage: "exclamationmark.triangle.fill")
-                    .scaledFont(12)
-                    .foregroundStyle(Theme.color(for: .developing))
-            }
-        }
-    }
-
-    // MARK: What to fix: the first fix, then the other weak categories, one page at a time
-
-    private var fixFirst: some View { FixCarousel(card: card, footer: deepDiveFooter) }
-
-    // MARK: At a glance: the best and weakest categories, one line each
-
-    private var scored: [ScoreCard.DimensionResult] { card.ordered.filter { $0.score != nil } }
-    private var glanceGood: [ScoreCard.DimensionResult] {
-        Array(scored.filter { ($0.score ?? 0) >= 6 }.sorted { ($0.score ?? 0) > ($1.score ?? 0) }.prefix(3))
-    }
-    private var glance: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Heading(text: "Going well")
-            glanceCard(title: "Keep doing this", symbol: "checkmark", band: .strong, items: glanceGood)
-        }
-    }
-
-    private func glanceCard(title: String, symbol: String, band: Band, items: [ScoreCard.DimensionResult]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label(title, systemImage: symbol)
-                .scaledFont(12, weight: .semibold)
-                .padding(.horizontal, 8).padding(.vertical, 3)
-                .foregroundStyle(Theme.color(for: band))
-                .background(Theme.color(for: band).opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
-            ForEach(items) { d in
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(inline(d.headline)).scaledFont(14, weight: .semibold).foregroundStyle(Theme.ink)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text("\(d.dimension.title) · \(d.score ?? 0)/10").scaledFont(12).foregroundStyle(Theme.muted)
-                }
-            }
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
-    }
-
-    // MARK: All 10 categories
-
-    private var categories: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Heading(text: "All 10 categories")
-            VStack(spacing: 0) {
-                ForEach(card.ordered) { d in
-                    Divider()
-                    CategoryRow(result: d, change: change(for: d.dimension), note: card.deductionNote(for: d.dimension),
-                                deductions: card.deductionAppliedTo == d.dimension ? card.deductions ?? [] : [],
-                                footer: deepDiveFooter?(d.dimension), expanded: expandAll)
-                }
-                Divider()
-            }
-        }
-    }
-
-    // MARK: What changed, and what comes after the first fix
-
-    private func changesSection(_ baseline: CardRecord) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Heading(text: "What changed since \(baseline.createdAt.formatted(.dateTime.month(.abbreviated).day()))")
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(changes) { c in
-                    Divider()
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 8) {
-                            Text(c.dimension.title).scaledFont(14, weight: .semibold).foregroundStyle(Theme.ink)
-                            Spacer()
-                            DeltaBadge(change: c)
-                        }
-                        Text(c.isUnexplained ? "No new evidence, so this is most likely scoring variation." : c.reason!)
-                            .scaledFont(13).foregroundStyle(Theme.muted)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding(.vertical, 10)
-                }
-                Divider()
-            }
-        }
-    }
-
-    private var roadmap: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Heading(text: "After that")
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(card.roadmap, id: \.stage) { stage in
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        Text("\(stage.stage)")
-                            .scaledFont(12, weight: .semibold)
-                            .frame(width: 22, height: 22)
-                            .overlay(Circle().strokeBorder(Theme.rule))
-                            .foregroundStyle(Theme.muted)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(inline(stage.change)).scaledFont(14).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
-                            Text(inline(stage.result)).scaledFont(13).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                }
-            }
-        }
     }
 
     // MARK: About this score: the technical details, folded
@@ -204,252 +55,46 @@ struct ReadableCardContent: View {
     }
 }
 
-/// "What to fix": the card's first improvement, then each other category in the bottleneck band, weakest
-/// first (the same order as the menu bar). One page at a time, moved with the arrows, the dots or the arrow keys.
-struct FixCarousel: View {
-    var card: ScoreCard
-    /// Shown under each page's Solution for that page's category (the Pro deep dive in official builds).
-    var footer: ((VibemetricCore.Dimension) -> AnyView)? = nil
-    @State private var page = 0
-    /// The row's width, measured; the first layout uses a typical window width.
-    @State private var width: CGFloat = 756
-    private let spacing: CGFloat = 14
-
-    private var others: [ScoreCard.DimensionResult] { card.nextFixes.filter { $0.isReadable } }
-    private var count: Int { 1 + others.count }
-    /// Each card is narrower than the row, so the next one shows at the right edge.
-    private var cardWidth: CGFloat { count > 1 ? (width * 0.86).rounded() : width }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // "Issues (1/7)" with the arrows right beside it, so they're found where the eye already is.
-            HStack(alignment: .center, spacing: 10) {
-                Heading(text: count > 1 ? "Issues (\(page + 1)/\(count))" : "Issues")
-                if count > 1 { navigation }
-                Spacer()
-            }
-            // Measures the row's width; the cards themselves are wider than it in total.
-            Color.clear.frame(maxWidth: .infinity).frame(height: 0)
-                .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width = $0 }
-            // Laid out side by side and clipped, rather than in a ScrollView, so it also renders to images.
-            HStack(alignment: .top, spacing: spacing) {
-                ForEach(0..<count, id: \.self) { i in
-                    framed(i)
-                        .frame(width: cardWidth)
-                        .opacity(i == page ? 1 : 0.55)
-                        .onTapGesture { if i != page { withAnimation(.easeOut(duration: 0.3)) { page = i } } }
-                }
-            }
-            .fixedSize(horizontal: true, vertical: false)
-            .offset(x: -CGFloat(page) * (cardWidth + spacing))
-            // minWidth 0, not `width: width`: a fixed width set from the last measurement kept the whole detail column
-            // from getting narrower, so shrinking the window took space from the sidebar instead.
-            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-            .clipped()
-            .gesture(DragGesture(minimumDistance: 24).onEnded { drag in
-                if drag.translation.width < -60 { go(1) } else if drag.translation.width > 60 { go(-1) }
-            })
-            if count > 1 { dots }
-        }
-        .focusable()
-        .focusEffectDisabled()
-        .onKeyPress(.leftArrow) { go(-1); return .handled }
-        .onKeyPress(.rightArrow) { go(1); return .handled }
-        .onChange(of: count) { page = min(page, count - 1) }
-    }
-
-    /// One page in its box; every box in the row takes the height of the tallest.
-    private func framed(_ i: Int) -> some View {
-        Group {
-            if i == 0 { firstPage } else if others.indices.contains(i - 1) { categoryPage(others[i - 1]) }
-        }
-        .padding(20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.rule, lineWidth: 1))
-    }
-
-    private func go(_ step: Int) {
-        withAnimation(.easeOut(duration: 0.3)) { page = min(max(page + step, 0), count - 1) }
-    }
-
-    private var navigation: some View {
-        HStack(spacing: 6) {
-            Button { go(-1) } label: { Image(systemName: "chevron.left").fontWeight(.semibold) }
-                .help("Previous issue")
-                .disabled(page == 0)
-            Button { go(1) } label: { Image(systemName: "chevron.right").fontWeight(.semibold) }
-                .help("Next issue")
-                .disabled(page == count - 1)
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.regular)
-    }
-
-    private var dots: some View {
-        HStack(spacing: 6) {
-            ForEach(0..<count, id: \.self) { i in
-                Button {
-                    withAnimation(.easeOut(duration: 0.3)) { page = i }
-                } label: {
-                    Capsule()
-                        .fill(i == page ? Theme.accent : Theme.rule)
-                        .frame(width: i == page ? 18 : 7, height: 7)
-                }
-                .buttonStyle(.plain)
-                .help(i == 0 ? "Issue 1" : others[i - 1].dimension.title)
-            }
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private func label(_ d: ScoreCard.DimensionResult?, fallback: VibemetricCore.Dimension?) -> some View {
-        let title = d?.dimension.title ?? fallback?.title
-        let score = d.flatMap { $0.score.map { "\($0)/10" } ?? $0.status.label }
-        return Text([title?.uppercased(), score].compactMap { $0 }.joined(separator: " · "))
-            .scaledFont(12, weight: .bold)
-            .foregroundStyle(Theme.accent)
-    }
-
-    private var firstPage: some View {
-        let imp = card.improvement
-        let target = imp.dimension.flatMap { d in card.ordered.first { $0.dimension == d } }
-        return VStack(alignment: .leading, spacing: 16) {
-            if imp.dimension != nil { label(target, fallback: imp.dimension) }
-            ProblemSolution(problem: [imp.situation, imp.impact ?? ""], evidence: imp.evidence ?? [],
-                            solution: imp.title, steps: imp.actions,
-                            tryItOn: imp.tryItOn, signOfSuccess: imp.signOfSuccess)
-            if let dimension = imp.dimension, let footer { footer(dimension) }
-        }
-    }
-
-    private func categoryPage(_ d: ScoreCard.DimensionResult) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            label(d, fallback: nil)
-            ProblemSolution(problem: [d.saw ?? d.headline, d.impact ?? ""], evidence: d.evidence, solution: d.tryThis ?? "",
-                            steps: d.solutionSteps ?? [])
-            if let footer { footer(d.dimension) }
-        }
-    }
-}
-
-/// One category: icon and name, verdict and score; a click opens what we saw, why it matters, what to try,
-/// and the evidence.
-struct CategoryRow: View {
+/// A category's full explanation: what works, the problem with its evidence, the solution and its steps, any
+/// deduction, and the footer (the Pro deep dive in official builds).
+struct CategoryDetails: View {
     var result: ScoreCard.DimensionResult
-    var change: ScoreChange?
     var note: String?
     var deductions: [ScoreCard.Deduction] = []
     var footer: AnyView?
-    @Environment(\.textScale) private var scale
-    @State private var expanded: Bool
-
-    init(result: ScoreCard.DimensionResult, change: ScoreChange?, note: String?, deductions: [ScoreCard.Deduction],
-         footer: AnyView?, expanded: Bool) {
-        self.result = result
-        self.change = change
-        self.note = note
-        self.deductions = deductions
-        self.footer = footer
-        _expanded = State(initialValue: expanded)
-    }
-
-    private var color: Color { result.band.map(Theme.color(for:)) ?? Theme.muted }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Button {
-                withAnimation(.easeOut(duration: 0.15)) { expanded.toggle() }
-            } label: {
-                HStack(alignment: .center, spacing: 14) {
-                    // The category's icon in the same round badge for every category: black with a white icon in light
-                    // mode, white with a dark icon in dark mode.
-                    ZStack {
-                        Circle().fill(Theme.ink)
-                        Image(systemName: result.dimension.symbol)
-                            .font(.system(size: 13 * scale, weight: .semibold))
-                            .foregroundStyle(Theme.paper)
-                    }
-                    .frame(width: 30 * scale, height: 30 * scale)
-                    .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(result.dimension.title).scaledFont(14, weight: .semibold).foregroundStyle(Theme.ink)
-                        // The verdict as a one-line summary: a single muted line, the full text on hover.
-                        Text(inline(result.headline))
-                            .scaledFont(13)
-                            .foregroundStyle(Theme.muted)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                            .help(result.headline)
-                    }
-                    Spacer(minLength: 10)
-                    if let change { DeltaBadge(change: change) }
-                    ScorePips(score: result.score, size: 8)
-                    Text(result.score.map { "\($0)/10" } ?? result.status.label)
-                        .scaledFont(13, weight: .semibold)
-                        .monospacedDigit()
-                        .foregroundStyle(color)
-                        .frame(minWidth: 40, alignment: .trailing)
-                    Image(systemName: "chevron.right")
-                        .scaledFont(12, weight: .semibold)
-                        .foregroundStyle(Theme.muted)
-                        .rotationEffect(.degrees(expanded ? 90 : 0))
+            if result.isReadable {
+                if let strengths = result.strengths {
+                    // Newer cards: what works on its own, above a problem that holds only the gap.
+                    if !strengths.isEmpty { WhatsWorking(points: strengths) }
+                    ProblemSolution(problem: [result.saw ?? "", result.impact ?? ""], evidence: result.evidence,
+                                    solution: result.tryThis ?? "", steps: result.solutionSteps ?? [],
+                                    nextStep: result.band == .strong)
+                } else {
+                    // Older cards: a strong category's text is what went well.
+                    ProblemSolution(problem: [result.saw ?? "", result.impact ?? ""], evidence: result.evidence,
+                                    solution: result.tryThis ?? "", steps: result.solutionSteps ?? [],
+                                    goodNews: result.band == .strong, nextStep: result.band == .strong)
                 }
-                .contentShape(Rectangle())
+            } else {
+                // A category from an older card inside a readable one: its reason as written.
+                Text(markdown(result.reason)).scaledFont(13).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
             }
-            .buttonStyle(.plain)
-            .accessibilityHint(expanded ? "Hides the details" : "Shows the details")
-
-            if expanded {
-                VStack(alignment: .leading, spacing: 12) {
-                    if result.isReadable {
-                        if let strengths = result.strengths {
-                            // Newer cards: what works on its own, above a problem that holds only the gap.
-                            if !strengths.isEmpty { WhatsWorking(points: strengths) }
-                            ProblemSolution(problem: [result.saw ?? "", result.impact ?? ""], evidence: result.evidence,
-                                            solution: result.tryThis ?? "", steps: result.solutionSteps ?? [],
-                                            nextStep: result.band == .strong)
-                        } else {
-                            // Older cards: a strong category's text is what went well.
-                            ProblemSolution(problem: [result.saw ?? "", result.impact ?? ""], evidence: result.evidence,
-                                            solution: result.tryThis ?? "", steps: result.solutionSteps ?? [],
-                                            goodNews: result.band == .strong, nextStep: result.band == .strong)
-                        }
-                    } else {
-                        // A category from an older card inside a readable one: its reason as written.
-                        Text(markdown(result.reason)).scaledFont(13).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
-                    }
-                    if let note {
-                        Text(note).scaledFont(12, weight: .semibold).foregroundStyle(Theme.color(for: .bottleneck))
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    ForEach(Array(deductions.enumerated()), id: \.offset) { _, d in
-                        Text("Permission-bypass deduction (−\(d.points)): \(d.reason)")
-                            .scaledFont(12).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
-                            .padding(10)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Theme.color(for: .bottleneck).opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
-                    }
-                    if !result.isReadable { EvidenceChips(evidence: result.evidence) }
-                    if let footer { footer }
-                }
-                .padding(.leading, 2)
-                .padding(.bottom, 4)
+            if let note {
+                Text(note).scaledFont(12, weight: .semibold).foregroundStyle(Theme.color(for: .bottleneck))
+                    .fixedSize(horizontal: false, vertical: true)
             }
-        }
-        .padding(.vertical, 12)
-    }
-}
-
-/// Small grey section heading.
-/// A section title ("Issues", "Going well", "All 10 categories"): large and dark, with a short accent bar
-/// before it, so the page reads as a few clear sections at a glance.
-private struct Heading: View {
-    var text: String
-    var body: some View {
-        HStack(spacing: 8) {
-            RoundedRectangle(cornerRadius: 2).fill(Theme.accent).frame(width: 4, height: 18)
-            Text(text).scaledFont(18, weight: .bold).foregroundStyle(Theme.ink)
+            ForEach(Array(deductions.enumerated()), id: \.offset) { _, d in
+                Text("Permission-bypass deduction (−\(d.points)): \(d.reason)")
+                    .scaledFont(12).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Theme.color(for: .bottleneck).opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
+            }
+            if !result.isReadable { EvidenceChips(evidence: result.evidence) }
+            if let footer { footer }
         }
     }
 }

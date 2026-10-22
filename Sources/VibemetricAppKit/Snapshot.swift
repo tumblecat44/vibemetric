@@ -45,9 +45,15 @@ enum Snapshot {
                 try render(view, scheme: scheme).write(to: dir.appendingPathComponent("card-\(scheme == .light ? "light" : "dark").png"))
             }
             // The same card with every category collapsed, as people first see it.
-            let collapsed = CardContent(record: record, baseline: baseline, expandAll: false)
-                .frame(width: 860).background(Theme.paper).environment(\.colorScheme, .light)
-            try render(collapsed, scheme: .light).write(to: dir.appendingPathComponent("card-collapsed-light.png"))
+            // VIBEMETRIC_SNAPSHOT_TEXT_SCALE=1.75 renders the collapsed card at that text size (View > text size).
+            let textScale = env["VIBEMETRIC_SNAPSHOT_TEXT_SCALE"].flatMap(Double.init).map { CGFloat($0) } ?? 1
+            for scheme in [ColorScheme.light, .dark] {
+                let collapsed = CardContent(record: record, baseline: baseline, expandAll: false)
+                    .environment(\.textScale, textScale)
+                    .frame(width: 860 * max(1, textScale)).background(Theme.paper).environment(\.colorScheme, scheme)
+                try render(collapsed, scheme: scheme)
+                    .write(to: dir.appendingPathComponent("card-collapsed-\(scheme == .light ? "light" : "dark").png"))
+            }
             if let share = ShareCard.png(card: card, date: Date()) { try share.write(to: dir.appendingPathComponent("share.png")) }
             // The menu bar panel for the same card, in a throwaway preferences domain.
             let suite = "vibemetric-snapshot-\(UUID())"
