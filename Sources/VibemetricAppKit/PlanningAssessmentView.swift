@@ -24,7 +24,7 @@ struct PlanningAssessmentView: View {
                 section("Problem", symbol: "exclamationmark.triangle.fill", color: Theme.color(for: .bottleneck), items: problems)
             }
             if !unassessed.isEmpty {
-                section("Scope", symbol: "info.circle", color: Theme.muted, items: unassessed)
+                section("Not rated", symbol: "info.circle", color: Theme.muted, items: unassessed)
             }
             if problems.contains(where: { !($0.solution ?? "").isEmpty }) {
                 VStack(alignment: .leading, spacing: 12) {
@@ -121,7 +121,7 @@ private struct PlanningCompetencyView: View {
 
     private var details: some View {
         VStack(alignment: .leading, spacing: 14) {
-            detailSection("Source basis") {
+            detailSection("Why we look for this") {
                 detailText(competency.explanation?.sourceBasis ?? competency.sources.map(\.note).joined(separator: " "))
                 ForEach(Array(competency.sources.enumerated()), id: \.offset) { _, source in
                     if let url = URL(string: source.url), url.scheme?.lowercased() == "https" {
@@ -131,26 +131,26 @@ private struct PlanningCompetencyView: View {
                     }
                 }
             }
-            detailSection("Criteria") {
+            detailSection("How we rate this") {
                 detailText(competency.explanation?.criteria ?? "High. \(competency.criteria.high)\nMedium. \(competency.criteria.medium)\nLow. \(competency.criteria.low)")
             }
-            detailSection("Observed behavior") {
+            detailSection("What you did") {
                 if let explanation = competency.explanation {
                     detailText(explanation.observedBehavior)
                 } else if representativeTasks.isEmpty {
-                    detailText("No assessable observations were saved in this result.")
+                    detailText("This result has no examples to rate.")
                 } else {
                     ForEach(representativeTasks, id: \.taskID) { task in
                         detailText("\(task.observation) \(task.rationale)")
                     }
                 }
             }
-            detailSection("Overall judgment") {
+            detailSection("Why you got this rating") {
                 if let explanation = competency.explanation {
                     detailText(explanation.overallJudgment)
                 } else {
-                    detailText("High \(competency.highCount), Medium \(competency.mediumCount), Low \(competency.lowCount). This result recorded an overall level of \(levelLabel).")
-                    detailText("This saved result does not include a separate overall rationale.")
+                    detailText("High \(competency.highCount), Medium \(competency.mediumCount), Low \(competency.lowCount). Your rating is \(levelLabel).")
+                    detailText("This older result has no written explanation for the rating.")
                 }
             }
         }

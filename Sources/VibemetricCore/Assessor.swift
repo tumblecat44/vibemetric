@@ -12,7 +12,7 @@ public struct AssessmentOptions: Sendable {
     public static let readingTarget = 70
     /// The person's own notes for the judge, e.g. "the demo-skill sessions were only a test".
     public var instructions: String?
-    public static let rubricVersion = "12"
+    public static let rubricVersion = "13"
     public static let maxInstructionsLength = 2000
 
     public init(engine: AssessmentEngine = .claude, model: String? = nil, instructions: String? = nil) {
@@ -484,9 +484,12 @@ public final class Assessor: Sendable {
         On Planning set `assessment` to null. Set `planning` to null on every other dimension. On Planning return an object
         with `competencies`, exactly four entries in this order: `outcomes_completion`, `constraints`, `task_context`,
         `ambiguity_resolution`. Each Planning entry contains `id`, `summary`, `sources`, `criteria`, `tasks`, `explanation`, and `solution`:
-        - `summary`: exactly two plain, personalized sentences naming actual projects or task types and the connected
-        observation. Explain the observed pattern and what supports the aggregate level. Report true counts and denominator
-        when useful. Keep source philosophy out of these sentences. Missing records do not establish a personal weakness.
+        - `summary`: two everyday sentences giving an overall view of how the person handled this competency across
+        the observed tasks. Start with what they tend to do or leave unresolved, then explain it with a familiar project
+        detail or an observed count. Describe differences between tasks when they matter. A single completed repair is
+        an example, not an overall pattern. If only one task was established, keep the statement about that task.
+        Keep source names, scoring terminology, and investigation procedure in the expanded explanation. Missing records
+        do not establish a personal weakness. Do not invent percentages or generalize to unread work.
         - `sources`: adopted references from Planning's source basis only, each with exact `title`, `url`, and a localized
         `note` explaining the adopted practice. Use pstack Prove It Works and Anthropic for outcomes, Anthropic for
         constraints and task context, and Matt Pocock grilling with Anthropic for ambiguity. Source titles are names of
@@ -504,23 +507,21 @@ public final class Assessor: Sendable {
         the explanation shorter or achieve a desired grade.
         - `explanation`: an object with four short paragraphs in the person's language. These are the expanded detail
         shown together below the two-sentence summary, not a second bare three-row High/Medium/Low list:
-          - `sourceBasis`: name the supplied source and the actual behavior it recommends, then connect that recommendation
-        to this competency's adopted practice and why it helps. Derive this only from the supplied source notes and
-        competency definitions. Do not claim to have freshly visited a source, and do not attribute our 80%/50% aggregate
-        policy or an empirically validated ability rating to its author.
-          - `criteria`: explain the concrete behavior that qualifies a task as High, the incomplete but established behavior
-        that qualifies as Medium, and the observed basic or contrary behavior that qualifies as Low. Preserve this
-        competency's meaningful distinctions and applicability. Explain unknown separately when needed. No generic
-        “clear / partly clear / unclear” replacements or unexplained level labels.
+          - `sourceBasis`: explain in everyday language why this behavior helps the person's work and what the supplied
+        source recommends. Name the source naturally. Say what it helps them achieve or avoid instead of announcing that
+        a source perspective was adopted. Use only the supplied notes. Do not claim a fresh source visit or say the source
+        validated our numerical boundaries.
+          - `criteria`: explain what you would see in a task to rate it High, Medium, or Low, using ordinary words and the
+        actual differences in the competency definition. Explain any necessary technical term through what the person or
+        AI does. Keep the concrete behavior and applicability; do not replace them with vague adjectives.
           - `observedBehavior`: choose a few representative actual cases from `tasks` and explain what each actor did,
         what was detected, and what it establishes. Name the actual project or task and connect the details to the
         criterion. Include a contrary case when it explains the pattern. These examples illustrate the complete judging
         set; their number does not limit its denominator. Do not dump every task or session into this paragraph.
-          - `overallJudgment`: report the High/Medium/Low counts among ALL assessable tasks in this competency, with the
-        denominator and relevant proportion, then explain why the 80% High / 50% Low / otherwise Medium product policy
-        produces this aggregate. Keep unknown/not-applicable counts separate. Distinguish repeated Medium behavior from
-        mixed High/Low behavior. If no assessable tasks exist, explain unknown or not_applicable from the actual scope.
-        Explain the result to the person using the established writing style, without implying that unread work was judged.
+          - `overallJudgment`: explain why the observed work earned this rating. Give the High/Medium/Low counts across
+        all assessable tasks and connect them to the shared 80%/50% rule in plain sentences. Distinguish repeated partial
+        behavior from a mixture of strong and weak cases. Keep missing or inapplicable evidence separate. If nothing can
+        be rated, say what could not be checked. Do not use formulas, internal field names, or unexplained scoring terms.
         - `solution`: one or two concrete sentences for an observed gap, identifying what changes in the next relevant
         task and how it addresses the gap. Null where no useful change is supported. Do not invent damage or repeated
         failure; missing coverage alone is not a personal defect.

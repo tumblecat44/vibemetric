@@ -443,6 +443,8 @@ Write in the user's primary language, defaulting to English if unknown. Preserve
 
 Write for someone unfamiliar with the person or their projects. Introduce a project, tool, file, or acronym with its relevant purpose when the records establish that purpose. Otherwise identify the observed task. Keep every observation within the examined evidence and attribute the person's decisions separately from AI execution.
 
+Speak directly to the person as a colleague, using everyday words and concrete actions. Each competency's two-sentence summary gives an overall view of their observed work, including differences between tasks where relevant. Start with the way they work, then support it with a familiar project detail or a count established by the records. A completed repair is an example, not a summary of their habits. Keep claims about a single observed task limited to that task. Put source references, rating rules, and the details behind the judgment in the expanded explanation. Explain why a behavior helps and what actually happened without announcing that a source perspective was adopted or using unexplained assessment terminology.
+
 ### Score and diagnosis
 
 Start with `# AI NATIVE SCORE` and the calculated total out of 100 when all dimensions are scored. State that the score describes behavioral levels confirmed in the examined records. Describe the main confirmed strength and an observed problem when one is established. If only records are missing, identify that coverage limit without inventing a personal weakness. Follow section 2 when a dimension has no applicable competencies.

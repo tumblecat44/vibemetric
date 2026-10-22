@@ -9,10 +9,10 @@ public struct PlanningAssessment: Codable, Sendable {
 
         public var title: String {
             switch self {
-            case .outcomesCompletion: "End-user outcomes and completion criteria"
-            case .constraints: "Constraints"
-            case .taskContext: "Task context"
-            case .ambiguityResolution: "Clarifying ambiguous requirements"
+            case .outcomesCompletion: "Goals and completion checks"
+            case .constraints: "Limits and requirements"
+            case .taskContext: "Background for the task"
+            case .ambiguityResolution: "Clearing up unclear requests"
             }
         }
 

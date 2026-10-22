@@ -28,7 +28,7 @@ struct BehavioralAssessmentView: View {
                         color: Theme.color(for: .bottleneck), items: problems)
             }
             if !unassessed.isEmpty {
-                section("Scope", symbol: "info.circle", color: Theme.muted, items: unassessed)
+                section("Not rated", symbol: "info.circle", color: Theme.muted, items: unassessed)
             }
             if problems.contains(where: { !($0.solution ?? "").isEmpty }) {
                 VStack(alignment: .leading, spacing: 12) {
@@ -126,7 +126,7 @@ private struct BehavioralCompetencyView: View {
 
     private var details: some View {
         VStack(alignment: .leading, spacing: 14) {
-            explanationPart("Source basis", text: competency.explanation?.sourceBasis
+            explanationPart("Why we look for this", text: competency.explanation?.sourceBasis
                             ?? competency.sources.map(\.note).joined(separator: " "))
             if !competency.sources.isEmpty {
                 ForEach(Array(competency.sources.enumerated()), id: \.offset) { _, source in
@@ -138,9 +138,9 @@ private struct BehavioralCompetencyView: View {
                     }
                 }
             }
-            explanationPart("Criteria", text: competency.explanation?.criteria ?? fallbackCriteria)
-            explanationPart("Observed behavior", text: competency.explanation?.observedBehavior ?? fallbackObservations)
-            explanationPart("Overall judgment", text: competency.explanation?.overallJudgment ?? fallbackJudgment)
+            explanationPart("How we rate this", text: competency.explanation?.criteria ?? fallbackCriteria)
+            explanationPart("What you did", text: competency.explanation?.observedBehavior ?? fallbackObservations)
+            explanationPart("Why you got this rating", text: competency.explanation?.overallJudgment ?? fallbackJudgment)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .textSelection(.enabled)
@@ -162,12 +162,12 @@ private struct BehavioralCompetencyView: View {
         let examples = competency.tasks.prefix(3).map {
             "\($0.project): \($0.observation) \($0.rationale)"
         }
-        return examples.isEmpty ? "No connected task observation is stored in this result." : examples.joined(separator: " ")
+        return examples.isEmpty ? "This result has no examples to rate." : examples.joined(separator: " ")
     }
 
     private var fallbackJudgment: String {
         let counts = "High \(competency.highCount), Medium \(competency.mediumCount), Low \(competency.lowCount), Unknown \(competency.unknownCount), Not applicable \(competency.notApplicableCount)."
-        return "\(counts) The overall level is \(competency.level.label(language: "en")). High requires at least 80% of assessed tasks to be High; Low requires at least 50% to be Low; the remaining assessed combinations are Medium. The examples shown above do not limit the tasks used in this calculation."
+        return "Your rating is \(competency.level.label(language: "en")). \(counts) High means at least 80% of rated tasks were High. Low means at least half were Low. Other rated combinations are Medium. This uses all rated tasks, including those not shown above."
     }
 
 }
