@@ -74,11 +74,14 @@ struct SectionLabel: View {
 public struct ScorePips: View {
     var score: Int?
     var baseSize: CGFloat = 9
+    /// The inside of an empty dot: clear on a plain background, solid on a tinted one so the dot still shows.
+    var emptyFill: Color = .clear
     @Environment(\.textScale) private var scale
 
-    public init(score: Int?, size: CGFloat = 9) {
+    public init(score: Int?, size: CGFloat = 9, emptyFill: Color = .clear) {
         self.score = score
         self.baseSize = size
+        self.emptyFill = emptyFill
     }
 
     private var size: CGFloat { baseSize * scale }
@@ -97,7 +100,7 @@ public struct ScorePips: View {
     }
 
     private func fill(_ i: Int) -> Color {
-        guard let score, i < score else { return .clear }
+        guard let score, i < score else { return emptyFill }
         return Theme.color(for: Band(score: score))
     }
 }

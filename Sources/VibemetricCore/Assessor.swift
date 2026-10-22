@@ -408,18 +408,25 @@ public final class Assessor: Sendable {
         First what is going well, then the biggest thing holding the person back, then the one thing to do first. For example: \
         "Your AI does careful, solid work." / "But it often says done without testing anything." / \
         "Start by asking it to run your tests before it finishes."
+        - `highlights`, `issueLine` and `fixLine` are the first thing the person reads, before any detail, so they must read \
+        like a colleague talking to them: complete sentences with a subject and a verb, "you" or "your AI" as the subject, \
+        and everyday words a non-technical reader knows. No clipped headline style that drops words ("Restrictions \
+        enforced, but only in one project"), no shorthand or insider terms ("deny rules", "pre-push hook", "done-when \
+        line", "OSV scan") unless a few plain words say what they are, and no rubric terms. When a file or tool must be \
+        named, put it in backticks and say what it is for, for example "your project notes file (`CLAUDE.md`)".
         - `highlights`: 2 to 4 things the person already does well, across all dimensions, shown as bullets on the first screen \
-        of the result. One line each, at most 10 words, everyday words, no rubric terms, no numbers unless essential, and no \
-        "but". For example "Releases run through a saved skill and agents".
+        of the result. One sentence each, about 8 to 16 words, that says what they do and why it helps, with no "but" and \
+        no numbers unless essential. For example "You saved your release steps as a skill, so AI repeats them the same way \
+        every time."
         - `dimensions`: all 10 in rubric order. `score` is an integer 0–10, or null with `status` `not_assessable` only under the rubric's Not assessable rule; never use `not_reviewed`.
           - `headline`: the verdict, at most 10 words, for example "You rarely make the AI prove its work".
-          - `issueLine`: below 8, the problem as one sentence of about 12 to 18 words, shown in this dimension's box on the \
-        first screen. It must make sense on its own: say what happens, where or how often, and what it causes. Plain words, \
-        no rubric terms, no praise. For example "Build requests rarely say how to check the result, so AI decides when \
-        it's done". An empty string at 8 or above.
-          - `fixLine`: below 8, the fix as one sentence of about 10 to 16 words, starting with a verb and naming where the \
-        change goes, for example "Add a done-when line and one failure case to every build request". An empty string at \
-        8 or above.
+          - `issueLine`: below 8, the problem as one sentence of about 12 to 20 words, shown in this dimension's box on the \
+        first screen. It must make sense on its own to someone who has not read anything else: say what happens, where or \
+        how often, and what it costs the person. No praise. For example "Your build requests rarely say how to check the \
+        result, so the AI decides on its own when it's done." An empty string at 8 or above.
+          - `fixLine`: below 8, the fix as one sentence of about 10 to 18 words, starting with a verb, that says what to change, \
+        where, and in plain words what it gets them. For example "Add one line to each build request saying what done looks \
+        like and one case that should fail." An empty string at 8 or above.
           - `strengths`: up to 3 things the person already does well in this dimension, one short sentence each, as it happened \
         in their sessions, with a number where one exists, for example "Commits and pushes go to a cheaper subagent, 12 times in two sessions." \
         The app shows them under "What's working:" above the problem. An empty array when nothing stands out. Group related habits \

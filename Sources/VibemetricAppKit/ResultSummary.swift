@@ -200,23 +200,17 @@ private struct FixBox: View {
 
     private var summary: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // A banner across the top holds the name and score. The badge is as tall as the 16-point title's letters,
-            // not its line height.
-            HStack(spacing: 7) {
-                CategoryBadge(dimension: result.dimension, size: 16)
+            // A banner across the top: the name on the left; the score as dots and "6/10" on the right.
+            HStack(spacing: 10) {
                 Text(result.dimension.title).scaledFont(16, weight: .semibold).foregroundStyle(Theme.ink)
-                // The score right after the name.
-                if let score = result.score, let band = result.band {
-                    Text("\(score)/10")
-                        .scaledFont(12, weight: .semibold)
-                        .monospacedDigit()
-                        .padding(.horizontal, 8).padding(.vertical, 2)
-                        .foregroundStyle(Theme.color(for: band))
-                        .background(Theme.card, in: RoundedRectangle(cornerRadius: 6))
-                        .padding(.leading, 3)
-                }
-                Spacer(minLength: 0)
+                Spacer(minLength: 10)
                 if let change { DeltaBadge(change: change) }
+                ScorePips(score: result.score, size: 8, emptyFill: Theme.card)
+                Text(result.score.map { "\($0)/10" } ?? result.status.label)
+                    .scaledFont(13, weight: .semibold)
+                    .monospacedDigit()
+                    .foregroundStyle(result.band.map(Theme.color(for:)) ?? Theme.muted)
+                    .frame(minWidth: 40, alignment: .trailing)
                 Image(systemName: "chevron.right")
                     .scaledFont(12, weight: .semibold)
                     .foregroundStyle(Theme.muted)
@@ -251,24 +245,6 @@ private struct FixBox: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-    }
-}
-
-/// A category's icon in a round badge: black with a white icon in light mode, white with a dark icon in dark mode.
-struct CategoryBadge: View {
-    @Environment(\.textScale) private var scale
-    var dimension: VibemetricCore.Dimension
-    var size: CGFloat = 30
-
-    var body: some View {
-        ZStack {
-            Circle().fill(Theme.ink)
-            Image(systemName: dimension.symbol)
-                .font(.system(size: size * 0.45 * scale, weight: .semibold))
-                .foregroundStyle(Theme.paper)
-        }
-        .frame(width: size * scale, height: size * scale)
-        .accessibilityHidden(true)
     }
 }
 
