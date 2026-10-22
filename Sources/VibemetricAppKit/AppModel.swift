@@ -193,18 +193,43 @@ public final class AppModel {
 
     var engine: AssessmentEngine {
         didSet {
-            preferences.set(engine.rawValue, forKey: Self.engineKey)
+            // An automatic pick isn't saved: the saved engine also marks that the person has chosen one.
+            if !isAutoPickingEngine { preferences.set(engine.rawValue, forKey: Self.engineKey) }
             if case .failed = phase { phase = .ready }
         }
     }
+    @ObservationIgnored private var isAutoPickingEngine = false
     var model: ModelChoice {
         didSet { preferences.set(model.rawValue, forKey: Self.claudeModelKey) }
     }
     var codexModel: CodexModelChoice {
         didSet { preferences.set(codexModel.rawValue, forKey: Self.codexModelKey) }
     }
+    /// Engines ready to score: installed and not signed out.
     public var installations: [AssessmentEngine: CLIInstallation] = [:]
+    /// Engines that are installed but report no sign-in.
+    var signedOut: [AssessmentEngine: CLIInstallation] = [:]
     var installationErrors: [AssessmentEngine: String] = [:]
+
+    enum EngineStatus: Equatable { case checking, ready, notInstalled, signedOut, failed(String) }
+
+    func status(of engine: AssessmentEngine) -> EngineStatus {
+        if installations[engine] != nil { return .ready }
+        if isCheckingEngines { return .checking }
+        if signedOut[engine] != nil { return .signedOut }
+        if let error = installationErrors[engine] { return .failed(error) }
+        return .notInstalled
+    }
+
+    /// The selected engine's problem in a few words, for the sidebar and the menu bar; nil when it's ready or checking.
+    var engineProblem: String? {
+        switch status(of: engine) {
+        case .ready, .checking: nil
+        case .notInstalled: "\(engine.name) isn't installed"
+        case .signedOut: "\(engine.name) isn't signed in"
+        case .failed: "\(engine.name) couldn't start"
+        }
+    }
     var isCheckingEngines = false
     public var isScanning = false
     var runningEngine: AssessmentEngine?
@@ -347,7 +372,9 @@ public final class AppModel {
             await rescan()
             // rescan() returns at once when another scan is in flight; wait for that one to finish.
             while isScanning { try? await Task.sleep(for: .milliseconds(200)) }
-            guard installations[engine] != nil else { return setAutoStatus("Skipped: \(engine.name) is not ready") }
+            guard installations[engine] != nil else {
+                return setAutoStatus("Skipped: \(engine.name) is \(signedOut[engine] != nil ? "not signed in" : "not installed")")
+            }
             guard let scan, !scan.sessions.isEmpty else { return setAutoStatus("Skipped: no sessions found") }
             if AutoSettings.skipWhenIdle, let last = history.first(where: { $0.isComparable(to: assessmentOptions) }) {
                 let hasNew = scan.sessions.contains { ($0.end ?? .distantPast) > last.scannedAt }
@@ -368,20 +395,37 @@ public final class AppModel {
         guard !isCheckingEngines else { return }
         isCheckingEngines = true
         defer { isCheckingEngines = false }
-        let results = await withTaskGroup(of: (AssessmentEngine, CLIInstallation?, String?).self) { group in
+        let results = await withTaskGroup(of: (AssessmentEngine, CLIInstallation?, Bool?, String?).self) { group in
             for engine in AssessmentEngine.allCases {
                 group.addTask {
-                    do { return (engine, try await CLILocator.discover(engine), nil) }
-                    catch { return (engine, nil, error.localizedDescription) }
+                    do {
+                        guard let installed = try await CLILocator.discover(engine) else { return (engine, nil, nil, nil) }
+                        return (engine, installed, await CLISignIn.isSignedIn(engine, installed), nil)
+                    } catch { return (engine, nil, nil, error.localizedDescription) }
                 }
             }
-            var results: [(AssessmentEngine, CLIInstallation?, String?)] = []
+            var results: [(AssessmentEngine, CLIInstallation?, Bool?, String?)] = []
             for await result in group { results.append(result) }
             return results
         }
-        for (engine, installed, error) in results {
-            installations[engine] = installed
+        applyEngineChecks(results)
+    }
+
+    /// One check per engine: what was found, whether it's signed in (nil when it can't tell), and any error.
+    func applyEngineChecks(_ results: [(AssessmentEngine, CLIInstallation?, Bool?, String?)]) {
+        for (engine, installed, signedIn, error) in results {
+            // An unclear sign-in answer counts as ready; scoring itself reports a real sign-in problem.
+            installations[engine] = signedIn == false ? nil : installed
+            signedOut[engine] = signedIn == false ? installed : nil
             installationErrors[engine] = error
+        }
+        // Until an engine is saved (picked or used), use one that works when the default doesn't. A saved choice
+        // stays, so a person's scores keep coming from one engine.
+        if preferences.string(forKey: Self.engineKey) == nil, installations[engine] == nil,
+           let ready = AssessmentEngine.allCases.first(where: { installations[$0] != nil }) {
+            isAutoPickingEngine = true
+            engine = ready
+            isAutoPickingEngine = false
         }
     }
 

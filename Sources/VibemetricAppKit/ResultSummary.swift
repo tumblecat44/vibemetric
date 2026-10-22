@@ -117,8 +117,8 @@ struct ResultSummary: View {
     }
 }
 
-/// One category: a banner with its icon, name and score, then the issue and the fix in one line each.
-/// A click opens the full explanation below them.
+/// One category: a centered banner with its name and score, the issue and the fix side by side, and "See details",
+/// which opens the full explanation. A click anywhere on the box does the same.
 private struct FixBox: View {
     var result: ScoreCard.DimensionResult
     var change: ScoreChange?
@@ -161,74 +161,91 @@ private struct FixBox: View {
         return result.tryThis.flatMap { $0.isEmpty ? nil : $0 }
     }
 
+    private var bandColor: Color { result.band.map(Theme.color(for:)) ?? Theme.muted }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Button {
-                withAnimation(.easeOut(duration: 0.15)) { expanded.toggle() }
-            } label: {
-                summary.contentShape(Rectangle())
+        VStack(spacing: 0) {
+            Button(action: toggle) { summary.contentShape(Rectangle()) }
+                .buttonStyle(.plain)
+                .accessibilityHint(expanded ? "Hides the details" : "Shows the details")
+            if expanded {
+                divider
+                CategoryDetails(result: result, note: note, deductions: deductions, footer: footer)
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            divider
+            // "See details" across the bottom, tinted in the score's band color; unscored categories stay neutral.
+            Button(action: toggle) {
+                Label {
+                    Text(expanded ? "Hide details" : "See details")
+                } icon: {
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                }
+                    .labelStyle(TrailingIconLabelStyle())
+                    .scaledFont(13, weight: .semibold)
+                    .foregroundStyle(bandColor)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 13)
+                    .background(result.band.map { Theme.color(for: $0).opacity(0.16) } ?? Theme.paper)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityHint(expanded ? "Hides the details" : "Shows the details")
-            if expanded {
-                Rectangle().fill(Theme.rule).frame(height: 1)
-                CategoryDetails(result: result, note: note, deductions: deductions, footer: footer)
-                    .padding(14)
-            }
+            .pointingHandCursor()
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity)
         .background(Theme.card)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.rule, lineWidth: 1))
     }
 
+    private func toggle() { withAnimation(.easeOut(duration: 0.15)) { expanded.toggle() } }
+
+    private var divider: some View {
+        Rectangle().fill(result.band.map { Theme.color(for: $0).opacity(0.3) } ?? Theme.rule).frame(height: 1)
+    }
+
     private var summary: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // A banner across the top: the name on the left; the score as dots and "6/10" on the right.
-            HStack(spacing: 10) {
-                Text(result.dimension.title).scaledFont(16, weight: .semibold).foregroundStyle(Theme.ink)
-                Spacer(minLength: 10)
-                if let change { DeltaBadge(change: change) }
-                ScorePips(score: result.score, size: 8, emptyFill: Theme.card)
-                Text(result.score.map { "\($0)/10" } ?? result.status.label)
-                    .scaledFont(13, weight: .semibold)
-                    .monospacedDigit()
-                    .foregroundStyle(result.band.map(Theme.color(for:)) ?? Theme.muted)
-                    .frame(minWidth: 40, alignment: .trailing)
-                Image(systemName: "chevron.right")
-                    .scaledFont(12, weight: .semibold)
-                    .foregroundStyle(Theme.muted)
-                    .rotationEffect(.degrees(expanded ? 90 : 0))
+        VStack(spacing: 0) {
+            // A centered banner: the name, then the score as dots and "6/10".
+            VStack(spacing: 5) {
+                Text(result.dimension.title).scaledFont(15, weight: .semibold).foregroundStyle(Theme.ink)
+                HStack(spacing: 8) {
+                    ScorePips(score: result.score, size: 9)
+                    Text(result.score.map { "\($0)/10" } ?? result.status.label)
+                        .scaledFont(15, weight: .semibold)
+                        .monospacedDigit()
+                        .foregroundStyle(bandColor)
+                    if let change { DeltaBadge(change: change) }
+                }
             }
-            .padding(.vertical, 9)
-            .padding(.horizontal, 14)
-            // Tinted in the score's band color; unscored categories keep a neutral banner.
-            .background(result.band.map { Theme.color(for: $0).opacity(0.16) } ?? Theme.paper)
-            .overlay(alignment: .bottom) {
-                Rectangle().fill(result.band.map { Theme.color(for: $0).opacity(0.3) } ?? Theme.rule).frame(height: 1)
-            }
-            // A grid sizes the label column to the widest label at any text size, so both lines start at one edge,
-            // flush with the box's left padding.
-            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 4) {
-                row(label: "Issue", text: issue, color: Theme.color(for: .bottleneck))
-                if let fix { row(label: "Fix", text: fix, color: Theme.color(for: .strong)) }
-            }
+            .multilineTextAlignment(.center)
             .padding(.vertical, 11)
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity)
+            divider
+            // Issue and fix side by side, split by a thin rule.
+            HStack(alignment: .top, spacing: 0) {
+                column(label: "Issue", text: issue, color: Theme.color(for: .bottleneck))
+                if let fix {
+                    Rectangle().fill(Theme.rule).frame(width: 1).padding(.vertical, 2)
+                    column(label: "Fix", text: fix, color: Theme.color(for: .strong))
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.vertical, 12)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
     }
 
-    private func row(label: String, text: String, color: Color) -> some View {
-        GridRow {
-            Text(label).scaledFont(12, weight: .semibold).foregroundStyle(color)
-                .fixedSize()
-                .gridColumnAlignment(.leading)
+    private func column(label: String, text: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label).scaledFont(13, weight: .semibold).foregroundStyle(color)
             Text(inline(text)).scaledFont(14).foregroundStyle(Theme.ink)
                 .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -268,5 +285,24 @@ private struct ChangePill: View {
             .padding(.horizontal, 10).padding(.vertical, 3)
             .foregroundStyle(color)
             .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+/// The title, then its icon: "See details ⌄".
+private struct TrailingIconLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 5) {
+            configuration.title
+            configuration.icon
+        }
+    }
+}
+
+private extension View {
+    /// The pointing-hand cursor while the pointer is over this view, as for a link.
+    func pointingHandCursor() -> some View {
+        onHover { inside in
+            if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        }
     }
 }
