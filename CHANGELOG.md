@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.10 (2026-10-22)
+
+- The top of a result shows only its date, and in place of the band label, how much the score changed since your previous one (for example "↑ 7 since Oct 21"). "Few sessions were examined" moves into "About this score".
+- The toolbar keeps the same buttons in the same place on every screen; the export buttons are greyed out when no result is open.
+- The past results and deep dives lists no longer have a heading, so a click there no longer folds the list.
+
 ## 0.4.9 (2026-10-22)
 
 - Each category box shows its score as dots and "6/10" on the right of its banner, in place of the icon.
