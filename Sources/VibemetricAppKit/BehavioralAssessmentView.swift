@@ -160,15 +160,11 @@ private struct BehavioralCompetencyView: View {
     }
 
     private var fallbackObservations: String {
-        let examples = competency.tasks.prefix(3).map {
-            "\($0.project): \($0.observation) \($0.rationale)"
-        }
-        return examples.isEmpty ? "This result has no examples to rate." : examples.joined(separator: " ")
+        "This older result does not include a written observation."
     }
 
     private var fallbackJudgment: String {
-        let counts = "High \(competency.highCount), Medium \(competency.mediumCount), Low \(competency.lowCount), Unknown \(competency.unknownCount), Not applicable \(competency.notApplicableCount)."
-        return "Your rating is \(competency.level.label(language: "en")). \(counts) High means at least 80% of rated tasks were High. Low means at least half were Low. Other rated combinations are Medium. This uses all rated tasks, including those not shown above."
+        "The stored rating is \(competency.level.label(language: "en")). This older result does not include a written judgment."
     }
 
 }

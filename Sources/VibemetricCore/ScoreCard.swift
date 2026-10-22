@@ -132,9 +132,9 @@ public struct ScoreCard: Codable, Sendable {
         /// The solution explained as 2–4 plain bullets: what to change, where, how to do it in the next task,
         /// and how to tell it worked. nil on older cards, which show `tryThis` alone.
         public var solutionSteps: [String]?
-        /// Task-level Planning judgments and the criteria used when the assessment was made.
+        /// Direct Planning competency ratings and the criteria used for the assessment.
         public var planning: PlanningAssessment?
-        /// Task judgments for the other dimensions, including the canonical guide snapshot.
+        /// Direct competency ratings for the other dimensions, including the canonical guide snapshot.
         public var assessment: BehavioralAssessment?
 
         /// True when the card carries the short readable fields.
@@ -376,33 +376,11 @@ public struct ScoreCard: Codable, Sendable {
 
     public mutating func normalizePlanningAssessment() throws {
         guard let index = dimensions.firstIndex(where: { $0.dimension == .planningSpecs }),
-              let planning = dimensions[index].planning else { return }
+              var planning = dimensions[index].planning else { return }
         try planning.validate()
-        let competencies = planning.ordered
-        let gaps = competencies.filter { $0.level == .medium || $0.level == .low }
-        let scoreChanged = dimensions[index].score != planning.score
-        if scoreChanged {
-            dimensions[index].headline = PlanningAssessment.Level.allCases.map { level in
-                let count = competencies.filter { $0.level == level }.count
-                return "\(level.label(language: language)) \(count)"
-            }.joined(separator: ", ")
-            dimensions[index].changeReason = nil
-        }
-        if scoreChanged || gaps.isEmpty {
-            dimensions[index].impact = nil
-        }
-        dimensions[index].score = planning.score
-        dimensions[index].status = planning.score == nil ? .notAssessable : .scored
+        planning.competencies = planning.ordered
+        dimensions[index].planning = planning
         dimensions[index].reason = planning.markdown(language: language)
-        dimensions[index].points = nil
-        dimensions[index].conclusion = nil
-        dimensions[index].strengths = competencies.filter { $0.level == .high }.map(\.summary)
-        dimensions[index].saw = gaps.map(\.summary).joined(separator: "\n\n")
-        let solutions = gaps.compactMap(\.solution).filter { !$0.isEmpty }
-        dimensions[index].solutionSteps = solutions
-        dimensions[index].tryThis = solutions.first
-        scope.limits.removeAll { $0.hasPrefix("Planning & Specs calculated audit:") }
-        scope.limits.append(planning.calculatedAudit)
     }
 
     /// Validate the whole response before updating any dimension. Older saved cards remain unchanged.
@@ -432,29 +410,8 @@ public struct ScoreCard: Codable, Sendable {
                 snapshot.criteria = definition.criteria
                 return snapshot
             }
-            let competencies = assessment.competencies
-            let gaps = competencies.filter { $0.level == .medium || $0.level == .low }
-            let scoreChanged = dimensions[index].score != assessment.score
-            if scoreChanged {
-                dimensions[index].headline = PlanningAssessment.Level.allCases.map { level in
-                    "\(level.label(language: language)) \(competencies.filter { $0.level == level }.count)"
-                }.joined(separator: ", ")
-                dimensions[index].changeReason = nil
-            }
-            if scoreChanged || gaps.isEmpty { dimensions[index].impact = nil }
             dimensions[index].assessment = assessment
-            dimensions[index].score = assessment.score
-            dimensions[index].status = assessment.score == nil ? .notAssessable : .scored
             dimensions[index].reason = assessment.markdown(language: language, expectedIDs: ids)
-            dimensions[index].points = nil
-            dimensions[index].conclusion = nil
-            dimensions[index].strengths = competencies.filter { $0.level == .high }.map(\.summary)
-            dimensions[index].saw = gaps.map(\.summary).joined(separator: "\n\n")
-            let solutions = gaps.compactMap(\.solution).filter { !$0.isEmpty }
-            dimensions[index].solutionSteps = solutions
-            dimensions[index].tryThis = solutions.first
-            scope.limits.removeAll { $0.hasPrefix("\(dimension.rawValue) calculated audit:") }
-            scope.limits.append(assessment.calculatedAudit(dimension: dimension, expectedIDs: ids))
         }
     }
 

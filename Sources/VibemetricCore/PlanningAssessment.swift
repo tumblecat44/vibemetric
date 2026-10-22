@@ -31,15 +31,6 @@ public struct PlanningAssessment: Codable, Sendable {
         case high, medium, low, unknown
         case notApplicable = "not_applicable"
 
-        var scoreUnits: Int {
-            switch self {
-            case .high: 3
-            case .medium: 2
-            case .low: 1
-            case .unknown, .notApplicable: 0
-            }
-        }
-
         public func label(language: String) -> String {
             let korean = language.lowercased().hasPrefix("ko")
             switch self {
@@ -100,76 +91,36 @@ public struct PlanningAssessment: Codable, Sendable {
         }
     }
 
-    public struct TaskObservation: Codable, Sendable {
-        public var taskID: String
-        public var project: String
-        public var level: Level
-        public var observation: String
-        public var rationale: String
-        public var evidence: [ScoreCard.Evidence]
-
-        public init(taskID: String, project: String, level: Level, observation: String,
-                    rationale: String, evidence: [ScoreCard.Evidence]) {
-            self.taskID = taskID
-            self.project = project
-            self.level = level
-            self.observation = observation
-            self.rationale = rationale
-            self.evidence = evidence
-        }
-    }
-
     public struct Competency: Codable, Sendable, Identifiable {
         public var id: CompetencyID
+        public var level: Level
         public var summary: String
         public var sources: [Source]
         public var criteria: Criteria
-        public var tasks: [TaskObservation]
         public var solution: String?
         public var explanation: Explanation?
 
-        public init(id: CompetencyID, summary: String, sources: [Source], criteria: Criteria,
-                    tasks: [TaskObservation], solution: String? = nil, explanation: Explanation? = nil) {
+        public init(id: CompetencyID, level: Level, summary: String, sources: [Source], criteria: Criteria,
+                    solution: String? = nil, explanation: Explanation? = nil) {
             self.id = id
+            self.level = level
             self.summary = summary
             self.sources = sources
             self.criteria = criteria
-            self.tasks = tasks
             self.solution = solution
             self.explanation = explanation
         }
 
-        public var highCount: Int { tasks.filter { $0.level == .high }.count }
-        public var mediumCount: Int { tasks.filter { $0.level == .medium }.count }
-        public var lowCount: Int { tasks.filter { $0.level == .low }.count }
-        public var unknownCount: Int { tasks.filter { $0.level == .unknown }.count }
-        public var notApplicableCount: Int { tasks.filter { $0.level == .notApplicable }.count }
-        public var assessedCount: Int { highCount + mediumCount + lowCount }
-
-        public var level: Level {
-            guard assessedCount > 0 else {
-                return !tasks.isEmpty && notApplicableCount == tasks.count ? .notApplicable : .unknown
-            }
-            if highCount * 5 >= assessedCount * 4 { return .high }
-            if lowCount * 2 >= assessedCount { return .low }
-            return .medium
-        }
     }
 
     public enum ValidationError: Error, LocalizedError {
         case invalidCompetencies
-        case duplicateTaskID(CompetencyID, String)
-        case missingTaskEvidence(CompetencyID, String)
         case unsupportedSourceURL(CompetencyID, String)
 
         public var errorDescription: String? {
             switch self {
             case .invalidCompetencies:
                 return "Planning must contain each of its four competencies exactly once."
-            case let .duplicateTaskID(id, taskID):
-                return "Planning competency \(id.rawValue) repeats task \(taskID)."
-            case let .missingTaskEvidence(id, taskID):
-                return "Planning competency \(id.rawValue) has no evidence for assessed task \(taskID)."
             case let .unsupportedSourceURL(id, url):
                 return "Planning competency \(id.rawValue) uses an unsupported source URL: \(url)."
             }
@@ -199,40 +150,11 @@ public struct PlanningAssessment: Codable, Sendable {
             for source in competency.sources where !Self.sourceURLs.contains(source.url) {
                 throw ValidationError.unsupportedSourceURL(competency.id, source.url)
             }
-            var seen = Set<String>()
-            for task in competency.tasks {
-                guard seen.insert(task.taskID).inserted else {
-                    throw ValidationError.duplicateTaskID(competency.id, task.taskID)
-                }
-                if [.high, .medium, .low].contains(task.level), task.evidence.isEmpty {
-                    throw ValidationError.missingTaskEvidence(competency.id, task.taskID)
-                }
-            }
         }
     }
 
     public var ordered: [Competency] {
         CompetencyID.allCases.compactMap { id in competencies.first { $0.id == id } }
-    }
-
-    public var score: Int? {
-        let applicable = competencies.filter { $0.level != .notApplicable }
-        guard !applicable.isEmpty else { return nil }
-        let weighted = applicable.reduce(0) { $0 + $1.level.scoreUnits }
-        let denominator = 3 * applicable.count
-        return (20 * weighted + denominator) / (2 * denominator)
-    }
-
-    public var calculatedAudit: String {
-        let applicable = competencies.filter { $0.level != .notApplicable }
-        let weighted = applicable.reduce(0) { $0 + $1.level.scoreUnits }
-        let counts = ordered.map {
-            "\($0.id.rawValue)=\($0.level.rawValue) (H=\($0.highCount), M=\($0.mediumCount), L=\($0.lowCount), U=\($0.unknownCount), NA=\($0.notApplicableCount))"
-        }.joined(separator: "; ")
-        let arithmetic = applicable.isEmpty
-            ? "n=0; raw=not_assessable; rounded=null"
-            : "n=\(applicable.count); raw=\(10 * weighted)/\(3 * applicable.count); rounded=\(score!)"
-        return "Planning & Specs calculated audit: \(counts); \(arithmetic)."
     }
 
     public func markdown(language: String) -> String {
@@ -241,20 +163,15 @@ public struct PlanningAssessment: Codable, Sendable {
             let title = competency.id.title(language: language)
             let level = competency.level.label(language: language)
             var parts = ["### \(title) · \(level)", competency.summary]
-            let counts = korean
-                ? "관찰한 과제 중 상 \(competency.highCount), 중 \(competency.mediumCount), 하 \(competency.lowCount)입니다. 미확인 \(competency.unknownCount), 해당 없음 \(competency.notApplicableCount)은 이 비율에서 제외합니다."
-                : "Among observed tasks, \(competency.highCount) are high, \(competency.mediumCount) medium, and \(competency.lowCount) low. The \(competency.unknownCount) unknown and \(competency.notApplicableCount) not-applicable cases are outside that proportion."
-            let policy = korean
-                ? "판정 가능한 과제 중 상이 80% 이상이면 상, 하가 50% 이상이면 하, 나머지는 중입니다. 이 수치 경계는 제품 정책입니다."
-                : "The aggregate is high when at least 80% of assessable tasks are high, low when at least 50% are low, and medium otherwise. These numerical thresholds are product policy."
             let explanation = competency.explanation ?? Explanation(
                 sourceBasis: competency.sources.map(\.note).joined(separator: " "),
                 criteria: "\(Level.high.label(language: language)): \(competency.criteria.high) \(Level.medium.label(language: language)): \(competency.criteria.medium) \(Level.low.label(language: language)): \(competency.criteria.low)",
-                observedBehavior: competency.tasks.map { task in
-                    let references = task.evidence.map { "\($0.label) · \($0.sessionId): \($0.note)" }.joined(separator: "; ")
-                    return "\(task.project) · \(task.taskID): \(task.observation) \(task.rationale) \(references)"
-                }.joined(separator: "\n\n"),
-                overallJudgment: counts + " " + policy)
+                observedBehavior: korean
+                    ? "이 이전 결과에는 작성된 관찰 내용이 없습니다."
+                    : "This older result does not include a written observation.",
+                overallJudgment: korean
+                    ? "저장된 평가는 \(level)입니다. 이 이전 결과에는 판정 설명이 없습니다."
+                    : "The stored rating is \(level). This older result does not include a written judgment.")
             parts.append(explanation.markdown(language: language, sources: competency.sources))
             if [.medium, .low].contains(competency.level),
                let solution = competency.solution, !solution.isEmpty {

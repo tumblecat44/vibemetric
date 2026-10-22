@@ -21,16 +21,11 @@ enum JSONSchema {
         let planning = object([
             "competencies": array(object([
                 "id": ["type": "string", "enum": PlanningAssessment.CompetencyID.allCases.map(\.rawValue)],
+                "level": ["type": "string", "enum": PlanningAssessment.Level.allCases.map(\.rawValue)],
                 "summary": str,
                 "explanation": explanation,
                 "sources": array(object(["title": str, "url": str, "note": str])),
                 "criteria": object(["high": str, "medium": str, "low": str]),
-                "tasks": array(object([
-                    "taskID": str, "project": str,
-                    "level": ["type": "string", "enum": PlanningAssessment.Level.allCases.map(\.rawValue)],
-                    "observation": str, "rationale": str,
-                    "evidence": array(evidence),
-                ])),
                 "solution": ["type": ["string", "null"]],
             ]), min: 4, max: 4),
         ])
@@ -66,14 +61,9 @@ enum JSONSchema {
             properties["assessment"] = object([
                 "competencies": array(object([
                     "id": ["type": "string", "enum": guide.competencies.map(\.id)],
+                    "level": ["type": "string", "enum": PlanningAssessment.Level.allCases.map(\.rawValue)],
                     "summary": str,
                     "explanation": explanation,
-                    "tasks": array(object([
-                        "taskID": str, "project": str,
-                        "level": ["type": "string", "enum": PlanningAssessment.Level.allCases.map(\.rawValue)],
-                        "observation": str, "rationale": str,
-                        "evidence": array(evidence),
-                    ])),
                     "solution": ["type": ["string", "null"]],
                 ]), min: guide.competencies.count, max: guide.competencies.count),
             ])

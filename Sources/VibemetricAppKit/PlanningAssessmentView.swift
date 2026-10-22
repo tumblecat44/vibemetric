@@ -138,34 +138,20 @@ private struct PlanningCompetencyView: View {
             detailSection("What you did") {
                 if let explanation = competency.explanation {
                     detailText(explanation.observedBehavior)
-                } else if representativeTasks.isEmpty {
-                    detailText("This result has no examples to rate.")
                 } else {
-                    ForEach(representativeTasks, id: \.taskID) { task in
-                        detailText("\(task.observation) \(task.rationale)")
-                    }
+                    detailText("This older result does not include a written observation.")
                 }
             }
             detailSection("Why you got this rating") {
                 if let explanation = competency.explanation {
                     detailText(explanation.overallJudgment)
                 } else {
-                    detailText("High \(competency.highCount), Medium \(competency.mediumCount), Low \(competency.lowCount). Your rating is \(levelLabel).")
-                    detailText("This older result has no written explanation for the rating.")
+                    detailText("The stored rating is \(levelLabel). This older result does not include a written judgment.")
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .textSelection(.enabled)
-    }
-
-    private var representativeTasks: [PlanningAssessment.TaskObservation] {
-        let assessed = competency.tasks.filter { [.high, .medium, .low].contains($0.level) }
-        guard let first = assessed.first else { return [] }
-        if let contrasting = assessed.first(where: { $0.level != first.level }) {
-            return [first, contrasting]
-        }
-        return [first]
     }
 
     private func detailSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {

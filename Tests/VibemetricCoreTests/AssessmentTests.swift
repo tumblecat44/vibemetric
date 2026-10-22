@@ -260,25 +260,18 @@ private struct CLIFixture {
             overallJudgment: "One observed task supports the stated level; unread work is outside this judgment.")
         let levels: [PlanningAssessment.Level] = [.high, .medium, .low, .unknown]
         card.dimensions[0].planning = PlanningAssessment(competencies: zip(PlanningAssessment.CompetencyID.allCases, levels).map { id, level in
-            PlanningAssessment.Competency(id: id, summary: "Cedar defines its export work. The acceptance check is recorded.",
+            PlanningAssessment.Competency(id: id, level: level, summary: "Cedar defines its export work. The acceptance check is recorded.",
                 sources: [.init(title: "Prove It Works", url: "https://raw.githubusercontent.com/cursor/plugins/main/pstack/skills/principle-prove-it-works/SKILL.md", note: "A fictional practice guide.")],
                 criteria: .init(high: "Outcome and check agree.", medium: "Outcome is incomplete.", low: "Outcome is unspecified."),
-                tasks: [.init(taskID: "cedar-export", project: "Cedar", level: level,
-                    observation: "The export request was examined.", rationale: "The observed request supports this level.",
-                    evidence: [.init(tool: "Codex", sessionId: Self.sessionID, date: "2026-10-22", note: "Export request", project: "Cedar")])],
                 explanation: explanation)
         })
         let guide = try RubricGuide.load()
         for index in card.dimensions.indices where card.dimensions[index].dimension != .planningSpecs {
             let definition = guide.guide(for: card.dimensions[index].dimension)!
             card.dimensions[index].assessment = BehavioralAssessment(competencies: definition.competencies.map { competency in
-                .init(id: competency.id, title: competency.title,
+                .init(id: competency.id, level: .medium, title: competency.title,
                       summary: "Cedar uses a relevant procedure. Its complete behavior remains unverified.",
                       sources: [], criteria: .init(high: "", medium: "", low: ""),
-                      tasks: [.init(taskID: "cedar-export", project: "Cedar", level: .medium,
-                                    observation: "A relevant procedure was applied.", rationale: "Only partial verification is recorded.",
-                                    evidence: [.init(tool: "Codex", sessionId: Self.sessionID, date: "2026-10-22",
-                                                     note: "Export procedure", project: "Cedar")])],
                       explanation: explanation)
             })
         }

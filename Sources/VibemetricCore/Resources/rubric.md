@@ -1,8 +1,8 @@
 # AI Native Score rubric
 
-Behavioral guide and scoring policy updated: 2026-10-23. All dimensions use task-level observations and the shared task-frequency thresholds before the common score conversion. All 10 dimensions use core competencies with High, Medium, and Low behavioral levels, evidence to inspect, and reasons the behavior helps. Each applicable competency has the same maximum contribution of 1/n within its dimension. Low earns one third of that contribution, Medium earns two thirds, and High earns the full contribution.
+Behavioral guide and scoring policy updated: 2026-10-23. All 10 dimensions use core competencies with High, Medium, and Low behavioral descriptions, evidence to inspect, and reasons the behavior helps. Judge each competency's level and each dimension's score directly from the relevant evidence actually examined.
 
-The score describes behavioral levels confirmed in the examined records. Explain what is established and what remains unknown. Use the equal-weight calculation in section 2. Do not inherit earlier checklist row counts, binary credit, Planning's qualitative-only exception, draft thresholds, or previous numerical grades.
+The score describes practice confirmed in those records. Explain what is established and what remains unknown. Do not inherit earlier task-frequency thresholds, equal-weight level conversions, checklist counts, draft scoring policies, or previous numerical grades.
 
 ## 1. Goal and scope
 
@@ -25,24 +25,21 @@ Keep this assessment read-only and local. Do not modify files, install software,
 
 ## 2. Behavioral competencies
 
-Review the person's current practices across exactly 10 dimensions. Each table defines the core competencies in that dimension. Assess each competency as High, Medium, Low, `unknown`, or `not_applicable` from connected observations. Use the described behavior, not a count of documents, prompts, tools, or procedural steps. Each applicable competency has the same maximum contribution of `1/n` within its dimension. Each dimension contributes up to 10 points, for a total of 100 when all dimensions are scored.
+Review the person's current practices across exactly 10 dimensions. Each table defines the core competencies in that dimension. Assess each competency as High, Medium, Low, `unknown`, or `not_applicable` from connected observations. Use the described behavior, not a count of documents, prompts, tools, or procedural steps. Each dimension receives an AI-judged score from 0 to 10, for a total of 100 when all dimensions are scored.
 
-### Equal-weight scoring with three behavioral levels
+### Qualitative levels and AI-judged scores
 
-1. Review every competency once. Judge the task-relevant practice as a whole. High requires its defining behavior, not merely a favorable fragment. Medium establishes useful but incomplete practice; Low establishes that the needed practice was absent or ineffective at an observed opportunity. Use `unknown` only when relevant records cannot be found or inspected well enough to judge any level. An unverified higher level or later effect does not erase a level already established. Missing records alone do not establish Low. Use `not_applicable` only when no relevant opportunity exists, and explain why.
-2. Let `n` be the number of competency rows in the dimension's table minus rows established as `not_applicable`. Do not assume that every dimension has four competencies. An unresolved applicability decision remains `unknown` and stays in `n`. Count every competency once, including those that remain unknown.
-3. Divide each competency's maximum contribution of `1/n` into three equal parts. Low contributes `1/(3n)`, Medium contributes `2/(3n)`, and High contributes `3/(3n) = 1/n`. Unknown contributes zero confirmed credit and remains in the denominator. Let `H`, `M`, and `L` be the numbers assigned High, Medium, and Low. The exact confirmed proportion is `(3H + 2M + L)/(3n)`. The raw dimension score is `10*(3H + 2M + L)/(3n)`. Return the displayed integer `floor(raw + 0.5)`, so half points round up. Apply no additional weights, bonuses, or deductions. Apply the shared task-frequency policy before converting aggregate competency levels into points.
-4. Unknown and Low have different meanings and different contributions. Low establishes the described basic or incomplete behavior and earns one of the three parts. Unknown establishes no level and earns no confirmed credit. A lower score caused by unknown records describes limited confirmed coverage, not demonstrated inability. Preserve every confirmed observation in the explanation without claiming a higher level than it supports.
-5. Use `status: "scored"` and the calculated integer whenever `n > 0`, including when all applicable competencies remain unknown. Use `status: "not_assessable"` and `score: null` only when all competencies are established as `not_applicable`, so `n = 0`. Never divide by zero or use `not_reviewed` in a completed card. Planning & Specs follows the same policy as the other nine dimensions; its earlier qualitative-only exception no longer applies.
-6. When all 10 dimensions are scored, the total is the sum of their displayed integer scores out of 100. If a dimension has `n = 0`, leave it unscored and report the known subtotal and unscored scope. Do not treat it as zero or change the other dimensions' weights. The app may display its existing range for unscored dimensions. If a compatible output accepts a `deductions` field, return an empty array.
-7. Retain an audit for every dimension in the Scope note. When the app computes audits from structured task observations, return those observations and let the app append the calculation audits; do not generate duplicate audits in `scope.limits`. For standalone Markdown output, include the following calculation details in the Scope note. Identify every competency by its table name and report its level or unresolved status with the connected observations. List the competency names by High, Medium, Low, unknown, and not_applicable, with every name in exactly one list. Record each exclusion reason, `n`, `H`, `M`, `L`, the weighted numerator `3H+2M+L`, the exact fraction, raw score, and rounded integer. For `n = 0`, record the fraction and raw score as not applicable and return null. For example, four competencies classified High, Medium, Low, and unknown have `n=4`, numerator `3+2+1=6`, fraction `6/12`, raw score `5`, and displayed score `5`. If the unknown competency is instead established as not_applicable, `n=3`, fraction `6/9`, raw score `20/3`, and displayed score `7`.
-
-This policy describes the behavioral levels confirmed within the examined records. It replaces the earlier binary checklist calculation and Planning's temporary lack of numerical conversion. Reassess current observations under these definitions. Explain a method change separately from changes in the person's practices. Do not inherit earlier grades, thresholds, row counts, or an unfinished draft's neutral notices as improvement advice.
+1. Review every competency once against its behavioral description. High requires its defining behavior, not merely a favorable fragment. Medium establishes useful but incomplete practice; Low establishes that the needed practice was absent or ineffective at an observed opportunity. Use `unknown` only when relevant records cannot be found or inspected well enough to judge any level. An unverified higher level or later effect does not erase a level already established. Missing records alone do not establish Low. Use `not_applicable` only when no relevant opportunity exists, and explain why.
+2. Judge the practice as a whole from all relevant evidence actually inspected. Consider consistency, material variation, context, and consequential gaps. Explain mixed evidence without constructing a task-by-task rating array or counting how often each level occurs. Do not apply frequency thresholds, grading quotas, or another frequency formula. Representative examples explain the judgment; do not select only the strongest example or claim that a small sample represents every record.
+3. Directly assign an integer score from 0 to 10 for each dimension, based on the observed quality, consistency, and material limitations across its competencies. Explain the judgment through the supported practices and gaps. Do not convert competency labels or counts into points, apply fixed competency weights, or choose a desired score distribution. The app preserves the score rather than recomputing it from the levels.
+4. Unknown coverage does not establish inability or an observed failure. Preserve confirmed partial practice and explain what remains unverified. A dimension whose competencies are all unknown remains `scored` with score 0 for limited confirmed coverage. Use `status: "not_assessable"` and `score: null` only when every competency is established as `not_applicable`. Never use `not_reviewed` in a completed card.
+5. When all 10 dimensions are scored, the total is the sum of their displayed integer scores out of 100. If a dimension is not applicable, leave it unscored and report the known subtotal and unscored scope. Do not treat it as zero or change the other dimensions' scores. If a compatible output accepts a `deductions` field, return an empty array.
+6. Return each competency's explicit level, personal summary, explanation, and supported next action. Put representative connected cases in the explanation rather than an exhaustive task ledger. Keep scope limits about actual coverage and applicability; do not add arithmetic audits. A changed scoring method does not establish changed ability.
 
 ### Observation rules
 
 - Distinguish High, Medium, Low, unknown, and not-applicable cases. Read each competency's evidence and level definitions for the opportunity the task presents. Do not turn every sentence in a level description into a separate scored checkbox.
-- Record the observed opportunities and coverage. One successful case does not establish a recurring habit across all work. When observed episodes differ, explain that variation and the evidence for the current level using the shared task-frequency policy and reporting its observed scope rather than inventing other thresholds or averaging unrelated historical practices.
+- Record the observed opportunities and coverage. One successful case does not establish a recurring habit across all work. When observed episodes differ, explain that variation and the evidence for the current level by judging the observed practice qualitatively and reporting its scope, without averaging unrelated historical practices.
 - Trace practices still in effect at the assessment time. When later records establish that an earlier practice changed and the new practice remains in use, describe that change and its later application. Recency alone does not establish a change.
 - Distinguish an action requested on that occasion, an action run under saved settings, and a change AI initiates after discovering a problem. Automatic execution does not earn separate credit for the same action. Do not require autonomy when the competency is satisfied through an explicit instruction.
 - The same record may support different competencies only when it establishes their distinct behaviors. Do not award the same save, maintenance edit, review, or correction again under another name. Apply the dimension boundaries below and explain the separate basis when a record is reused.
@@ -77,21 +74,19 @@ In the Scope note, briefly list screened projects with their deployment/use stat
 
 ---
 
-### Shared task observation and aggregate levels
+### Connected observations and overall levels
 
-This policy applies to all ten dimensions. The High 80% and Low 50% aggregate thresholds are Vibemetric product policy. Public sources support the practices and mechanisms, not these numerical thresholds or a scientifically validated ability scale.
+This policy applies to all ten dimensions. Public sources support the described practices and mechanisms, not a scientifically validated ability scale or a numerical task-frequency threshold.
 
-1. An independent task is one intended outcome and its connected request, investigation, execution, and review. Link continuing sessions rather than counting each message, agent subtask, or retry as a new task. Investigate the full accessible history without selecting only successful examples. For each competency retain every relevant independent task actually observed, ordered newest to older, and report encountered unknown/not-applicable cases separately. There is no task-count cap or minimum. The judging set includes all observed cases; a few representative examples in the explanation do not replace that set. Never fabricate tasks, claim unread records were examined, or imply record-wide percentages from incomplete coverage.
-2. Read the relevant request, then-effective instructions, adopted delegated investigation, actual actions, and results required by that competency. A saved rule, installed tool, requested action, automatic injection, or completion claim alone does not establish execution or effect. Do not require the person to do AI's routine work. Credit authorized delegation when its behavior is observed.
-3. Classify each task using the competency's High/Medium/Low descriptions and the records available at the relevant decision. Credit partial practice at its established level; an unverified extension is not unknown. Unknown means the relevant records cannot be found or inspected well enough to judge any level. Missing records are never Low. Exclude a task as not_applicable only when no relevant opportunity exists and explain why.
-4. Let K=H+M+L be assessable task count for this competency; unknown and not-applicable task counts remain separate and visible. For K>0, aggregate High when H/K>=0.8, Low when L/K>=0.5, otherwise Medium. Explain whether the aggregate reflects repeated behavior or mixed practices, and state its actual observed scope. If K=0, use not_applicable only when every retained case is established inapplicable; otherwise unknown.
-5. Convert these aggregate competency levels using the equal-weight formula above. The competency denominator n is not task count K. Aggregate unknown earns zero confirmed credit while staying in n; only aggregate not_applicable is excluded. All-unknown dimensions score zero with limited confirmed coverage, not demonstrated inability. All-not-applicable dimensions stay unscored.
-6. Automation is part of High where the competency explicitly assesses repeated memory capture/reconciliation, guidance upkeep, verification triggers, or reusable resource assignment. Do not give an automatic bonus for unrelated work or demand automation of the person's substantive judgment. Installing a mechanism without observing its application is insufficient.
-7. Return all observed relevant task evidence, two-sentence personal summaries, the four explanation fields defined in section 3, and supported next actions. The app preserves the explanation and computes counts, levels, and numerical audits. Canonical definitions, source links, and why the practice helps are saved with the card; do not invent sources or attribute our numerical policy to an author.
+1. Follow an intended outcome through its connected request, investigation, execution, and review. Link continuing sessions; messages, delegated subtasks, and retries are not independent proof of a recurring practice. Consider supporting and contrary evidence actually read, and state the examined scope. Never fabricate cases or imply that unread records were examined.
+2. Read the relevant request, then-effective instructions, adopted delegated investigation, actual actions, and results required by the competency. A saved rule, installed tool, requested action, automatic injection, or completion claim alone does not establish execution or effect. Credit authorized delegation when its behavior is observed; the person need not do AI's routine work.
+3. Judge each competency directly against its High/Medium/Low descriptions using the connected evidence. Credit partial practice at its established level. Distinguish unknown later effects from actions already established, missing records from Low, and inapplicability from a failed practice.
+4. Automation is part of High where the competency explicitly assesses repeated memory capture/reconciliation, guidance upkeep, verification triggers, or reusable resource assignment. Do not give an automatic bonus for unrelated work or demand automation of the person's substantive judgment. Installing a mechanism without observing its application is insufficient.
+5. Return the overall level and four explanation fields defined in section 3, using representative cases to explain meaningful consistency or variation. Do not emit every task's observation, rationale, project, and session references as a repeated array. Keep source links exact and state only supported next actions.
 
 ### 1. Planning & Specs
 
-Assess the intended outcome and working conditions established before the relevant implementation begins. Planning now has an explicit task-level observation and aggregation policy. The other nine dimensions use the shared aggregation policy with their own distinct competency definitions.
+Assess the intended outcome and working conditions established before the relevant implementation begins. Apply the shared qualitative judgment policy with Planning’s distinct competency definitions.
 
 Read the initial request, instructions that were in effect, pre-execution investigation, and the adopted execution direction together. Credit an AI investigation or proposal when the person delegates that investigation or adopts its findings within the permitted scope. Do not require the person to write every detail, answer unnecessary questions, or approve each routine step. Successful implementation does not retroactively establish a clear plan.
 
@@ -102,19 +97,17 @@ Read the initial request, instructions that were in effect, pre-execution invest
 | **Task context.** Establish the problem and existing state needed to choose the work direction. Structured ID: `task_context`. | Connect background or source inspection to the decision about what to change. Read actual investigation findings rather than treating a file link or a request to investigate as proof that the needed facts were established. | **High.** The problem and relevant existing state are supplied or investigated, and the findings establish the facts needed for the adopted execution direction. For example, sign-in works but loses the selected product; the direction repairs the observed return path rather than merely changing the sign-in screen. Background material alone does not establish this connection.<br><br>**Medium.** Relevant background or material is supplied, but the connection between the observed situation and change direction is incomplete. For example, “Buying after sign-in is inconvenient; here are the screens” leaves the actual failure and current handling unestablished.<br><br>**Low.** Needed background exists in the work records, but it is neither supplied nor investigated before execution. For example, the product-return problem is left unexamined while work begins only on the visual sign-in screen. | The same broad feature can have different causes and useful changes. Connecting existing behavior to the chosen direction helps AI address the actual problem. Context length is not the competency. |
 | **Clarifying ambiguous requirements.** Resolve consequential differences in meaning or define an adequate decision boundary before the affected implementation. Structured ID: `ambiguity_resolution`. | Identify a real interpretation difference, facts that can be investigated, choices for the person, and the settled direction. Include appropriate bounded delegation and already-agreed defaults. Do not count questions or require clarification when the request is already settled. | **High.** Consequential interpretation differences affecting the implementation are resolved or adequately bounded before that implementation, and the settled direction governs execution. For example, duplicates mean the same ID; existing rows stay unchanged, incoming duplicates are skipped, and the skipped count is shown.<br><br>**Medium.** Discussion or investigation narrows the requirement but leaves a consequential choice unresolved. For example, “Skip instead of overwrite” is settled but ID versus name as the duplicate key is not.<br><br>**Low.** A consequential interpretation difference is established, but execution begins without resolving it or defining an appropriate delegation boundary. For example, preserve versus overwrite remains explicitly unresolved when the import begins. “Use your judgment,” skipping an unnecessary interview, or choosing implementation details within an adequate boundary are not Low by themselves. | Agreement should remove choices that could produce a different intended result while leaving routine implementation decisions with AI. This avoids making unnecessary interviews or human-written detail prerequisites for a good plan. |
 
-#### Planning task observation and aggregation
+#### Planning observations and overall judgment
 
-- **Unit of observation.** Count an independent task with its own intended result once. Link sessions continuing that task instead of counting them separately. Agent subtasks and repeated attempts are not additional independent tasks.
-- **Investigation scope.** All accessible history is in scope, subject to project screening. Follow relevant connected tasks without selecting by apparent quality. Retain every relevant task actually observed; there is no per-competency task cap or minimum. Keep representative examples in the explanation separate from the full judging set. Respect the reading deadline, report unexamined scope honestly, and never count an index entry as a read session.
-- **Classify each task.** Apply the behavioral definitions above before aggregating. Use `unknown` when the needed exchanges or links are unavailable. Missing records alone are never Low. Use `not_applicable` only when no relevant opportunity is established, such as no needed constraint or no ambiguity to resolve. Explain why. Changed goals and facts discovered only after execution are not automatically earlier omissions.
-- **Aggregate each competency.** Let K be assessable task count, H/M/L its High/Medium/Low task counts. K=H+M+L; unknown and not-applicable task counts are reported separately. If K>0, High requires H/K >= 80%; Low requires L/K >= 50%; otherwise the aggregate is Medium. Explain whether Medium reflects repeated Medium behavior or a mixture. These aggregate thresholds are Vibemetric product policy, not statistically validated thresholds from the sources.
-- **Observed scope.** State the actual observed scope. Never generalize one successful example to all the person's work. If K=0 and all retained cases are established as not applicable, the aggregate is not_applicable; otherwise it is unknown. Unknown or excluded cases must remain visible and do not establish weakness.
-- **Dimension score.** Apply the existing equal-weight three-part conversion to the four aggregate competency levels. Here n is applicable competency count, not K. Only aggregate not_applicable is excluded from n; aggregate unknown stays in n and earns no confirmed credit. The app computes task counts, aggregate levels, and the final Planning score from returned observations. Do not invent another per-task numeric weighting or copy old scores.
-- **Distinct behavior.** The same task may support several competencies only through their separate behavior. A background fact is not automatically a constraint, acceptance criterion, or resolved ambiguity. Do not award the same action repeatedly without showing the distinct basis.
+- Read the initial request, active guidance, delegated investigation, and adopted direction together for the same intended result. Link sessions continuing that work and preserve later corrections.
+- All accessible history remains in scope, subject to project screening and the reading deadline. Follow relevant connected work without selecting by apparent quality. Never count an index entry as a read session or claim that unexamined records support the judgment.
+- Judge each of the four competencies directly from the observed practice and its defining behavior. Explain consequential variation and representative contrasts qualitatively, without a task ledger or frequency tally. Changed goals and facts discovered only after execution are not automatically earlier omissions.
+- Use unknown for unavailable relevant records and not_applicable only when no relevant opportunity is established. Explain the coverage or applicability limit without inventing a personal failure.
+- Assign Planning's dimension score directly under the shared scoring guidance. The same task supports several competencies only through distinct behavior: a background fact is not automatically a constraint, acceptance check, or resolved ambiguity.
 
 #### Planning source basis and presentation
 
-The source materials establish the adopted practices, not the numerical thresholds. They are supplied reference material; this read-only assessment does not need web access or a fresh claim to have visited them. Preserve each source title, exact URL, and the specific practice adopted. Do not attribute 80%, 50%, or a human ability rating to these authors.
+The source materials establish the adopted practices, not numerical ability grades. They are supplied reference material; this read-only assessment does not need web access or a fresh claim to have visited them. Preserve each source title, exact URL, and the specific practice adopted. Do not attribute a human ability rating to these authors.
 
 - pstack, **Prove It Works**: verify the real result instead of a completion claim or a proxy. URL: https://raw.githubusercontent.com/cursor/plugins/main/pstack/skills/principle-prove-it-works/SKILL.md
 - pstack, **sharpen**: identify raw evidence, a suitable method, and an independent check; leave the person's choices open. URL: https://raw.githubusercontent.com/cursor/plugins/main/pstack/skills/sharpen/SKILL.md
@@ -122,13 +115,13 @@ The source materials establish the adopted practices, not the numerical threshol
 - Anthropic, **Claude Code Best practices**: provide a way to verify work, concrete context and constraints, allow context gathering by tools, and use interviews or planning as the task needs. URL: https://code.claude.com/docs/en/best-practices
 - GitHub, **Spec Kit specification template**: connect user scenarios, independently testable outcomes, acceptance situations/actions/results, and explicit assumptions. URL: https://raw.githubusercontent.com/github/spec-kit/main/templates/spec-template.md
 
-Return Planning's four competencies in table order with two-sentence personalized summaries and all observed relevant per-task evidence. The main view shows High under What's working, Medium/Low under Problem, and unknown/not-applicable under neutral coverage. Expanding the title row shows four focused explanation paragraphs: source basis, concrete criteria, representative observed behavior, and overall judgment from the full observed task counts. Use the section 3 example to calibrate their specificity. Include the actual source links with the source basis. Do not replace the explanation with bare High/Medium/Low labels, make another disclosure necessary, or dump every task into the main narrative. Solutions address observed gaps; unknown records do not justify invented failures or correction claims. Keep source rationale out of the two-sentence summary. UI headings remain English; narrative text, source notes, and criteria descriptions use the person's requested language, while source titles and URLs remain exact. Criteria must express this rubric's full distinctions rather than generic “clear/partly clear/unclear” labels.
+Return Planning's four competencies in table order with explicit levels, two-sentence personalized summaries, and representative connected evidence in the explanation. The main view shows High under What's working, Medium/Low under Problem, and unknown/not-applicable under neutral coverage. Expanding the title row shows four focused explanation paragraphs: source basis, concrete criteria, representative observed behavior, and overall judgment from the examined practice. Use the section 3 example to calibrate their specificity. Include the actual source links with the source basis. Do not replace the explanation with bare High/Medium/Low labels, make another disclosure necessary, or dump every task into the main narrative. Solutions address observed gaps; unknown records do not justify invented failures or correction claims. Keep source rationale out of the two-sentence summary. UI headings remain English; narrative text, source notes, and criteria descriptions use the person's requested language, while source titles and URLs remain exact. Criteria must express this rubric's full distinctions rather than generic “clear/partly clear/unclear” labels.
 
 ---
 
 ### 2. Context Engineering
 
-Use the shared task observation and aggregation policy. The bundled `competency-guides.json` stores these definitions and their public source basis for the saved assessment.
+Use the shared qualitative judgment policy. The bundled `competency-guides.json` stores these definitions and their public source basis for the saved assessment.
 
 | Core competency and meaning | Evidence to inspect | High, Medium, and Low behavioral levels | Why it helps |
 | --- | --- | --- | --- |
@@ -163,7 +156,7 @@ Use the shared task observation and aggregation policy. The bundled `competency-
 
 ### 3. Memory & Knowledge
 
-Use the shared task observation and aggregation policy. The bundled `competency-guides.json` stores these definitions and their public source basis for the saved assessment.
+Use the shared qualitative judgment policy. The bundled `competency-guides.json` stores these definitions and their public source basis for the saved assessment.
 
 | Core competency and meaning | Evidence to inspect | High, Medium, and Low behavioral levels | Why it helps |
 | --- | --- | --- | --- |
@@ -181,7 +174,7 @@ Use the shared task observation and aggregation policy. The bundled `competency-
 - Tool Integration covers executable procedures; Task Mapping and Feedback Loops cover arrangement and execution decisions; Testing & Evals covers verification quality. Saving those same procedures is not additional memory credit. Distinct retained knowledge may be assessed when its own lifecycle is evidenced.
 - Capture, reconciliation, and later application require different connected evidence. A successful save may coexist with unknown later use. Do not collapse failures to save, retrieve, scope, update, and follow retrieved knowledge into one presumed memory failure.
 - For capture and reconciliation, High requires a working reusable automatic procedure and an observed correct operation. Standing instructions carried out by AI can qualify; an instruction alone cannot. Correct on-demand management is Medium. Human approval of an unresolved preference or decision does not by itself reduce the level.
-- Account for later repairs and identify the person, AI, or storage mechanism responsible. Do not invent a conflict, change, later task, or incident to create evidence. Missing evidence is unknown; absent relevant opportunities are not applicable. Apply the common aggregation and equal-weight policy without redefining it here.
+- Account for later repairs and identify the person, AI, or storage mechanism responsible. Do not invent a conflict, change, later task, or incident to create evidence. Missing evidence is unknown; absent relevant opportunities are not applicable. Apply the shared qualitative judgment policy.
 
 #### Adopted public source basis
 
@@ -196,7 +189,7 @@ Use the shared task observation and aggregation policy. The bundled `competency-
 
 ### 4. Tool Integration
 
-Use the shared task observation and aggregation policy. The bundled `competency-guides.json` stores these definitions and their public source basis for the saved assessment.
+Use the shared qualitative judgment policy. The bundled `competency-guides.json` stores these definitions and their public source basis for the saved assessment.
 
 | Core competency and meaning | Evidence to inspect | High, Medium, and Low behavioral levels | Why it helps |
 | --- | --- | --- | --- |
@@ -233,7 +226,7 @@ Use the shared task observation and aggregation policy. The bundled `competency-
 
 ### 5. Orchestration I: Task Mapping
 
-Use the shared task observation and aggregation policy. The bundled `competency-guides.json` stores these definitions and their public source basis for the saved assessment.
+Use the shared qualitative judgment policy. The bundled `competency-guides.json` stores these definitions and their public source basis for the saved assessment.
 
 | Core competency and meaning | Evidence to inspect | High, Medium, and Low behavioral levels | Why it helps |
 | --- | --- | --- | --- |
@@ -268,7 +261,7 @@ Use the shared task observation and aggregation policy. The bundled `competency-
 
 ### 6. Orchestration II: Feedback Loops
 
-Use the shared task observation and aggregation policy. The bundled `competency-guides.json` stores these definitions and their public source basis for the saved assessment.
+Use the shared qualitative judgment policy. The bundled `competency-guides.json` stores these definitions and their public source basis for the saved assessment.
 
 | Core competency and meaning | Evidence to inspect | High, Medium, and Low behavioral levels | Why it helps |
 | --- | --- | --- | --- |
@@ -304,7 +297,7 @@ Use the shared task observation and aggregation policy. The bundled `competency-
 
 ### 7. Testing & Evals
 
-Use the shared task observation and aggregation policy. The bundled `competency-guides.json` stores these definitions and their public source basis for the saved assessment.
+Use the shared qualitative judgment policy. The bundled `competency-guides.json` stores these definitions and their public source basis for the saved assessment.
 
 | Core competency and meaning | Evidence to inspect | High, Medium, and Low behavioral levels | Why it helps |
 | --- | --- | --- | --- |
@@ -323,7 +316,7 @@ Use the shared task observation and aggregation policy. The bundled `competency-
 - Feedback Loops assesses how a result chooses the next attempt, repair, stop, or escalation. This dimension assesses the check's reach and validity, repeated execution, and the evidence allowed to support completion. Human Steering assesses the person's own interpretation and intervention; valid automatic or delegated verification does not establish that personal judgment.
 - Tool Integration assesses whether a reusable tool procedure is executable and usable. Context Engineering assesses how project instructions are supplied. Their presence does not establish that verification ran or that its result controlled completion here.
 - Judge recorded behavior, not test counts, coverage totals, tool brands, framework installation, or asserted success. A detected failure can demonstrate effective verification. A blocked run does not establish the blocked behavior, and missing evidence is unknown rather than Low. Do not invent failures, additional sessions, or unrelated risk cases to demand more activity.
-- Use independent work tasks as the unit of common aggregation and retain the shared aggregation and weighting policy. This category adds no thresholds, project quotas, incident requirements, or statistical claims.
+- Use connected work and its observed outcomes to judge the practice qualitatively. This category adds no thresholds, project quotas, incident requirements, or statistical claims.
 
 #### Adopted public source basis
 
@@ -339,7 +332,7 @@ Use the shared task observation and aggregation policy. The bundled `competency-
 
 ### 8. Human Steering
 
-Use the shared task observation and aggregation policy. The bundled `competency-guides.json` stores these definitions and their public source basis for the saved assessment.
+Use the shared qualitative judgment policy. The bundled `competency-guides.json` stores these definitions and their public source basis for the saved assessment.
 
 | Core competency and meaning | Evidence to inspect | High, Medium, and Low behavioral levels | Why it helps |
 | --- | --- | --- | --- |
@@ -365,7 +358,7 @@ Use the shared task observation and aggregation policy. The bundled `competency-
 
 ### 9. Security
 
-Use the shared task observation and aggregation policy. The bundled `competency-guides.json` stores these definitions and their public source basis for the saved assessment.
+Use the shared qualitative judgment policy. The bundled `competency-guides.json` stores these definitions and their public source basis for the saved assessment.
 
 | Core competency and meaning | Evidence to inspect | High, Medium, and Low behavioral levels | Why it helps |
 | --- | --- | --- | --- |
@@ -400,7 +393,7 @@ Use the shared task observation and aggregation policy. The bundled `competency-
 
 ### 10. Efficiency & Cost
 
-Use the shared task observation and aggregation policy. The bundled `competency-guides.json` stores these definitions and their public source basis for the saved assessment.
+Use the shared qualitative judgment policy. The bundled `competency-guides.json` stores these definitions and their public source basis for the saved assessment.
 
 | Core competency and meaning | Evidence to inspect | High, Medium, and Low behavioral levels | Why it helps |
 | --- | --- | --- | --- |
@@ -435,7 +428,7 @@ Use the shared task observation and aggregation policy. The bundled `competency-
 
 ## 3. Diagnostic content
 
-Use the output format supplied for the run. Write in the user's primary language, defaulting to English if unknown. Calculate every dimension with section 2's policy and keep observed limitations separate from unknown records.
+Use the output format supplied for the run. Write in the user's primary language, defaulting to English if unknown. Judge every dimension with section 2's policy and keep observed limitations separate from unknown records.
 
 Write for someone unfamiliar with the person or their projects. Introduce a project, tool, file, or acronym with its relevant purpose when the records establish that purpose. Otherwise identify the observed task. Keep every observation within the examined evidence and attribute the person's decisions separately from AI execution.
 
@@ -443,7 +436,7 @@ Speak directly to the person as a colleague, using everyday words and concrete a
 
 ### Explanation example — specificity reference
 
-Match this example's level of detail: the relevant source recommendation, concrete level differences, cases connected to their ratings, and counts connected to the aggregate. It is neither a one-line shorthand nor a long source analysis. Do not impose a display-line or character quota. The projects and counts below are fictional illustrations, not evidence to copy into a person's result. Use the actual competency definitions, task observations and shared aggregation rule. If contrasting cases are not established, explain only the cases that exist.
+Match this example's level of detail: the relevant source recommendation, concrete level differences, cases connected to their ratings, and the observed pattern connected to the overall judgment. It is neither a one-line shorthand nor a long source analysis. Do not impose a display-line or character quota. The projects below are fictional illustrations, not evidence to copy into a person's result. Use the actual competency definitions and connected observations to make the qualitative judgment. If contrasting cases are not established, explain only the cases that exist.
 
 **How we rated your goals and completion checks**
 
@@ -453,14 +446,14 @@ Match this example's level of detail: the relevant source recommendation, concre
 
 **What you did.** In Cedar, you asked to check both the unchanged normal output and whether JSON output could be parsed, supporting High. In Ridge, you wanted customers to continue buying after login, but the return location and cart preservation were left undecided, supporting Medium.
 
-**Why you got this rating.** There was 1 High, 3 Medium and 1 Low task. High did not reach 80% of rated tasks, and Low did not reach 50%, so the aggregate was Medium.
+**Why you got this rating.** The examined work shows that you state the intended result, but consequential completion checks remain unresolved in comparable requests. Cedar demonstrates a stronger way of working, while Ridge shows the remaining gap. Taken together, the observed practice supports Medium.
 
 Map these four paragraphs to sourceBasis, criteria, observedBehavior and overallJudgment:
 
 - sourceBasis names the supplied source, explains its relevant recommendation, and connects the practice to why it helps. Write the source name as an inline Markdown hyperlink in that same sentence, using [name](supplied URL). Use the exact URL supplied for the relevant source; never invent a URL or substitute an unrelated source. Do not append a reference list, a repeated source title, or bare URL lines. Keep structured source metadata intact.
 - criteria explains the concrete behavior that establishes each level and distinguishes adjacent levels in everyday sentences, rather than labels such as "clear" or "vague".
 - observedBehavior connects representative actual cases to their levels: what was requested or done, what condition or check was present or missing, and why that supports the level. Include a contrasting case when it explains a mixed rating and the records support it. A project name and a level alone are insufficient.
-- overallJudgment gives counts across every observed relevant task and explains why they meet or miss the aggregate thresholds and produce the resulting level. Keep unknown and not-applicable counts separate.
+- overallJudgment explains why the observed practice as a whole supports the resulting level, including meaningful consistency, variation, and remaining gaps. Distinguish missing coverage from demonstrated limitations; do not add task-count tallies or percentage calculations.
 
 Use these plain English labels when referring to the four parts: "Why this matters", "How we rate this", "What you did", and "Why you got this rating". Do not use "External basis", "Rating criteria", "Observed behavior", or "Overall judgment" as user-facing labels. The app supplies headings; do not repeat the example's title or labels inside field values. The inline source-name hyperlinks belong in sourceBasis itself, as in the example, even when the run otherwise asks for plain field strings. Write the explanation body in the person's requested language. Preserve this amount of explanatory detail without adding background essays, invented cases or every task's history. Before returning, check that a reader can connect the source recommendation, the concrete level differences, the actual cases, and the resulting rating without opening the transcript.
 
@@ -478,7 +471,7 @@ Include changes supported by the examined records and explain the expected obser
 
 ### Scope note
 
-Record the assessment date and time zone, absolute record dates by tool, unique sessions actually examined, tasks checked in detail, actual elapsed time, and investigation limits. Report any shortfall against requested coverage. Unknown dates and time remain unknown. When editing a supplied report, distinguish its reported coverage from records personally inspected. Preserve the screened-project summary and each dimension's named competency levels, observations, exclusions, and calculation audit required in section 2. State any method change from the previous card separately from changes in observed practice.
+Record the assessment date and time zone, absolute record dates by tool, unique sessions actually examined, tasks checked in detail, actual elapsed time, and investigation limits. Report any shortfall against requested coverage. Unknown dates and time remain unknown. When editing a supplied report, distinguish its reported coverage from records personally inspected. Preserve the screened-project summary and each dimension's named competency levels, representative observations, and exclusions. Do not add a calculation audit. State any method change from the previous card separately from changes in observed practice.
 
 ## 4. Evidence principles
 
@@ -486,4 +479,4 @@ Record the assessment date and time zone, absolute record dates by tool, unique 
 - Establish connections through the same call, task, file, artifact, check, or revision. Nearby timestamps and unrelated successful events do not establish a workflow. Reuse requires later execution or a later session when the competency says so. Identify the actor responsible for a decision when that affects interpretation.
 - Consider failures and unfinished work alongside success. Distinguish missing proof from proof of absence. Do not guess causes, invent numbers or references, or make population rankings from the sample.
 - Count analyzed sessions only when message or event bodies were examined. Directory listings do not count. Deduplicate repeated records, distinguish partial reads, and do not count child sessions as independent tasks. A `user` role alone does not establish human authorship. Worker assignments, evaluator instructions, and automatic continuations are not independent human decisions. No separate provenance investigation is required.
-- Before returning the card, compare each competency level with its description, explanation, and evidence. Preserve a lower level when its behavior is fully established but the higher level is not. Leave unresolved judgments unknown without turning them into Low. Verify that every competency appears once in its dimension audit, that exclusions match applicability, and that `n`, the weighted numerator, exact fraction, raw score, rounded score, and status agree. Check that the total uses the displayed integers. Ensure that diagnosis and recommendations distinguish observed limitations from unknown records. This is a consistency check, not an instruction to reopen the investigation.
+- Before returning the card, compare each competency level with its description, explanation, and evidence. Preserve a lower level when its behavior is fully established but the higher level is not. Leave unresolved judgments unknown without turning them into Low. Verify that every competency appears once, that exclusions match applicability, and that each AI-judged dimension score agrees with its explanation and status. Check that the total uses the displayed integers. Ensure that diagnosis and recommendations distinguish observed limitations from unknown records. This is a consistency check, not an instruction to reopen the investigation.
