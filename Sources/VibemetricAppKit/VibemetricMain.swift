@@ -1,6 +1,17 @@
 import SwiftUI
 import VibemetricCore
 
+/// The app's one main window (the `Window` scene with id "main").
+@MainActor
+enum MainWindow {
+    /// The main window, while it's on screen.
+    static var visible: NSWindow? {
+        NSApp.windows.first { $0.isVisible && $0.identifier?.rawValue.contains("main") == true }
+    }
+
+    static func close() { visible?.performClose(nil) }
+}
+
 /// Keeps Vibemetric running in the menu bar after its window is closed.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
@@ -9,8 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `hasVisibleWindows` counts helper windows (status item, popover), so check the main window itself.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         MainActor.assumeIsolated {
-            let mainVisible = NSApp.windows.contains { $0.isVisible && $0.identifier?.rawValue.contains("main") == true }
-            if !mainVisible { AppModel.shared?.showMainWindow(selectLatest: false) }
+            if MainWindow.visible == nil { AppModel.shared?.showMainWindow(selectLatest: false) }
         }
         return true
     }
@@ -74,6 +84,12 @@ public struct VibemetricMain: App {
             CommandGroup(replacing: .appSettings) {
                 Button("Settings…") { model.showSettings() }
                     .keyboardShortcut(",")
+            }
+            // ⌘W closes the main window, even while the menu bar panel is the active window; the panel stays open
+            // until it's dismissed (a click elsewhere, Esc, or the menu bar item).
+            CommandGroup(replacing: .saveItem) {
+                Button("Close Window") { MainWindow.close() }
+                    .keyboardShortcut("w")
             }
             TextScaleCommands()
         }
