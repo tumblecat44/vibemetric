@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.8 (2026-10-22)
+
+- A simpler result screen: your score, what you're doing well, and one box per category with its score, a one-line issue and a one-line fix. Click a box to see the full explanation, evidence and steps. New scores write these short lines; older results use their existing text.
+
 ## 0.4.7 (2026-10-22)
 
 - ⌘W closes the main window and leaves the menu bar panel open, even when the panel is in front. Esc or a click elsewhere still closes the panel.
