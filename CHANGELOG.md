@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- ⌘W closes the main window and leaves the menu bar panel open, even when the panel is in front. Esc or a click elsewhere still closes the panel.
+
 ## 0.4.6 (2026-10-20)
 
 - The sidebar keeps its width when you make the window smaller: the score card narrows instead, and the window stops shrinking once the card reaches its minimum. The sidebar never gets narrower than its minimum and can be dragged much wider than before.
