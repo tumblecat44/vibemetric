@@ -8,13 +8,9 @@ The score describes behavioral levels confirmed in the examined records. Explain
 
 Assess how this person uses AI in real work. Return a diagnostic card that helps the person recognize their way of working with AI and choose useful changes to it. An unfamiliar reader, including a developer-tool maker, should understand the person's AI-use practices through concrete examples: how they direct and equip AI, judge its work, and intervene, and what those practices accomplish. Describe those practices using the observation guide below.
 
-Investigate available local AI conversation and execution records directly, without subagents. Choose your own investigation method. The investigation scope is all accessible records, covering different projects, tools, and dates, including every session since the previous assessment. Follow the reading target and deadline supplied for the run. Prioritize unresolved dimensions and connected cases; there is no per-competency task quota or cap. Use indexes to locate cases and establish index counts, not to claim that unread session behavior was examined. If the available records or time are insufficient, report the actual examined and unexamined scope. Favor connected evidence of actions and outcomes over large counts of loosely related events.
+Investigate local AI conversation and execution records directly, without subagents, under the run's supplied reading target, reading deadline, and access limits. All accessible history is in scope, across projects, tools, and dates, including sessions since the previous assessment. Use indexes to locate relevant records, then inspect connected actions and outcomes. Prioritize unresolved dimensions while continuing toward the supplied reading target; there is no per-competency task quota or cap. Report actual examined and unexamined scope when records or time are insufficient.
 
-Use this evidence-search procedure within the available time:
-
-1. Track which dimensions have connected evidence and which remain unresolved. Prioritize targeted investigation of unresolved dimensions over unnecessary additional scanning of dimensions already supported. Judge the recurring level visible in the records examined.
-2. Investigate Memory & Knowledge separately from searches for models, tokens, cost, or other dimensions. Search for candidate user requests to remember, save, review, correct, or remove information across available tools and date ranges, including message bodies beyond initial messages. Read the relevant passages around matches and follow their links; a full reread of all records is not required. Do not restrict this search to the most recent month. Follow actual storage or modification calls and their results, then trace the saved content or path into later conversations to establish what was applied and with what outcome. Stored information may also be a starting point: trace its saving, review, correction, and later use even without an explicit "remember this" request.
-3. If one candidate's evidence chain cannot be completed, try other candidates or available sources. Do not end the memory investigation because a mixed keyword search reached a hit count or one candidate lacked a later link. Prioritize connecting actions and outcomes over accumulating unrelated hits; file existence, automatic injection, or an AI completion claim alone still does not establish memory use. Injected memory can qualify when its content is demonstrably applied in a later answer or action; an explicit read call is not required in every case.
+Investigate Memory & Knowledge separately from model, token, and cost searches. Across available tools and date ranges, including older records, search message bodies for requests to remember, save, review, correct, or remove information. Inspect surrounding passages, actual storage or modification calls, and results; trace the content or path into later conversations to establish its application. Stored information can also start this investigation without an explicit request. Try other candidates when a chain is incomplete rather than stopping at a search hit count or one missing link. Injected memory qualifies when its content demonstrably guides a later answer or action; neither an explicit read call nor a full reread of all records is required.
 
 Source locations are starting points; inspect the formats actually present:
 
@@ -91,7 +87,7 @@ This policy applies to all ten dimensions. The High 80% and Low 50% aggregate th
 4. Let K=H+M+L be assessable task count for this competency; unknown and not-applicable task counts remain separate and visible. For K>0, aggregate High when H/K>=0.8, Low when L/K>=0.5, otherwise Medium. Explain whether the aggregate reflects repeated behavior or mixed practices, and state its actual observed scope. If K=0, use not_applicable only when every retained case is established inapplicable; otherwise unknown.
 5. Convert these aggregate competency levels using the equal-weight formula above. The competency denominator n is not task count K. Aggregate unknown earns zero confirmed credit while staying in n; only aggregate not_applicable is excluded. All-unknown dimensions score zero with limited confirmed coverage, not demonstrated inability. All-not-applicable dimensions stay unscored.
 6. Automation is part of High where the competency explicitly assesses repeated memory capture/reconciliation, guidance upkeep, verification triggers, or reusable resource assignment. Do not give an automatic bonus for unrelated work or demand automation of the person's substantive judgment. Installing a mechanism without observing its application is insufficient.
-7. Return connected task evidence, two-sentence personal summaries, and four focused explanation paragraphs: sourceBasis, criteria, observedBehavior, and overallJudgment. Match the specificity of the explanation example in section 3. Source basis names the relevant source recommendation. Criteria states the concrete behavior detected at each level. Observed behavior connects representative actual cases to their levels, including a contrasting case when it explains a mixed rating. Overall judgment gives counts across every observed relevant task and explains why they produce the aggregate under the shared policy, keeping unknown and not-applicable counts separate. Add supported next actions. The app preserves the generated explanation and computes counts, levels, and numerical audits. Canonical definitions, source links, and why the practice helps are saved with the card; do not invent sources or attribute our numerical policy to an author.
+7. Return all observed relevant task evidence, two-sentence personal summaries, the four explanation fields defined in section 3, and supported next actions. The app preserves the explanation and computes counts, levels, and numerical audits. Canonical definitions, source links, and why the practice helps are saved with the card; do not invent sources or attribute our numerical policy to an author.
 
 ### 1. Planning & Specs
 
@@ -437,9 +433,9 @@ Use the shared task observation and aggregation policy. The bundled `competency-
 
 ---
 
-## 3. Output format
+## 3. Diagnostic content
 
-Write in the user's primary language, defaulting to English if unknown. Preserve the diagnostic card's section order. Calculate every dimension with section 2's equal-weight, three-level policy. Keep observed limitations separate from unknown records.
+Use the output format supplied for the run. Write in the user's primary language, defaulting to English if unknown. Calculate every dimension with section 2's policy and keep observed limitations separate from unknown records.
 
 Write for someone unfamiliar with the person or their projects. Introduce a project, tool, file, or acronym with its relevant purpose when the records establish that purpose. Otherwise identify the observed task. Keep every observation within the examined evidence and attribute the person's decisions separately from AI execution.
 
@@ -449,31 +445,28 @@ Speak directly to the person as a colleague, using everyday words and concrete a
 
 Match this example's level of detail: the relevant source recommendation, concrete level differences, cases connected to their ratings, and counts connected to the aggregate. It is neither a one-line shorthand nor a long source analysis. Do not impose a display-line or character quota. The projects and counts below are fictional illustrations, not evidence to copy into a person's result. Use the actual competency definitions, task observations and shared aggregation rule. If contrasting cases are not established, explain only the cases that exist.
 
-**Assessment rationale: End-user outcomes and completion criteria**
+**How we rated your goals and completion checks**
 
-**External basis.** We drew on pstack's Prove It Works principle and Claude Code's guidance to provide a way to verify the result.
+**Why this matters.** pstack's [Prove It Works](https://raw.githubusercontent.com/cursor/plugins/main/pstack/skills/principle-prove-it-works/SKILL.md) principle asks for checking the actual result, and the [Claude Code guide](https://code.claude.com/docs/en/best-practices) recommends giving AI a way to verify its work. Connecting the desired result to a check makes completion distinguishable from a claim that the work is done.
 
-**Rating criteria.** High means the desired user outcome is linked to an action or state that confirms completion. Medium means the outcome is stated but the condition distinguishing completion remains undecided. Low means only a feature or implementation method is specified, without the user outcome.
+**How we rate this.** High means the desired user outcome is linked to an action or state that confirms completion. Medium means the outcome is stated but the condition distinguishing completion remains undecided. Low means only a feature or implementation method is specified, without the user outcome.
 
-**Observed behavior.** In Cedar, you asked to check both the unchanged normal output and whether JSON output could be parsed, supporting High. In Ridge, you wanted customers to continue buying after login, but the return location and cart preservation were left undecided, supporting Medium.
+**What you did.** In Cedar, you asked to check both the unchanged normal output and whether JSON output could be parsed, supporting High. In Ridge, you wanted customers to continue buying after login, but the return location and cart preservation were left undecided, supporting Medium.
 
-**Overall judgment.** There was 1 High, 3 Medium and 1 Low task. High did not reach 80% of rated tasks, and Low did not reach 50%, so the aggregate was Medium.
+**Why you got this rating.** There was 1 High, 3 Medium and 1 Low task. High did not reach 80% of rated tasks, and Low did not reach 50%, so the aggregate was Medium.
 
-In structured output, map these four paragraphs to sourceBasis, criteria, observedBehavior and overallJudgment. The app supplies English UI headings and source links; do not repeat the example's title or labels inside field values. Write the explanation body in the person's requested language. Preserve this amount of explanatory detail without adding background essays, invented cases or every task's history.
+Map these four paragraphs to sourceBasis, criteria, observedBehavior and overallJudgment:
 
-### Score and diagnosis
+- sourceBasis names the supplied source, explains its relevant recommendation, and connects the practice to why it helps. Write the source name as an inline Markdown hyperlink in that same sentence, using [name](supplied URL). Use the exact URL supplied for the relevant source; never invent a URL or substitute an unrelated source. Do not append a reference list, a repeated source title, or bare URL lines. Keep structured source metadata intact.
+- criteria explains the concrete behavior that establishes each level and distinguishes adjacent levels in everyday sentences, rather than labels such as "clear" or "vague".
+- observedBehavior connects representative actual cases to their levels: what was requested or done, what condition or check was present or missing, and why that supports the level. Include a contrasting case when it explains a mixed rating and the records support it. A project name and a level alone are insufficient.
+- overallJudgment gives counts across every observed relevant task and explains why they meet or miss the aggregate thresholds and produce the resulting level. Keep unknown and not-applicable counts separate.
 
-Start with `# AI NATIVE SCORE` and the calculated total out of 100 when all dimensions are scored. State that the score describes behavioral levels confirmed in the examined records. Describe the main confirmed strength and an observed problem when one is established. If only records are missing, identify that coverage limit without inventing a personal weakness. Follow section 2 when a dimension has no applicable competencies.
+Use these plain English labels when referring to the four parts: "Why this matters", "How we rate this", "What you did", and "Why you got this rating". Do not use "External basis", "Rating criteria", "Observed behavior", or "Overall judgment" as user-facing labels. The app supplies headings; do not repeat the example's title or labels inside field values. The inline source-name hyperlinks belong in sourceBasis itself, as in the example, even when the run otherwise asks for plain field strings. Write the explanation body in the person's requested language. Preserve this amount of explanatory detail without adding background essays, invented cases or every task's history. Before returning, check that a reader can connect the source recommendation, the concrete level differences, the actual cases, and the resulting rating without opening the transcript.
 
-### Score bands and reasons
+### Diagnosis
 
-Place scored dimensions in the existing score bands using their displayed integer scores. List any dimension with no applicable competencies separately as **Not assessable** and state its scope reason. A band label or a score lowered by unknown records does not establish an unobserved failure.
-
-Explain which behaviors establish High, Medium, or Low and what remains unknown. Describe what the person specified, supplied, examined, decided, corrected, delegated, or required AI to verify. Trace connected execution and checked results where the competency requires them. Do not claim an unsuccessful outcome merely because a later result is missing. Keep the complete competency audit and arithmetic in the Scope note.
-
-### 10 DIMENSIONS
-
-Show all 10 dimensions in rubric order in a Markdown table with columns **Dimension / Progress / Score**. Use the displayed integer out of 10 and its progress for each scored dimension. For a dimension with no applicable competencies, show unavailable progress and **Not assessable**. In structured output, retain the existing dimension IDs and return the status and integer or null required by section 2. Planning uses the same policy and can receive a numerical score.
+Describe the main confirmed strength and an observed problem when one is established. Explain what the person specified, supplied, examined, decided, corrected, delegated, or required AI to verify, and connect execution and checked results where the competency requires them. If only records are missing, identify that coverage limit without inventing a personal weakness or an unsuccessful outcome. The score describes behavioral levels confirmed in the examined records. A band label or a score lowered by unknown records does not establish an unobserved failure.
 
 ### One improvement to make first
 
