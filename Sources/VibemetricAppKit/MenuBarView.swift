@@ -64,6 +64,13 @@ struct MenuBarPanel: View {
                     .foregroundStyle(.secondary)
             }
 
+            if !model.isRunning, let problem = model.engineProblem {
+                Label("\(problem). Open Vibemetric to set it up.", systemImage: "exclamationmark.circle")
+                    .scaledFont(11)
+                    .foregroundStyle(Theme.accent)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             Divider()
 
             HStack {

@@ -19,7 +19,7 @@ struct AssessmentEnginePicker: View {
 
     private var compactBody: some View {
         VStack(alignment: .leading, spacing: 14) {
-            row("Engine") { engineSegments }
+            row("Engine", height: 46 * scale) { engineSegments }
             row("Model") { modelDropdown }
             if showsDetails {
                 Text("\(modelHelp) Evidence is sent to \(model.engine.provider) using your \(model.engine.name) sign-in, plan or API credits.")
@@ -36,25 +36,32 @@ struct AssessmentEnginePicker: View {
     private var controlWidth: CGFloat { 320 * scale }
     private var controlHeight: CGFloat { 34 * scale }
 
-    private func row<Control: View>(_ label: String, @ViewBuilder control: () -> Control) -> some View {
-        FieldRow(label) { control().frame(width: controlWidth, height: controlHeight) }
+    private func row<Control: View>(_ label: String, height: CGFloat? = nil, @ViewBuilder control: () -> Control) -> some View {
+        FieldRow(label) { control().frame(width: controlWidth, height: height ?? controlHeight) }
     }
 
-    /// Two equal halves in one rounded frame; the selected engine is filled.
+    /// Two equal halves in one rounded frame; the selected engine is filled. Each says whether it's ready, so an
+    /// engine that can't score doesn't look like one that can.
     private var engineSegments: some View {
         HStack(spacing: 0) {
             ForEach(AssessmentEngine.allCases) { engine in
                 let selected = model.engine == engine
+                let status = model.status(of: engine)
                 Button { model.engine = engine } label: {
-                    Text(engine.name)
-                        .scaledFont(13, weight: selected ? .semibold : .regular)
-                        .foregroundStyle(selected ? Color.white : Theme.ink)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    VStack(spacing: 1) {
+                        Text(engine.name)
+                            .scaledFont(13, weight: selected ? .semibold : .regular)
+                            .foregroundStyle(selected ? Color.white : Theme.ink)
+                        Label(statusLabel(status), systemImage: statusSymbol(status))
+                            .scaledFont(10, weight: .medium)
+                            .foregroundStyle(selected ? Color.white.opacity(0.9) : statusColor(status))
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(selected ? Theme.accent : Color.clear)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(engine.name)
+                .accessibilityLabel("\(engine.name), \(statusLabel(status))")
                 .accessibilityAddTraits(selected ? [.isSelected] : [])
                 .accessibilityIdentifier("engine-\(engine.rawValue)")
             }
@@ -240,9 +247,10 @@ struct AssessmentEnginePicker: View {
                     ProgressView().controlSize(.small)
                     Text("Checking installation…").foregroundStyle(Theme.muted)
                 } else {
-                    Label("Not ready", systemImage: "exclamationmark.circle")
+                    Label(setupTitle, systemImage: "exclamationmark.circle.fill")
+                        .scaledFont(13, weight: .semibold)
                         .foregroundStyle(Theme.accent)
-                    Link("Set up \(model.engine.name)", destination: model.engine.setupURL)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
                 Button {
@@ -261,11 +269,112 @@ struct AssessmentEnginePicker: View {
             }
             .scaledFont(12)
 
-            if let error = model.installationErrors[model.engine] {
-                Text(error).scaledFont(12).foregroundStyle(Theme.accent)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            if model.installations[model.engine] == nil, !model.isCheckingEngines { setupGuide }
         }
+    }
+
+    // MARK: Engine status
+
+    private func statusLabel(_ status: AppModel.EngineStatus) -> String {
+        switch status {
+        case .ready: "Ready"
+        case .checking: "Checking…"
+        case .notInstalled: "Not installed"
+        case .signedOut: "Not signed in"
+        case .failed: "Can't start"
+        }
+    }
+
+    private func statusSymbol(_ status: AppModel.EngineStatus) -> String {
+        switch status {
+        case .ready: "checkmark.circle.fill"
+        case .checking: "clock"
+        default: "exclamationmark.circle"
+        }
+    }
+
+    private func statusColor(_ status: AppModel.EngineStatus) -> Color {
+        switch status {
+        case .ready: Theme.color(for: .strong)
+        case .checking: Theme.muted
+        default: Theme.accent
+        }
+    }
+
+    private var setupTitle: String {
+        let engine = model.engine
+        switch model.status(of: engine) {
+        case .signedOut: return "\(engine.name) is installed but not signed in"
+        case .failed: return "\(engine.name) is installed but couldn't start"
+        default: return "\(engine.name)'s command-line tool isn't installed"
+        }
+    }
+
+    /// What's missing in plain words, the Terminal command that fixes it, and a way out to the other engine.
+    private var setupGuide: some View {
+        let engine = model.engine
+        let status = model.status(of: engine)
+        let other = AssessmentEngine.allCases.first { $0 != engine && model.installations[$0] != nil }
+        return VStack(alignment: .leading, spacing: 10) {
+            switch status {
+            case .signedOut:
+                guideText("Sign in once in Terminal, then click Check again:")
+                TerminalCommand(command: engine.signInCommand)
+            case .failed(let message):
+                guideText(message)
+            default:
+                if engine == .claude && engine.hasDesktopApp {
+                    guideText("The Claude desktop app is installed, but scoring needs Claude Code's separate `claude` command. Install it in Terminal, then click Check again:")
+                } else {
+                    guideText("Scoring runs the `\(engine.command)` command. Install it in Terminal, then click Check again:")
+                }
+                TerminalCommand(command: engine.installCommand)
+            }
+            HStack(spacing: 14) {
+                Link("Setup guide", destination: engine.setupURL)
+                if let other {
+                    Button("Use \(other.name) instead") { model.engine = other }
+                        .buttonStyle(.link)
+                }
+            }
+            .scaledFont(12)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.accent.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func guideText(_ text: String) -> some View {
+        Text(inline(text)).scaledFont(12).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// A Terminal command in monospace with a Copy button.
+private struct TerminalCommand: View {
+    var command: String
+    @State private var copied = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(command)
+                .scaledFont(12, design: .monospaced)
+                .foregroundStyle(Theme.ink)
+                .textSelection(.enabled)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer(minLength: 0)
+            Button(copied ? "Copied" : "Copy") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(command, forType: .string)
+                copied = true
+                Task { try? await Task.sleep(for: .seconds(1.5)); copied = false }
+            }
+            .buttonStyle(AssessmentSecondaryButtonStyle())
+            .scaledFont(12)
+        }
+        .padding(.horizontal, 10).padding(.vertical, 7)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(Theme.rule))
     }
 }
 

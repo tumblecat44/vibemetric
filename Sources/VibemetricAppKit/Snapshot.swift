@@ -78,6 +78,23 @@ enum Snapshot {
                         .environment(\.colorScheme, scheme)
                     try render(running, scheme: scheme).write(to: dir.appendingPathComponent("running-\(scheme == .light ? "light" : "dark").png"))
                 }
+                // The start screen when Claude Code can't score: not installed (Codex ready), then signed out.
+                let codex = CLIInstallation(executable: URL(fileURLWithPath: "/usr/local/bin/codex"), version: "codex-cli 0.163.0")
+                let claude = CLIInstallation(executable: URL(fileURLWithPath: "/usr/local/bin/claude"), version: "2.1.308 (Claude Code)")
+                model.selected = nil
+                model.engine = .claude
+                for (label, checks) in [("missing", [(AssessmentEngine.claude, CLIInstallation?.none, Bool?.none, String?.none),
+                                                     (.codex, codex, true, nil)]),
+                                        ("signedout", [(.claude, claude, false, nil), (.codex, nil, nil, nil)])] {
+                    model.applyEngineChecks(checks)
+                    for scheme in [ColorScheme.light, .dark] {
+                        // The picker alone: ImageRenderer leaves a ScrollView, and so all of HomeView, blank.
+                        let home = AssessmentEnginePicker(compact: true, showsDetails: false).environment(model)
+                            .padding(24).frame(width: 760).background(Theme.paper)
+                            .environment(\.colorScheme, scheme)
+                        try render(home, scheme: scheme).write(to: dir.appendingPathComponent("home-\(label)-\(scheme == .light ? "light" : "dark").png"))
+                    }
+                }
                 defaults.removePersistentDomain(forName: suite)
             }
             print("Snapshots written to \(dir.path)")

@@ -301,7 +301,8 @@ struct RunMyScoreRow: View {
     }
 
     private var subtitle: String {
-        if model.installations[model.engine] == nil { return "Set up \(model.engine.name) first" }
+        if let problem = model.engineProblem { return problem }
+        if model.installations[model.engine] == nil { return "Checking \(model.engine.name)…" }
         if let reason = Extensions.currentBusyReason { return reason }
         return "\(model.engine.name) · about 5 minutes"
     }
