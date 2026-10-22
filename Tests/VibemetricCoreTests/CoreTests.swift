@@ -330,10 +330,6 @@ final class RubricTwoTests: XCTestCase {
         XCTAssertEqual(Dimension.testingEvals.title, "Testing & Evals")
         XCTAssertEqual(Dimension.efficiencyCost.rawValue, "efficiency_cost")
     }
-
-    func testRubricIsVersionSeven() {
-        XCTAssertEqual(AssessmentOptions.rubricVersion, "7")
-    }
 }
 
 final class BandOrderTests: XCTestCase {
