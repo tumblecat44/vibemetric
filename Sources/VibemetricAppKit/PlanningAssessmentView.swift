@@ -4,6 +4,7 @@ import VibemetricCore
 struct PlanningAssessmentView: View {
     var assessment: PlanningAssessment
     var expandAll: Bool
+    var problemsOnly: Bool = false
 
     private var strengths: [PlanningAssessment.Competency] {
         assessment.ordered.filter { $0.level == .high }
@@ -17,13 +18,13 @@ struct PlanningAssessmentView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            if !strengths.isEmpty {
+            if !problemsOnly && !strengths.isEmpty {
                 section("What's working", symbol: "checkmark.circle.fill", color: Theme.color(for: .strong), items: strengths)
             }
             if !problems.isEmpty {
                 section("Problem", symbol: "exclamationmark.triangle.fill", color: Theme.color(for: .bottleneck), items: problems)
             }
-            if !unassessed.isEmpty {
+            if !problemsOnly && !unassessed.isEmpty {
                 section("Not rated", symbol: "info.circle", color: Theme.muted, items: unassessed)
             }
             if problems.contains(where: { !($0.solution ?? "").isEmpty }) {

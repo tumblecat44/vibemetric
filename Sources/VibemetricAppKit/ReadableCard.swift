@@ -316,9 +316,13 @@ struct FixCarousel: View {
         let target = imp.dimension.flatMap { d in card.ordered.first { $0.dimension == d } }
         return VStack(alignment: .leading, spacing: 16) {
             if imp.dimension != nil { label(target, fallback: imp.dimension) }
-            ProblemSolution(problem: [imp.situation, imp.impact ?? ""], evidence: imp.evidence ?? [],
-                            solution: imp.title, steps: imp.actions,
-                            tryItOn: imp.tryItOn, signOfSuccess: imp.signOfSuccess)
+            if let target {
+                CategoryAssessmentContent(result: target, expandAll: false, problemsOnly: true)
+            } else {
+                ProblemSolution(problem: [imp.situation, imp.impact ?? ""], evidence: imp.evidence ?? [],
+                                solution: imp.title, steps: imp.actions,
+                                tryItOn: imp.tryItOn, signOfSuccess: imp.signOfSuccess)
+            }
             if let dimension = imp.dimension, let footer { footer(dimension) }
         }
     }
@@ -326,8 +330,7 @@ struct FixCarousel: View {
     private func categoryPage(_ d: ScoreCard.DimensionResult) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             label(d, fallback: nil)
-            ProblemSolution(problem: [d.saw ?? d.headline, d.impact ?? ""], evidence: d.evidence, solution: d.tryThis ?? "",
-                            steps: d.solutionSteps ?? [])
+            CategoryAssessmentContent(result: d, expandAll: false, problemsOnly: true)
             if let footer { footer(d.dimension) }
         }
     }
@@ -406,27 +409,7 @@ struct CategoryRow: View {
 
             if expanded {
                 VStack(alignment: .leading, spacing: 12) {
-                    if result.dimension == .planningSpecs, let planning = result.planning {
-                        PlanningAssessmentView(assessment: planning, expandAll: expandAll)
-                    } else if let assessment = result.assessment {
-                        BehavioralAssessmentView(assessment: assessment, expandAll: expandAll)
-                    } else if result.isReadable {
-                        if let strengths = result.strengths {
-                            // Newer cards: what works on its own, above a problem that holds only the gap.
-                            if !strengths.isEmpty { WhatsWorking(points: strengths) }
-                            ProblemSolution(problem: [result.saw ?? "", result.impact ?? ""], evidence: result.evidence,
-                                            solution: result.tryThis ?? "", steps: result.solutionSteps ?? [],
-                                            nextStep: result.band == .strong)
-                        } else {
-                            // Older cards: a strong category's text is what went well.
-                            ProblemSolution(problem: [result.saw ?? "", result.impact ?? ""], evidence: result.evidence,
-                                            solution: result.tryThis ?? "", steps: result.solutionSteps ?? [],
-                                            goodNews: result.band == .strong, nextStep: result.band == .strong)
-                        }
-                    } else {
-                        // A category from an older card inside a readable one: its reason as written.
-                        Text(markdown(result.reason)).scaledFont(13).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
-                    }
+                    CategoryAssessmentContent(result: result, expandAll: expandAll)
                     if let note {
                         Text(note).scaledFont(12, weight: .semibold).foregroundStyle(Theme.color(for: .bottleneck))
                             .fixedSize(horizontal: false, vertical: true)
@@ -446,6 +429,34 @@ struct CategoryRow: View {
             }
         }
         .padding(.vertical, 12)
+    }
+}
+
+private struct CategoryAssessmentContent: View {
+    var result: ScoreCard.DimensionResult
+    var expandAll: Bool
+    var problemsOnly: Bool = false
+
+    var body: some View {
+        if result.dimension == .planningSpecs, let planning = result.planning {
+            PlanningAssessmentView(assessment: planning, expandAll: expandAll, problemsOnly: problemsOnly)
+        } else if let assessment = result.assessment {
+            BehavioralAssessmentView(assessment: assessment, expandAll: expandAll, problemsOnly: problemsOnly)
+        } else if result.isReadable {
+            if let strengths = result.strengths {
+                if !problemsOnly && !strengths.isEmpty { WhatsWorking(points: strengths) }
+                ProblemSolution(problem: [result.saw ?? "", result.impact ?? ""], evidence: result.evidence,
+                                solution: result.tryThis ?? "", steps: result.solutionSteps ?? [],
+                                nextStep: result.band == .strong)
+            } else {
+                ProblemSolution(problem: [result.saw ?? "", result.impact ?? ""], evidence: result.evidence,
+                                solution: result.tryThis ?? "", steps: result.solutionSteps ?? [],
+                                goodNews: result.band == .strong, nextStep: result.band == .strong)
+            }
+        } else {
+            Text(markdown(result.reason)).scaledFont(13).foregroundStyle(Theme.ink)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 
