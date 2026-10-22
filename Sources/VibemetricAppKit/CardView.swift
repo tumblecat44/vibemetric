@@ -6,10 +6,8 @@ import VibemetricCore
 struct CardView: View {
     var record: CardRecord
     @Environment(AppModel.self) private var model
-    @State private var copied = false
     @State private var visibleSection: String?
 
-    private var card: ScoreCard { record.card }
     private var baseline: CardRecord? { model.baseline(for: record) }
 
     var body: some View {
@@ -22,43 +20,58 @@ struct CardView: View {
             .frame(maxWidth: .infinity)
         }
         .scrollPosition(id: $visibleSection, anchor: .top)
-        .toolbar {
-            ToolbarItemGroup {
-                Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(markdownReport, forType: .string)
-                    copied = true
-                    Task { try? await Task.sleep(for: .seconds(1.5)); copied = false }
-                } label: {
-                    Label(copied ? "Copied" : "Copy Markdown", systemImage: copied ? "checkmark" : "doc.on.doc")
-                }
-                .help("Copy the full report as Markdown")
-                Button { saveImage() } label: { Label("Save Image", systemImage: "photo") }
-                    .help("Save a shareable score card image")
-                Button { saveMarkdown() } label: { Label("Save Report", systemImage: "square.and.arrow.down") }
-                    .help("Save the full report as a Markdown file")
+    }
+}
+
+/// The main window's export buttons. They sit in the toolbar on every screen, so the bar keeps its height and the
+/// buttons their place; they're disabled when no result is showing.
+struct CardExportToolbar: ToolbarContent {
+    /// The result on screen, or nil on the start screen, settings, or another tab.
+    var record: CardRecord?
+    @Environment(AppModel.self) private var model
+    @State private var copied = false
+
+    var body: some ToolbarContent {
+        ToolbarItemGroup {
+            Button {
+                guard let record else { return }
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(markdownReport(record), forType: .string)
+                copied = true
+                Task { try? await Task.sleep(for: .seconds(1.5)); copied = false }
+            } label: {
+                Label(copied ? "Copied" : "Copy Markdown", systemImage: copied ? "checkmark" : "doc.on.doc")
             }
+            .help("Copy the full report as Markdown")
+            .disabled(record == nil)
+            Button { record.map(saveImage) } label: { Label("Save Image", systemImage: "photo") }
+                .help("Save a shareable score card image")
+                .disabled(record == nil)
+            Button { record.map(saveMarkdown) } label: { Label("Save Report", systemImage: "square.and.arrow.down") }
+                .help("Save the full report as a Markdown file")
+                .disabled(record == nil)
         }
     }
 
     // MARK: Export
 
-    private var markdownReport: String {
-        MarkdownRenderer.render(card, previous: baseline?.card,
-                                previousDate: baseline?.createdAt.formatted(date: .abbreviated, time: .shortened))
+    private func markdownReport(_ record: CardRecord) -> String {
+        let baseline = model.baseline(for: record)
+        return MarkdownRenderer.render(record.card, previous: baseline?.card,
+                                       previousDate: baseline?.createdAt.formatted(date: .abbreviated, time: .shortened))
     }
 
-    private func saveMarkdown() {
+    private func saveMarkdown(_ record: CardRecord) {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [UTType(filenameExtension: "md") ?? .plainText]
         panel.nameFieldStringValue = "AI Native Score \(record.createdAt.formatted(.iso8601.year().month().day())).md"
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        try? markdownReport.write(to: url, atomically: true, encoding: .utf8)
+        try? markdownReport(record).write(to: url, atomically: true, encoding: .utf8)
     }
 
     @MainActor
-    private func saveImage() {
-        guard let png = ShareCard.png(card: card, date: record.createdAt) else { return }
+    private func saveImage(_ record: CardRecord) {
+        guard let png = ShareCard.png(card: record.card, date: record.createdAt) else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.png]
         panel.nameFieldStringValue = "AI Native Score.png"

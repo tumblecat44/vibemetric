@@ -38,6 +38,9 @@ struct ReadableCardContent: View {
                 Text(sc.recordDates.map { "\($0.tool): \($0.sessions) sessions, \($0.from) to \($0.to)" }.joined(separator: " · "))
                 Text("\(sc.sessionsExamined) of \(record.sessionsScanned) sessions read · \(sc.tasksCheckedInDetail) tasks checked in detail")
                 Text("Scored by \(record.engineLabel) (\(record.actualModel ?? record.model ?? "default model")) in \(String(format: "%.1f", sc.elapsedMinutes)) minutes")
+                if card.isLowCoverage(sessionsAvailable: record.sessionsScanned) {
+                    Text("Few sessions were examined, so this score may miss evidence.")
+                }
                 if card.unknownCount > 0 {
                     Text("\(card.unknownCount) categor\(card.unknownCount == 1 ? "y" : "ies") could not be scored, so the total is a range.")
                 }
