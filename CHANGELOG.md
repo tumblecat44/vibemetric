@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.9 (2026-10-22)
+
+- Each category box shows its score as dots and "6/10" on the right of its banner, in place of the icon.
+- New scores write "What you're doing well" and each box's issue and fix as plain, complete sentences, without shorthand.
+
 ## 0.4.8 (2026-10-22)
 
 - A simpler result screen: your score, what you're doing well, and one box per category with its score, a one-line issue and a one-line fix. Click a box to see the full explanation, evidence and steps. New scores write these short lines; older results use their existing text.
