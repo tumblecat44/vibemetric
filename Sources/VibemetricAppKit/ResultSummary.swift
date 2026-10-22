@@ -31,36 +31,20 @@ struct ResultSummary: View {
     private var score: some View {
         VStack(alignment: .leading, spacing: 6) {
             TimelineView(.periodic(from: .now, by: 60)) { context in
-                HStack(spacing: 6) {
-                    Text("Your AI Native Score · \(RelativeDate.format(record.createdAt, now: context.date)) · from \(card.scope.sessionsExamined) sessions")
-                        .foregroundStyle(Theme.muted)
-                    if let baseline, let delta = ScoreChanges.totalDelta(card, to: baseline.card), delta != 0 {
-                        Text("· \(delta > 0 ? "↗ +" : "↘ ")\(delta) since \(baseline.createdAt.formatted(.dateTime.month(.abbreviated).day()))")
-                            .fontWeight(.semibold)
-                            .foregroundStyle(delta > 0 ? Theme.color(for: .strong) : Theme.color(for: .bottleneck))
-                    }
-                }
-                .scaledFont(13)
+                Text(RelativeDate.format(record.createdAt, now: context.date))
+                    .foregroundStyle(Theme.muted)
+                    .scaledFont(13)
             }
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(card.totalLabel ?? "—").scaledFont(56, weight: .semibold).foregroundStyle(Theme.ink)
                     Text("/ 100").scaledFont(20).foregroundStyle(Theme.muted)
                 }
-                if let band = overallBand { BandPill(band: band) }
-            }
-            if card.isLowCoverage(sessionsAvailable: record.sessionsScanned) {
-                Label("Few sessions were examined, so this score may miss evidence.", systemImage: "exclamationmark.triangle.fill")
-                    .scaledFont(12)
-                    .foregroundStyle(Theme.color(for: .developing))
+                if let baseline, let delta = ScoreChanges.totalDelta(card, to: baseline.card) {
+                    ChangePill(delta: delta, since: baseline.createdAt)
+                }
             }
         }
-    }
-
-    /// The total's band on the same 0–10 scale as a category: 68 → 6.8 → developing.
-    private var overallBand: Band? {
-        guard card.totalLabel != nil, card.unknownCount < VibemetricCore.Dimension.allCases.count else { return nil }
-        return Band(score: card.knownTotal / 10)
     }
 
     // MARK: What you're doing well
@@ -263,15 +247,26 @@ private struct SummaryHeading: View {
     }
 }
 
-/// The band as a small tinted label, e.g. "Developing".
-private struct BandPill: View {
-    var band: Band
+/// The change in the total since the previous score, e.g. "↑ 7 since Oct 20": green up, red down, grey unchanged.
+private struct ChangePill: View {
+    var delta: Int
+    var since: Date
+
+    private var color: Color {
+        delta > 0 ? Theme.color(for: .strong) : delta < 0 ? Theme.color(for: .bottleneck) : Theme.muted
+    }
+    private var text: String {
+        let date = since.formatted(.dateTime.month(.abbreviated).day())
+        if delta == 0 { return "No change since \(date)" }
+        return "\(delta > 0 ? "↑" : "↓") \(abs(delta)) since \(date)"
+    }
 
     var body: some View {
-        Text(band.rawValue.capitalized)
+        Text(text)
             .scaledFont(12, weight: .semibold)
+            .monospacedDigit()
             .padding(.horizontal, 10).padding(.vertical, 3)
-            .foregroundStyle(Theme.color(for: band))
-            .background(Theme.color(for: band).opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+            .foregroundStyle(color)
+            .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
     }
 }

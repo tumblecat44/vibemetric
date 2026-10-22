@@ -177,6 +177,8 @@ struct RootView: View {
                     HomeView()
                 }
             }
+            // The same buttons on every screen, so the toolbar never changes height or layout.
+            .toolbar { CardExportToolbar(record: exportableRecord) }
             // A small ideal width, so the split view lets the detail shrink to its minimum before anything else.
             .frame(minWidth: Self.detailMinWidth, idealWidth: Self.detailMinWidth, maxWidth: .infinity)
             .navigationSplitViewColumnWidth(min: Self.detailMinWidth, ideal: 860)
@@ -191,6 +193,12 @@ struct RootView: View {
 }
 
 extension RootView {
+    /// The result the toolbar's export buttons act on: the one on screen in the General tab.
+    var exportableRecord: CardRecord? {
+        guard !model.showsSettings, !Extensions.sidebarTabs.contains(where: { $0.id == model.sidebarTab }) else { return nil }
+        return model.selected
+    }
+
     /// The score history: new assessment, the run in progress, past results.
     var generalList: some View {
         @Bindable var model = model
