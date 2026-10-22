@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.7 (2026-10-22)
 
 - ⌘W closes the main window and leaves the menu bar panel open, even when the panel is in front. Esc or a click elsewhere still closes the panel.
 
