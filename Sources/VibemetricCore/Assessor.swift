@@ -12,7 +12,7 @@ public struct AssessmentOptions: Sendable {
     public static let readingTarget = 70
     /// The person's own notes for the judge, e.g. "the demo-skill sessions were only a test".
     public var instructions: String?
-    public static let rubricVersion = "26"
+    public static let rubricVersion = "29"
     public static let maxInstructionsLength = 2000
 
     public init(engine: AssessmentEngine = .claude, model: String? = nil, instructions: String? = nil) {
@@ -365,7 +365,7 @@ public final class Assessor: Sendable {
         f.dateFormat = "yyyy-MM-dd HH:mm"
         let roots = sources.map { "- \($0.tool.rawValue): `\($0.root.path)`" }.joined(separator: "\n")
         let readingInstructions = engine == .claude
-            ? "Use Grep on raw transcripts to confirm citations. You only have Read, Grep, and Glob."
+            ? "Use Grep to locate actions and results in raw transcripts, then Read the relevant line ranges. You only have Read, Grep, and Glob."
             : "Use read-only shell commands such as cat, rg, and sed to inspect the evidence. Do not write files, run project scripts, or use the network."
         return rubric + """
 
@@ -401,17 +401,21 @@ public final class Assessor: Sendable {
 
         Only these tools are parsed by this version; say in the scope limits that Cursor and Grok records were not included if that matters.
 
-        Method: start with `overview.md` and `leads.md`, then read digests across projects, tools, and dates, following connections between sessions \
-        (for example, a rule written in one session and applied in a later one). \(readingInstructions) Aim to finish in about five minutes. \
-        Count a session as examined only if you read its digest or transcript body; the index row alone does not count. \
+        Method: gather evidence across all ten dimensions before composing the card. Start with `overview.md` and `leads.md`, \
+        inspect relevant sections of `context-files.md` and `settings.md`, then batch digest reads across projects, tools, and dates. \
+        Follow connected sessions and original action/result passages where a digest leaves a gap. \(readingInstructions) \
         Investigation scope: all accessible sessions in this pack and the supplied transcript roots, subject to project screening.
         Reading budget: this pack has \(digestCount) digests in `sessions/`. Read \(min(digestCount, AssessmentOptions.readingTarget) == digestCount ? "all of them" : "about \(AssessmentOptions.readingTarget) of them"),
         several per turn (batch independent reads), prioritizing every session listed in `changes.md` when it exists,
-        then leads for each dimension and a spread across tools, projects, and dates. Report any reading shortfall.
+        then leads for each dimension and a spread across tools, projects, and dates. Continue this evidence pass toward
+        the stated target rather than finalizing after the first few leads. If the app stops reading at its deadline first,
+        return the card from the evidence read and report the actual reading shortfall.
         Use `overview.md`, `sessions.tsv`, and `leads.md` to locate cases and establish index counts; they do not establish
         that a session body or its behavior was examined. There is no per-competency task quota or cap. Retain all relevant
         independent tasks actually observed, including contrary cases, rather than stopping when enough examples support a grade.
-        The run has a reading time budget; if it is reached, return the card from what you have read and report unexamined scope.
+        Before leaving a competency unknown, search the original transcripts behind its relevant leads and inspect
+        matching action and result passages. Digests can omit the relevant behavior. Missing keywords or truncated output
+        do not establish missing evidence. State what was searched and what remains unread or inaccessible.
         `sessionsExamined` must equal only the digests and transcripts you actually read. Never turn a few representative
         examples into a claim about all accessible sessions.
         \(previousDate.map { Self.followUpRules(previousDate: f.string(from: $0)) } ?? "")\(instructions.map(Self.personNotes) ?? "")
@@ -429,8 +433,10 @@ public final class Assessor: Sendable {
         Assess every competency in all ten dimensions once using section 2. Use the competencies listed in each dimension's \
         table, in table order. Do not assume that all dimensions have the same number of competencies. Assign High, Medium, \
         Low, unknown, or not_applicable from the behavioral descriptions and the rubric's global evidence and habit rules. \
-        Select the highest level whose description the records fully support. If High is unverified but Medium is fully \
-        supported, assign Medium, not unknown. Use unknown when the records do not establish a supported behavioral level. \
+        Judge each task's relevant practice as a whole against its defining behavior. A favorable fragment does not \
+        establish High. Credit useful incomplete practice at Medium and observed absent or ineffective needed practice at Low. \
+        Use unknown only when relevant records cannot be found or inspected well enough to judge any level. An unverified \
+        higher level or later effect does not erase a level already established. \
         Unknown is missing coverage, Low is observed behavior, and not_applicable means no relevant opportunity. Keep them distinct.
 
         Apply the same numerical conversion to every dimension, including Planning. Each applicable competency has equal \
