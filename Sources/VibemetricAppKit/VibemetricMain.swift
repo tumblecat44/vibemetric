@@ -203,7 +203,8 @@ extension RootView {
     var generalList: some View {
         @Bindable var model = model
         return List(selection: $model.selected) {
-            Section(model.history.isEmpty ? "" : "Past results") {
+            // No header: a sidebar section header folds the list when clicked.
+            Section {
                 // "Run my score" sits above the newest result, the same size as a result row.
                 // While a run is going, the in-progress row takes its place.
                 if !model.isRunning {
