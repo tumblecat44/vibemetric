@@ -12,7 +12,7 @@ public struct AssessmentOptions: Sendable {
     public static let readingTarget = 70
     /// The person's own notes for the judge, e.g. "the demo-skill sessions were only a test".
     public var instructions: String?
-    public static let rubricVersion = "9"
+    public static let rubricVersion = "12"
     public static let maxInstructionsLength = 2000
 
     public init(engine: AssessmentEngine = .claude, model: String? = nil, instructions: String? = nil) {
@@ -94,7 +94,9 @@ public final class Assessor: Sendable {
         var card: ScoreCard
         do {
             card = try JSONDecoder().decode(ScoreCard.self, from: raw.data)
-            try Self.validate(card)
+            try card.normalizePlanningAssessment()
+            try card.normalizeBehavioralAssessments()
+            try Self.validate(card, requirePlanning: true, requireAssessments: true, requireExplanations: true)
         } catch {
             throw AssessmentError.noStructuredOutput(options.engine, "The response did not match the score-card format. Try again.")
         }
@@ -279,13 +281,43 @@ public final class Assessor: Sendable {
         return args
     }
 
-    static func validate(_ card: ScoreCard) throws {
+    static func validate(_ card: ScoreCard, requirePlanning: Bool = false, requireAssessments: Bool = false,
+                         requireExplanations: Bool = false) throws {
+        if requireAssessments && card.dimensions.filter({ $0.dimension != .planningSpecs }).contains(where: { $0.assessment == nil }) {
+            throw AssessmentError.noStructuredOutput(.claude, "The assessment did not return competency details for every dimension.")
+        }
+        guard card.dimensions.first(where: { $0.dimension == .planningSpecs })?.assessment == nil else {
+            throw AssessmentError.noStructuredOutput(.claude, "Planning uses its dedicated competency details.")
+        }
+        if requirePlanning && card.dimensions.first(where: { $0.dimension == .planningSpecs })?.planning == nil {
+            throw AssessmentError.noStructuredOutput(.claude, "The assessment did not return Planning details.")
+        }
+        guard card.dimensions.filter({ $0.dimension != .planningSpecs }).allSatisfy({ $0.planning == nil }) else {
+            throw AssessmentError.noStructuredOutput(.claude, "Planning details belong only to Planning & Specs.")
+        }
         guard card.dimensions.count == Dimension.allCases.count,
               Set(card.dimensions.map(\.dimension)) == Set(Dimension.allCases),
               card.dimensions.allSatisfy({ d in
                   d.status == .scored ? d.score.map { (0...10).contains($0) } == true : d.status == .notAssessable && d.score == nil
               }), card.scope.sessionsExamined >= 0, card.scope.tasksCheckedInDetail >= 0 else {
             throw AssessmentError.noStructuredOutput(.claude, "Invalid dimensions, scores, or coverage.")
+        }
+        if requireExplanations {
+            for dimension in card.dimensions {
+                let explanations: [PlanningAssessment.Explanation?]
+                if dimension.dimension == .planningSpecs {
+                    explanations = dimension.planning?.competencies.map(\.explanation) ?? []
+                } else {
+                    explanations = dimension.assessment?.competencies.map(\.explanation) ?? []
+                }
+                guard !explanations.isEmpty, explanations.allSatisfy({ explanation in
+                    guard let explanation else { return false }
+                    return [explanation.sourceBasis, explanation.criteria, explanation.observedBehavior,
+                            explanation.overallJudgment].allSatisfy { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                }) else {
+                    throw AssessmentError.noStructuredOutput(.claude, "Every competency needs its complete four-part explanation.")
+                }
+            }
         }
     }
 
@@ -315,8 +347,11 @@ public final class Assessor: Sendable {
     static let wrapUpPrompt = """
         Time is up for reading. Do not read any more files. Return the complete score card now, matching the schema, \
         from the evidence you have already read. Assess every competency in all ten dimensions as High, Medium, Low, unknown, \
-        or not_applicable, and apply the rubric's equal-weight level conversion. Retain every competency's observations and \
-        the complete calculation audits in `scope.limits`. Unknown contributes zero and stays in the denominator, but does not \
+        or not_applicable, and apply the rubric's equal-weight level conversion. Return Planning's four structured competencies, each with \
+        all observed relevant independent tasks, a two-sentence summary, sources, full criteria, the four-part `explanation`, and any supported solution. Do not invent \
+        additional tasks after reading stops. Return structured `assessment` details for every other dimension with exact \
+        competency IDs, two-sentence summaries, all observed relevant independent tasks, four-part `explanation` paragraphs, and supported solutions. The app calculates all levels, scores, \
+        and audits from the complete observed task sets, not from the few examples selected for explanation. Keep representative examples in `explanation.observedBehavior` and report all-task counts in `explanation.overallJudgment`. Unknown contributes zero and stays in the denominator, but does not \
         establish a personal weakness. Exclude only not_applicable competencies. Set `sessionsExamined` to the \
         digests and transcripts you actually read, and add a line to `scope.limits` saying the run stopped reading at its time limit.
         """
@@ -366,12 +401,15 @@ public final class Assessor: Sendable {
         Method: start with `overview.md` and `leads.md`, then read digests across projects, tools, and dates, following connections between sessions \
         (for example, a rule written in one session and applied in a later one). \(readingInstructions) Aim to finish in about five minutes. \
         Count a session as examined only if you read its digest or transcript body; the index row alone does not count. \
-        Reading budget: this pack has \(digestCount) digests in `sessions/`. Read \(min(digestCount, AssessmentOptions.readingTarget) == digestCount ? "all of them" : "about \(AssessmentOptions.readingTarget) of them"), \
-        several per turn (batch independent reads in one turn), in this order: every session listed in `changes.md` when it exists, \
-        then the top sessions in `leads.md` for each dimension, then a spread across tools, projects, and dates. `overview.md`, \
-        `sessions.tsv`, and `leads.md` already cover every session, so use them for counts and patterns across the whole history. \
-        Then stop reading and write the card. The run has a hard time limit; if it is reached you will be asked to return the card \
-        from what you have read. `sessionsExamined` must equal the digests and transcripts you actually read.
+        Investigation scope: all accessible sessions in this pack and the supplied transcript roots, subject to project screening.
+        This pack has \(digestCount) digests in `sessions/`. Prioritize every session listed in `changes.md` when it exists,
+        then unresolved dimensions and connected cases across tools, projects, and dates. Batch independent reads.
+        Use `overview.md`, `sessions.tsv`, and `leads.md` to locate cases and establish index counts; they do not establish
+        that a session body or its behavior was examined. There is no per-competency task quota or cap. Retain all relevant
+        independent tasks actually observed, including contrary cases, rather than stopping when enough examples support a grade.
+        The run has a reading time budget; if it is reached, return the card from what you have read and report unexamined scope.
+        `sessionsExamined` must equal only the digests and transcripts you actually read. Never turn a few representative
+        examples into a claim about all accessible sessions.
         \(previousDate.map { Self.followUpRules(previousDate: f.string(from: $0)) } ?? "")\(instructions.map(Self.personNotes) ?? "")
         # Return format
 
@@ -394,13 +432,13 @@ public final class Assessor: Sendable {
         unknown. Such a zero reports no confirmed coverage, not confirmed poor behavior. If n is zero, return null and \
         `not_assessable`. The app adds the ten displayed integer scores for the total when all ten are scored.
 
-        In `scope.limits`, preserve every competency's name, level or unresolved status, and connected observations in table \
-        order. Explain what is unverified for each unknown competency. For each dimension, also list the competencies \
-        assigned High, Medium, Low, unknown, and not_applicable, \
-        give a reason for every not_applicable exclusion, and show n, the weighted sum 3*High + 2*Medium + Low, the exact \
-        fraction over 3*n, the raw score, and the rounded score. When n is zero, report that the calculation is undefined \
-        rather than dividing by zero. These audits explain the numbers and must agree with the narrative. Keep the complete \
-        audits there even though each dimension's `evidence` field holds at most three references.
+        Return structured task observations for all ten dimensions. On each non-Planning dimension, set `planning` to null \
+        and return `assessment` with `competencies` in the rubric table order. Use the exact competency IDs stated in the table. \
+        Each entry has `id`, `summary`, `tasks`, `explanation`, and `solution`. Do not generate source URLs or criteria snapshots for these nine \
+        dimensions; the app attaches the canonical definitions and sources from the bundled rubric guide. The app computes \
+        aggregate levels, scores, and calculation audits from every returned task. Keep `scope.limits` \
+        for actual reading and evidence limitations instead of duplicating these calculations.
+
         Recalculate from current observations. Previous grades from another policy and unfinished-draft cards do not \
         establish current scores or personal weaknesses. Do not reuse their neutral authoring notices as improvement advice.
         If only unknown records remain and no observed problem supports a corrective change, any proposed next action \
@@ -412,7 +450,7 @@ public final class Assessor: Sendable {
 
         The card is read in a small window by a busy developer. Section 2 decides what to judge, which evidence counts, and \
         how to calculate scores. This section decides how to write it down. Apply that policy, then write the app fields \
-        for their stated purpose instead of copying the full scoring argument into them. Keep competency labels, level names, score \
+        for their stated purpose instead of copying the full scoring argument into them. In the generic short fields, keep competency labels, level names, score \
         requirements, and commentary about your assessment process out of the problem and solution text. Explain the \
         concrete practice or result instead. Explain the person's work as a colleague speaking directly to them, using \
         everyday language, concrete verbs, and one point per sentence. Address them as "you", but name the actual actor: \
@@ -434,6 +472,62 @@ public final class Assessor: Sendable {
         from the benefit expected after the fix. Before returning, reread each problem and solution together: check that \
         every action belongs to the correct actor, each sentence follows from the previous one, and the proposed change \
         addresses the problem just explained. Shorten repetition after making the explanation clear.
+
+        Structured competency details override the generic short-field presentation limits in all ten dimensions.
+        Include every competency, even at score 10, unknown, or not_applicable. The generic three-strength and single-problem
+        limits do not restrict these entries. For non-Planning entries, `summary`, `tasks`, `explanation`, and `solution` follow
+        the same content rules described below for Planning. Store ALL observed relevant independent tasks in each competency's
+        `tasks`; never cap the judging set to the few examples shown in the explanation. Count continuing sessions, agent
+        subtasks, and retries toward one intended outcome once. Reuse a taskID across competencies for the same task, but never
+        duplicate it within one competency. Counts and proportions describe the actual observed task set, never unread work.
+
+        On Planning set `assessment` to null. Set `planning` to null on every other dimension. On Planning return an object
+        with `competencies`, exactly four entries in this order: `outcomes_completion`, `constraints`, `task_context`,
+        `ambiguity_resolution`. Each Planning entry contains `id`, `summary`, `sources`, `criteria`, `tasks`, `explanation`, and `solution`:
+        - `summary`: exactly two plain, personalized sentences naming actual projects or task types and the connected
+        observation. Explain the observed pattern and what supports the aggregate level. Report true counts and denominator
+        when useful. Keep source philosophy out of these sentences. Missing records do not establish a personal weakness.
+        - `sources`: adopted references from Planning's source basis only, each with exact `title`, `url`, and a localized
+        `note` explaining the adopted practice. Use pstack Prove It Works and Anthropic for outcomes, Anthropic for
+        constraints and task context, and Matt Pocock grilling with Anthropic for ambiguity. Source titles are names of
+        the referenced documents. Do not invent publications or claim that authors validated our numerical thresholds.
+        - `criteria`: `high`, `medium`, and `low`, each a concrete localized behavioral definition matching the Planning
+        table. State what must be detected and what distinguishes the adjacent level. Keep the actual distinctions and a
+        usable example rather than vague adjectives. Non-Planning criteria snapshots come from the canonical guide.
+        - `tasks`: all relevant independent tasks actually observed, ordered newest to older. Each has a stable `taskID`,
+        actual `project`, `level` as `high`, `medium`, `low`, `unknown`, or `not_applicable`, `observation` describing what
+        the records establish, `rationale` linking it to this competency's level, and `evidence` as verified
+        tool/session/date/project/note references. Read the request, then-effective instructions, adopted investigation,
+        execution, and results needed for the competency, rather than only the opening prompt. Unknown or excluded
+        observations state what is unavailable or inapplicable. Empty tasks are allowed when no actual task can be
+        established; never invent one. Missing records do not establish Low. Do not omit observed contrary tasks to make
+        the explanation shorter or achieve a desired grade.
+        - `explanation`: an object with four short paragraphs in the person's language. These are the expanded detail
+        shown together below the two-sentence summary, not a second bare three-row High/Medium/Low list:
+          - `sourceBasis`: name the supplied source and the actual behavior it recommends, then connect that recommendation
+        to this competency's adopted practice and why it helps. Derive this only from the supplied source notes and
+        competency definitions. Do not claim to have freshly visited a source, and do not attribute our 80%/50% aggregate
+        policy or an empirically validated ability rating to its author.
+          - `criteria`: explain the concrete behavior that qualifies a task as High, the incomplete but established behavior
+        that qualifies as Medium, and the observed basic or contrary behavior that qualifies as Low. Preserve this
+        competency's meaningful distinctions and applicability. Explain unknown separately when needed. No generic
+        “clear / partly clear / unclear” replacements or unexplained level labels.
+          - `observedBehavior`: choose a few representative actual cases from `tasks` and explain what each actor did,
+        what was detected, and what it establishes. Name the actual project or task and connect the details to the
+        criterion. Include a contrary case when it explains the pattern. These examples illustrate the complete judging
+        set; their number does not limit its denominator. Do not dump every task or session into this paragraph.
+          - `overallJudgment`: report the High/Medium/Low counts among ALL assessable tasks in this competency, with the
+        denominator and relevant proportion, then explain why the 80% High / 50% Low / otherwise Medium product policy
+        produces this aggregate. Keep unknown/not-applicable counts separate. Distinguish repeated Medium behavior from
+        mixed High/Low behavior. If no assessable tasks exist, explain unknown or not_applicable from the actual scope.
+        Explain the result to the person using the established writing style, without implying that unread work was judged.
+        - `solution`: one or two concrete sentences for an observed gap, identifying what changes in the next relevant
+        task and how it addresses the gap. Null where no useful change is supported. Do not invent damage or repeated
+        failure; missing coverage alone is not a personal defect.
+        The app computes aggregate levels, counts, legacy narrative fields, and scores from the whole `tasks` arrays.
+        Do not put separate calculation audits in `scope.limits`; the app appends them. Proposed scores and all generated
+        summary or explanation counts must agree with those same observations. Keep all four Planning competencies and
+        every other dimension's defined competencies, including unknown and not_applicable, with their full details.
 
         - `language`: BCP-47 code of the person's primary language in the records.
         - `diagnosis`: one plain sentence of at most 20 words that names the main confirmed strength and observed problem. \
@@ -498,9 +592,9 @@ public final class Assessor: Sendable {
         - `followUp`: always null.
         - `roadmap`: up to 3 stages from "AI-use improvement roadmap"; `change` and `result` are one short sentence each.
         - `scope`: `assessedAt` is today's date; `recordDates` covers each tool with records; `sessionsExamined` and `tasksCheckedInDetail` are honest counts; \
-        set `elapsedMinutes` to 0 (the app measures it). `limits` holds all ten dimensions' complete competency classifications, \
-        supporting observations, and calculation audits, any shortfall against the reading budget, project screening results, \
-        and the scope reason behind each Not assessable dimension.
+        set `elapsedMinutes` to 0 (the app measures it). `limits` holds reading and selection limits, any shortfall against the \
+        reading budget, project screening results, and the scope reason behind each Not assessable dimension. The app \
+        appends competency classifications and calculation audits from the structured task observations.
         """
     }
 }

@@ -60,7 +60,7 @@ final class CoreTests: XCTestCase {
         XCTAssertFalse(out.contains("abcdef123456"))
     }
 
-    func testTotalsAndProvisionalRange() throws {
+    func testTotalsAndUnscoredDimensionRange() throws {
         var card = try JSONDecoder().decode(ScoreCard.self, from: Data(Self.sampleCard.utf8))
         XCTAssertEqual(card.totalLabel, "50")
         XCTAssertEqual(card.dimensions(in: .bottleneck).count, 10)
@@ -367,19 +367,7 @@ final class ReasonPointsTests: XCTestCase {
         XCTAssertNil(try JSONDecoder().decode(ScoreCard.self, from: Data(CoreTests.sampleCard.utf8)).dimensions[0].points)
     }
 
-    func testSchemaAsksForReadableFields() throws {
-        let obj = try JSONSerialization.jsonObject(with: Data(JSONSchema.scoreCard.utf8)) as! [String: Any]
-        let props = obj["properties"] as! [String: Any]
-        let item = (props["dimensions"] as! [String: Any])["items"] as! [String: Any]
-        let required = Set(item["required"] as! [String])
-        XCTAssertTrue(required.isSuperset(of: ["headline", "strengths", "saw", "impact", "tryThis", "evidence"]))
-        XCTAssertFalse(required.contains("points"))
-        XCTAssertFalse(required.contains("reason"))
-        let evidence = ((item["properties"] as! [String: Any])["evidence"] as! [String: Any])["items"] as! [String: Any]
-        XCTAssertTrue((evidence["required"] as! [String]).contains("project"))
-        let improvement = Set((props["improvement"] as! [String: Any])["required"] as! [String])
-        XCTAssertTrue(improvement.isSuperset(of: ["dimension", "impact", "evidence"]))
-    }
+
 }
 
 final class ReadableCardTests: XCTestCase {

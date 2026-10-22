@@ -3,13 +3,35 @@ import Testing
 @testable import VibemetricCore
 
 struct AssessmentTests {
+    @Test func freshAssessmentsRequirePlanningDetailsWhileLegacyCardsRemainReadable() throws {
+        let legacy = try JSONDecoder().decode(ScoreCard.self, from: Data(CoreTests.sampleCard.utf8))
+        try Assessor.validate(legacy)
+        #expect(throws: AssessmentError.self) { try Assessor.validate(legacy, requirePlanning: true) }
+        #expect(throws: AssessmentError.self) { try Assessor.validate(legacy, requireAssessments: true) }
+        #expect(throws: AssessmentError.self) { try Assessor.validate(legacy, requireExplanations: true) }
+    }
+
+    @Test func liveResultsRequireEveryExplanationParagraphButLegacyDecodeDoesNot() throws {
+        let fixture = try CLIFixture()
+        defer { fixture.remove() }
+        let data = try Data(contentsOf: fixture.directory.appendingPathComponent("fixture-card.json"))
+        var card = try JSONDecoder().decode(ScoreCard.self, from: data)
+        try Assessor.validate(card, requirePlanning: true, requireAssessments: true, requireExplanations: true)
+        card.dimensions[0].planning?.competencies[0].explanation = nil
+        try Assessor.validate(card)
+        #expect(throws: AssessmentError.self) { try Assessor.validate(card, requireExplanations: true) }
+        card = try JSONDecoder().decode(ScoreCard.self, from: data)
+        card.dimensions[1].assessment?.competencies[0].explanation?.overallJudgment = " \n "
+        #expect(throws: AssessmentError.self) { try Assessor.validate(card, requireExplanations: true) }
+    }
+
     @Test(arguments: AssessmentEngine.allCases)
     func scoresWithEitherCLI(_ engine: AssessmentEngine) async throws {
         let fixture = try CLIFixture()
         defer { fixture.remove() }
         let assessor = Assessor(installation: CLIInstallation(executable: fixture.command, version: "fixture"))
         let outcome = try await assessor.run(packDir: fixture.directory, sources: [], options: AssessmentOptions(engine: engine)) { _ in }
-        #expect(outcome.card.knownTotal == 50)
+        #expect(outcome.card.knownTotal == 68)
         #expect(outcome.sessionID == CLIFixture.sessionID)
         #expect(outcome.engine == engine)
         #expect(outcome.cliVersion == "fixture")
@@ -183,7 +205,7 @@ struct AssessmentTests {
         let events = Events()
         let started = Date()
         let raw = try await assessor.runStructured(prompt: "Score this", schema: JSONSchema.scoreCard, packDir: fixture.directory,
-                                                   sources: [], options: options, wrapUp: (0.5, Assessor.wrapUpPrompt)) { events.append($0) }
+                                                   sources: [], options: options, wrapUp: (1.0, Assessor.wrapUpPrompt)) { events.append($0) }
         #expect(raw.wrappedUp)
         #expect(raw.sessionID == CLIFixture.forkID)
         #expect(Date().timeIntervalSince(started) < 5)
@@ -230,7 +252,37 @@ private struct CLIFixture {
         directory = FileManager.default.temporaryDirectory.appendingPathComponent("vibemetric test \(UUID())")
         command = directory.appendingPathComponent("fake-cli")
         try FileManager.default.createDirectory(at: directory.appendingPathComponent("sessions"), withIntermediateDirectories: true)
-        try Data(CoreTests.sampleCard.utf8).write(to: directory.appendingPathComponent("fixture-card.json"))
+        var card = try JSONDecoder().decode(ScoreCard.self, from: Data(CoreTests.sampleCard.utf8))
+        let explanation = PlanningAssessment.Explanation(
+            sourceBasis: "The supplied guide connects a result to its check.",
+            criteria: "A connected check is high; an unresolved check is medium; no intended result is low.",
+            observedBehavior: "Cedar's export request names its expected output.",
+            overallJudgment: "One observed task supports the stated level; unread work is outside this judgment.")
+        let levels: [PlanningAssessment.Level] = [.high, .medium, .low, .unknown]
+        card.dimensions[0].planning = PlanningAssessment(competencies: zip(PlanningAssessment.CompetencyID.allCases, levels).map { id, level in
+            PlanningAssessment.Competency(id: id, summary: "Cedar defines its export work. The acceptance check is recorded.",
+                sources: [.init(title: "Prove It Works", url: "https://raw.githubusercontent.com/cursor/plugins/main/pstack/skills/principle-prove-it-works/SKILL.md", note: "A fictional practice guide.")],
+                criteria: .init(high: "Outcome and check agree.", medium: "Outcome is incomplete.", low: "Outcome is unspecified."),
+                tasks: [.init(taskID: "cedar-export", project: "Cedar", level: level,
+                    observation: "The export request was examined.", rationale: "The observed request supports this level.",
+                    evidence: [.init(tool: "Codex", sessionId: Self.sessionID, date: "2026-10-22", note: "Export request", project: "Cedar")])],
+                explanation: explanation)
+        })
+        let guide = try RubricGuide.load()
+        for index in card.dimensions.indices where card.dimensions[index].dimension != .planningSpecs {
+            let definition = guide.guide(for: card.dimensions[index].dimension)!
+            card.dimensions[index].assessment = BehavioralAssessment(competencies: definition.competencies.map { competency in
+                .init(id: competency.id, title: competency.title,
+                      summary: "Cedar uses a relevant procedure. Its complete behavior remains unverified.",
+                      sources: [], criteria: .init(high: "", medium: "", low: ""),
+                      tasks: [.init(taskID: "cedar-export", project: "Cedar", level: .medium,
+                                    observation: "A relevant procedure was applied.", rationale: "Only partial verification is recorded.",
+                                    evidence: [.init(tool: "Codex", sessionId: Self.sessionID, date: "2026-10-22",
+                                                     note: "Export procedure", project: "Cedar")])],
+                      explanation: explanation)
+            })
+        }
+        try JSONEncoder().encode(card).write(to: directory.appendingPathComponent("fixture-card.json"))
         let script = #"""
         #!/bin/sh
         printf '%s\n' "$@" > received-arguments.txt

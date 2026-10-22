@@ -132,6 +132,10 @@ public struct ScoreCard: Codable, Sendable {
         /// The solution explained as 2–4 plain bullets: what to change, where, how to do it in the next task,
         /// and how to tell it worked. nil on older cards, which show `tryThis` alone.
         public var solutionSteps: [String]?
+        /// Task-level Planning judgments and the criteria used when the assessment was made.
+        public var planning: PlanningAssessment?
+        /// Task judgments for the other dimensions, including the canonical guide snapshot.
+        public var assessment: BehavioralAssessment?
 
         /// True when the card carries the short readable fields.
         public var isReadable: Bool { saw?.isEmpty == false || strengths != nil }
@@ -174,7 +178,7 @@ public struct ScoreCard: Codable, Sendable {
         public var band: Band? { score.map(Band.init(score:)) }
 
         enum CodingKeys: String, CodingKey {
-            case dimension, score, status, headline, reason, points, conclusion, evidence, changeReason, saw, strengths, impact, tryThis, solutionSteps
+            case dimension, score, status, headline, reason, points, conclusion, evidence, changeReason, saw, strengths, impact, tryThis, solutionSteps, planning, assessment
         }
 
         public init(from decoder: Decoder) throws {
@@ -192,6 +196,8 @@ public struct ScoreCard: Codable, Sendable {
             impact = try c.decodeIfPresent(String.self, forKey: .impact)
             tryThis = try c.decodeIfPresent(String.self, forKey: .tryThis)
             solutionSteps = try c.decodeIfPresent([String].self, forKey: .solutionSteps)
+            planning = try c.decodeIfPresent(PlanningAssessment.self, forKey: .planning)
+            assessment = try c.decodeIfPresent(BehavioralAssessment.self, forKey: .assessment)
             reason = try c.decodeIfPresent(String.self, forKey: .reason)
                 ?? (points?.isEmpty == false || (saw == nil && strengths == nil)
                     ? Self.compose(points: points ?? [], conclusion: conclusion)
@@ -367,6 +373,90 @@ public struct ScoreCard: Codable, Sendable {
 
     /// The sum of the scored dimensions, before deductions.
     public var dimensionSum: Int { ordered.compactMap(\.score).reduce(0, +) }
+
+    public mutating func normalizePlanningAssessment() throws {
+        guard let index = dimensions.firstIndex(where: { $0.dimension == .planningSpecs }),
+              let planning = dimensions[index].planning else { return }
+        try planning.validate()
+        let competencies = planning.ordered
+        let gaps = competencies.filter { $0.level == .medium || $0.level == .low }
+        let scoreChanged = dimensions[index].score != planning.score
+        if scoreChanged {
+            dimensions[index].headline = PlanningAssessment.Level.allCases.map { level in
+                let count = competencies.filter { $0.level == level }.count
+                return "\(level.label(language: language)) \(count)"
+            }.joined(separator: ", ")
+            dimensions[index].changeReason = nil
+        }
+        if scoreChanged || gaps.isEmpty {
+            dimensions[index].impact = nil
+        }
+        dimensions[index].score = planning.score
+        dimensions[index].status = planning.score == nil ? .notAssessable : .scored
+        dimensions[index].reason = planning.markdown(language: language)
+        dimensions[index].points = nil
+        dimensions[index].conclusion = nil
+        dimensions[index].strengths = competencies.filter { $0.level == .high }.map(\.summary)
+        dimensions[index].saw = gaps.map(\.summary).joined(separator: "\n\n")
+        let solutions = gaps.compactMap(\.solution).filter { !$0.isEmpty }
+        dimensions[index].solutionSteps = solutions
+        dimensions[index].tryThis = solutions.first
+        scope.limits.removeAll { $0.hasPrefix("Planning & Specs calculated audit:") }
+        scope.limits.append(planning.calculatedAudit)
+    }
+
+    /// Validate the whole response before updating any dimension. Older saved cards remain unchanged.
+    public mutating func normalizeBehavioralAssessments() throws {
+        let indices = dimensions.indices.filter {
+            dimensions[$0].dimension != .planningSpecs && dimensions[$0].assessment != nil
+        }
+        guard !indices.isEmpty else { return }
+        let catalog = try RubricGuide.load()
+        for index in indices {
+            guard let guide = catalog.guide(for: dimensions[index].dimension) else {
+                throw RubricGuide.LoadError.invalidDimensions
+            }
+            try dimensions[index].assessment!.validate(expectedIDs: guide.competencies.map(\.id))
+        }
+        for index in indices {
+            let dimension = dimensions[index].dimension
+            let guide = catalog.guide(for: dimension)!
+            let ids = guide.competencies.map(\.id)
+            var assessment = dimensions[index].assessment!
+            assessment.competencies = assessment.ordered(expectedIDs: ids).map { competency in
+                let definition = guide.competencies.first { $0.id == competency.id }!
+                var snapshot = competency
+                snapshot.title = definition.title
+                snapshot.whyItHelps = definition.whyItHelps
+                snapshot.sources = definition.sources
+                snapshot.criteria = definition.criteria
+                return snapshot
+            }
+            let competencies = assessment.competencies
+            let gaps = competencies.filter { $0.level == .medium || $0.level == .low }
+            let scoreChanged = dimensions[index].score != assessment.score
+            if scoreChanged {
+                dimensions[index].headline = PlanningAssessment.Level.allCases.map { level in
+                    "\(level.label(language: language)) \(competencies.filter { $0.level == level }.count)"
+                }.joined(separator: ", ")
+                dimensions[index].changeReason = nil
+            }
+            if scoreChanged || gaps.isEmpty { dimensions[index].impact = nil }
+            dimensions[index].assessment = assessment
+            dimensions[index].score = assessment.score
+            dimensions[index].status = assessment.score == nil ? .notAssessable : .scored
+            dimensions[index].reason = assessment.markdown(language: language, expectedIDs: ids)
+            dimensions[index].points = nil
+            dimensions[index].conclusion = nil
+            dimensions[index].strengths = competencies.filter { $0.level == .high }.map(\.summary)
+            dimensions[index].saw = gaps.map(\.summary).joined(separator: "\n\n")
+            let solutions = gaps.compactMap(\.solution).filter { !$0.isEmpty }
+            dimensions[index].solutionSteps = solutions
+            dimensions[index].tryThis = solutions.first
+            scope.limits.removeAll { $0.hasPrefix("\(dimension.rawValue) calculated audit:") }
+            scope.limits.append(assessment.calculatedAudit(dimension: dimension, expectedIDs: ids))
+        }
+    }
 
     /// The rubric allows at most a 1-point deduction in total, so cap it even if the judge reports more.
     public static let maxDeductionPoints = 1

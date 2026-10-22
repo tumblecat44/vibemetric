@@ -17,8 +17,25 @@ enum JSONSchema {
         }
 
         let evidence = object(["tool": str, "sessionId": str, "date": str, "note": str, "project": str])
+        let explanation = object(["sourceBasis": str, "criteria": str, "observedBehavior": str, "overallJudgment": str])
+        let planning = object([
+            "competencies": array(object([
+                "id": ["type": "string", "enum": PlanningAssessment.CompetencyID.allCases.map(\.rawValue)],
+                "summary": str,
+                "explanation": explanation,
+                "sources": array(object(["title": str, "url": str, "note": str])),
+                "criteria": object(["high": str, "medium": str, "low": str]),
+                "tasks": array(object([
+                    "taskID": str, "project": str,
+                    "level": ["type": "string", "enum": PlanningAssessment.Level.allCases.map(\.rawValue)],
+                    "observation": str, "rationale": str,
+                    "evidence": array(evidence),
+                ])),
+                "solution": ["type": ["string", "null"]],
+            ]), min: 4, max: 4),
+        ])
         let dimensionID: [String: Any] = ["type": "string", "enum": Dimension.allCases.map(\.rawValue)]
-        let dimension = object([
+        let dimensionProperties: [String: Any] = [
             "dimension": dimensionID,
             "score": ["type": ["integer", "null"], "minimum": 0, "maximum": 10],
             "status": ["type": "string", "enum": ["scored", "not_assessable"]],
@@ -30,7 +47,39 @@ enum JSONSchema {
             "solutionSteps": array(str, max: 4),
             "evidence": array(evidence, max: 3),
             "changeReason": ["type": ["string", "null"]],
-        ])
+        ]
+        var planningDimension = dimensionProperties
+        planningDimension["dimension"] = ["type": "string", "enum": [Dimension.planningSpecs.rawValue]]
+        planningDimension["planning"] = planning
+        planningDimension["assessment"] = ["type": "null"]
+        let catalog: RubricGuide
+        do {
+            catalog = try RubricGuide.load()
+        } catch {
+            preconditionFailure("The bundled competency guide could not be loaded: \(error.localizedDescription)")
+        }
+        let otherDimensions = Dimension.allCases.filter { $0 != .planningSpecs }.map { dimension in
+            let guide = catalog.guide(for: dimension)!
+            var properties = dimensionProperties
+            properties["dimension"] = ["type": "string", "enum": [dimension.rawValue]]
+            properties["planning"] = ["type": "null"]
+            properties["assessment"] = object([
+                "competencies": array(object([
+                    "id": ["type": "string", "enum": guide.competencies.map(\.id)],
+                    "summary": str,
+                    "explanation": explanation,
+                    "tasks": array(object([
+                        "taskID": str, "project": str,
+                        "level": ["type": "string", "enum": PlanningAssessment.Level.allCases.map(\.rawValue)],
+                        "observation": str, "rationale": str,
+                        "evidence": array(evidence),
+                    ])),
+                    "solution": ["type": ["string", "null"]],
+                ]), min: guide.competencies.count, max: guide.competencies.count),
+            ])
+            return object(properties)
+        }
+        let dimension: [String: Any] = ["anyOf": [object(planningDimension)] + otherDimensions]
         let schema = object([
             "language": str,
             "diagnosis": str,

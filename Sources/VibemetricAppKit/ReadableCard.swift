@@ -125,7 +125,7 @@ struct ReadableCardContent: View {
                     Divider()
                     CategoryRow(result: d, change: change(for: d.dimension), note: card.deductionNote(for: d.dimension),
                                 deductions: card.deductionAppliedTo == d.dimension ? card.deductions ?? [] : [],
-                                footer: deepDiveFooter?(d.dimension), expanded: expandAll)
+                                footer: deepDiveFooter?(d.dimension), expanded: expandAll, language: card.language)
                 }
                 Divider()
             }
@@ -341,16 +341,20 @@ struct CategoryRow: View {
     var note: String?
     var deductions: [ScoreCard.Deduction] = []
     var footer: AnyView?
+    var language: String
+    var expandAll: Bool
     @Environment(\.textScale) private var scale
     @State private var expanded: Bool
 
     init(result: ScoreCard.DimensionResult, change: ScoreChange?, note: String?, deductions: [ScoreCard.Deduction],
-         footer: AnyView?, expanded: Bool) {
+         footer: AnyView?, expanded: Bool, language: String = "en") {
         self.result = result
         self.change = change
         self.note = note
         self.deductions = deductions
         self.footer = footer
+        self.language = language
+        self.expandAll = expanded
         _expanded = State(initialValue: expanded)
     }
 
@@ -402,7 +406,11 @@ struct CategoryRow: View {
 
             if expanded {
                 VStack(alignment: .leading, spacing: 12) {
-                    if result.isReadable {
+                    if result.dimension == .planningSpecs, let planning = result.planning {
+                        PlanningAssessmentView(assessment: planning, expandAll: expandAll)
+                    } else if let assessment = result.assessment {
+                        BehavioralAssessmentView(assessment: assessment, expandAll: expandAll)
+                    } else if result.isReadable {
                         if let strengths = result.strengths {
                             // Newer cards: what works on its own, above a problem that holds only the gap.
                             if !strengths.isEmpty { WhatsWorking(points: strengths) }
