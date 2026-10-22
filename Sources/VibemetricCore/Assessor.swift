@@ -12,7 +12,7 @@ public struct AssessmentOptions: Sendable {
     public static let readingTarget = 70
     /// The person's own notes for the judge, e.g. "the demo-skill sessions were only a test".
     public var instructions: String?
-    public static let rubricVersion = "13"
+    public static let rubricVersion = "26"
     public static let maxInstructionsLength = 2000
 
     public init(engine: AssessmentEngine = .claude, model: String? = nil, instructions: String? = nil) {
@@ -354,6 +354,9 @@ public final class Assessor: Sendable {
         and audits from the complete observed task sets, not from the few examples selected for explanation. Keep representative examples in `explanation.observedBehavior` and report all-task counts in `explanation.overallJudgment`. Unknown contributes zero and stays in the denominator, but does not \
         establish a personal weakness. Exclude only not_applicable competencies. Set `sessionsExamined` to the \
         digests and transcripts you actually read, and add a line to `scope.limits` saying the run stopped reading at its time limit.
+        Match the specificity of the explanation example in section 3: source recommendation, concrete level
+        differences, representative actual cases, and why the full observed counts yield the aggregate. Do not impose
+        line or character quotas or expand into source essays and implementation histories.
         """
 
     static func prompt(sources: [TranscriptSource], now: Date, previousDate: Date? = nil, digestCount: Int = 0, engine: AssessmentEngine = .claude,
@@ -402,8 +405,9 @@ public final class Assessor: Sendable {
         (for example, a rule written in one session and applied in a later one). \(readingInstructions) Aim to finish in about five minutes. \
         Count a session as examined only if you read its digest or transcript body; the index row alone does not count. \
         Investigation scope: all accessible sessions in this pack and the supplied transcript roots, subject to project screening.
-        This pack has \(digestCount) digests in `sessions/`. Prioritize every session listed in `changes.md` when it exists,
-        then unresolved dimensions and connected cases across tools, projects, and dates. Batch independent reads.
+        Reading budget: this pack has \(digestCount) digests in `sessions/`. Read \(min(digestCount, AssessmentOptions.readingTarget) == digestCount ? "all of them" : "about \(AssessmentOptions.readingTarget) of them"),
+        several per turn (batch independent reads), prioritizing every session listed in `changes.md` when it exists,
+        then leads for each dimension and a spread across tools, projects, and dates. Report any reading shortfall.
         Use `overview.md`, `sessions.tsv`, and `leads.md` to locate cases and establish index counts; they do not establish
         that a session body or its behavior was examined. There is no per-competency task quota or cap. Retain all relevant
         independent tasks actually observed, including contrary cases, rather than stopping when enough examples support a grade.
@@ -415,6 +419,12 @@ public final class Assessor: Sendable {
 
         Return the card as structured output that matches the provided JSON schema instead of Markdown. The app lays out the card \
         itself and computes the total, bands, and progress bars.
+
+        Match the specificity of the explanation example in section 3. Each expanded explanation has four focused
+        paragraphs that let the person understand the source, the behavioral differences between levels, the actual
+        cases and the reason for the aggregate rating. Do not compress these into slogans or lengthen them into source
+        essays and implementation histories. The example calibrates the needed detail, not a line or character quota.
+        The app displays the generated explanation as written; do not rely on display clipping or stock replacements.
 
         Assess every competency in all ten dimensions once using section 2. Use the competencies listed in each dimension's \
         table, in table order. Do not assume that all dimensions have the same number of competencies. Assign High, Medium, \
@@ -484,10 +494,18 @@ public final class Assessor: Sendable {
         On Planning set `assessment` to null. Set `planning` to null on every other dimension. On Planning return an object
         with `competencies`, exactly four entries in this order: `outcomes_completion`, `constraints`, `task_context`,
         `ambiguity_resolution`. Each Planning entry contains `id`, `summary`, `sources`, `criteria`, `tasks`, `explanation`, and `solution`:
-        - `summary`: two everyday sentences giving an overall view of how the person handled this competency across
-        the observed tasks. Start with what they tend to do or leave unresolved, then explain it with a familiar project
-        detail or an observed count. Describe differences between tasks when they matter. A single completed repair is
-        an example, not an overall pattern. If only one task was established, keep the statement about that task.
+        - `summary`: two connected everyday sentences giving an overall view of how the person handled this competency
+        across the observed tasks. These appear under What's working or Problem. Start with the supported pattern and
+        what it means for their work, then ground it in a representative project and task: what they wanted to achieve,
+        what the person or AI actually did, and what that achieved or left unresolved. Include differences between tasks
+        or an observed count when they explain that pattern. A project name or a count alone does not explain a case.
+        Make the connection understandable without opening the session or remembering an earlier report. For a strength,
+        connect the action to the supported benefit; for a problem, explain what was missing and why it mattered to that
+        task. Keep the summary focused on the supported pattern; put the representative cases and rating rationale
+        in the expanded explanation.
+        A single completed repair is an example, not an overall pattern. If only one task was established, keep the
+        statement about that task. Attribute AI omissions to AI, preserve later corrections, and describe repaired
+        problems as repaired. Do not invent motives, benefits, harm, repeated failures, or costs to complete the story.
         Keep source names, scoring terminology, and investigation procedure in the expanded explanation. Missing records
         do not establish a personal weakness. Do not invent percentages or generalize to unread work.
         - `sources`: adopted references from Planning's source basis only, each with exact `title`, `url`, and a localized
@@ -505,23 +523,22 @@ public final class Assessor: Sendable {
         observations state what is unavailable or inapplicable. Empty tasks are allowed when no actual task can be
         established; never invent one. Missing records do not establish Low. Do not omit observed contrary tasks to make
         the explanation shorter or achieve a desired grade.
-        - `explanation`: an object with four short paragraphs in the person's language. These are the expanded detail
-        shown together below the two-sentence summary, not a second bare three-row High/Medium/Low list:
-          - `sourceBasis`: explain in everyday language why this behavior helps the person's work and what the supplied
-        source recommends. Name the source naturally. Say what it helps them achieve or avoid instead of announcing that
-        a source perspective was adopted. Use only the supplied notes. Do not claim a fresh source visit or say the source
-        validated our numerical boundaries.
-          - `criteria`: explain what you would see in a task to rate it High, Medium, or Low, using ordinary words and the
-        actual differences in the competency definition. Explain any necessary technical term through what the person or
-        AI does. Keep the concrete behavior and applicability; do not replace them with vague adjectives.
-          - `observedBehavior`: choose a few representative actual cases from `tasks` and explain what each actor did,
-        what was detected, and what it establishes. Name the actual project or task and connect the details to the
-        criterion. Include a contrary case when it explains the pattern. These examples illustrate the complete judging
-        set; their number does not limit its denominator. Do not dump every task or session into this paragraph.
-          - `overallJudgment`: explain why the observed work earned this rating. Give the High/Medium/Low counts across
-        all assessable tasks and connect them to the shared 80%/50% rule in plain sentences. Distinguish repeated partial
-        behavior from a mixture of strong and weak cases. Keep missing or inapplicable evidence separate. If nothing can
-        be rated, say what could not be checked. Do not use formulas, internal field names, or unexplained scoring terms.
+        - `explanation`: write all four fields yourself in the person's language, following the specificity of the
+        section 3 example. The app supplies English section headings; do not repeat headings inside the field values:
+          - `sourceBasis`: name the relevant supplied source and the recommendation supporting this criterion.
+        Explain the adopted behavior rather than saying that a guide's perspective was adopted. Keep this to the
+        relevant recommendation, without a long source summary or claims that the source validated our thresholds.
+          - `criteria`: explain the concrete behavior that establishes High, Medium and Low and the difference
+        between adjacent levels. State what must be present or remains missing, as in the example; do not replace
+        the behavioral distinctions with vague adjectives or invent stricter requirements.
+          - `observedBehavior`: explain representative actual cases from tasks, naming the project or task, the
+        relevant action or missing condition, and why that case receives its level. Include a contrasting case when
+        it explains the mixed rating and the records support it. Preserve a later repair that changes the judgment.
+        Do not invent a second case or dump every task, technical measurement or implementation step into the paragraph.
+          - `overallJudgment`: give High, Medium and Low counts from the complete observed task set and explain
+        why they meet or miss the shared aggregate thresholds, so the resulting level follows from the paragraph.
+        Keep unknown and not-applicable counts separate when present. Examples do not set the denominator; use every
+        retained task. Avoid unrelated caveats and the full numerical calculation audit.
         - `solution`: one or two concrete sentences for an observed gap, identifying what changes in the next relevant
         task and how it addresses the gap. Null where no useful change is supported. Do not invent damage or repeated
         failure; missing coverage alone is not a personal defect.
