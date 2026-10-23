@@ -353,8 +353,6 @@ public struct ScoreCard: Codable, Sendable {
                 self.searches = searches
                 self.remainingLeads = remainingLeads
             }
-
-            var key: String { "\(dimension.rawValue)/\(competencyID)" }
         }
         public struct ToolRange: Codable, Sendable {
             public var tool: String
@@ -405,25 +403,6 @@ public struct ScoreCard: Codable, Sendable {
 
     public enum ScoringError: Error {
         case invalidAssessments
-    }
-
-    var unknownCompetencyKeys: Set<String> {
-        Set(ordered.flatMap { result -> [String] in
-            let ids = result.planning?.competencies.filter { $0.level == .unknown }.map { $0.id.rawValue }
-                ?? result.assessment?.competencies.filter { $0.level == .unknown }.map(\.id) ?? []
-            return ids.map { "\(result.dimension.rawValue)/\($0)" }
-        })
-    }
-
-    /// Reading-phase signal for the existing focused continuation, never a condition for saving a card.
-    var hasCompletedInvestigation: Bool {
-        let reviews = scope.unknownInvestigations ?? []
-        return Set(reviews.map(\.key)) == unknownCompetencyKeys
-            && reviews.count == unknownCompetencyKeys.count
-            && reviews.allSatisfy { review in
-                review.status == .notFound && review.remainingLeads.isEmpty && !review.searches.isEmpty
-                    && review.searches.allSatisfy { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-            }
     }
 
     /// Keep project-relative detail while hiding personal home-directory prefixes in all report text.

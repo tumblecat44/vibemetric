@@ -240,11 +240,6 @@ public final class AppModel {
         var options = AssessmentOptions(engine: engine, model: engine == .claude ? model.alias : codexModel.modelID,
                                         instructions: UserDefaults.standard.string(forKey: Self.instructionsKey))
         options.timeout = AssessmentOptions.scoreTimeLimit
-        // Dev builds only: `defaults write app.vibemetric.dev debugWrapUpAfter 90` reaches the reading time limit early,
-        // to try the wrap-up on a short history.
-        if AppVariant.isDev, let seconds = preferences.object(forKey: "debugWrapUpAfter") as? Double, seconds > 0 {
-            options.wrapUpAfter = seconds
-        }
         return options
     }
     var canStartAssessment: Bool {
@@ -474,7 +469,7 @@ public final class AppModel {
         runningEngine = engine
         Notifier.shared.requestPermissionIfNeeded()
         let options = assessmentOptions
-        progress = ScoreProgress(started: runStarted ?? Date(), wrapUpAfter: options.wrapUpAfter)
+        progress = ScoreProgress(started: runStarted ?? Date(), phases: options.reading)
         let modelName = options.model
         let runProperties: [String: Any] = ["engine": options.engine.rawValue, "model": modelName ?? "default",
                                             "automatic": automatic, "sessions": lastScan.sessions.count,
@@ -585,7 +580,8 @@ public final class AppModel {
             progress.noteRead(what)
             activity.append(Activity(text: what, isThought: false))
         case let .thinking(text):
-            if text == Assessor.wrapUpNotice { progress.startWriting() }
+            if text == Assessor.investigateNotice { progress.startInvestigating() }
+            if text == Assessor.writingNotice { progress.startWriting() }
             activity.append(Activity(text: text, isThought: true))
         }
         if activity.count > 200 { activity.removeFirst(activity.count - 200) }

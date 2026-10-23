@@ -8,6 +8,17 @@ final class AssessmentStream: @unchecked Sendable {
         var model: String?
         var failure: String?
         var completed = false
+        /// Evidence-pack digests the run opened, by file name.
+        var digestsOpened: Set<String> = []
+    }
+
+    /// Digest file names from `EvidencePack`: `cc-<id>.md` or `codex-<id>.md`.
+    private static let digestName = try! NSRegularExpression(pattern: #"(?:cc|codex)-[A-Za-z0-9_-]+\.md"#)
+
+    private func noteDigests(in text: String) {
+        for match in Self.digestName.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+            if let range = Range(match.range, in: text) { state.digestsOpened.insert(String(text[range])) }
+        }
     }
 
     private let lock = NSLock()
@@ -57,6 +68,7 @@ final class AssessmentStream: @unchecked Sendable {
                 if part["type"] as? String == "tool_use" {
                     let input = part["input"] as? [String: Any] ?? [:]
                     let target = (input["file_path"] ?? input["pattern"] ?? input["path"]) as? String ?? ""
+                    if part["name"] as? String == "Read" { noteDigests(in: target) }
                     onProgress(.reading("\(part["name"] as? String ?? "Read") \(URL(fileURLWithPath: target).lastPathComponent)"))
                 } else if part["type"] as? String == "text", let text = part["text"] as? String, !text.isEmpty {
                     onProgress(.thinking(Redactor.scrub(text).clipped(160)))
@@ -89,6 +101,7 @@ final class AssessmentStream: @unchecked Sendable {
             switch item["type"] as? String {
             case "command_execution":
                 guard reportedItems.insert(key).inserted else { return }
+                noteDigests(in: item["command"] as? String ?? "")
                 onProgress(.reading(Redactor.scrub(item["command"] as? String ?? "Reading evidence").clipped(160)))
             case "agent_message":
                 guard event["type"] as? String == "item.completed", let text = item["text"] as? String,

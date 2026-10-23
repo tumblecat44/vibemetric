@@ -101,7 +101,7 @@ struct CompetencyScoringTests {
         setLevels([.low], for: .contextEngineering, in: &input)
         try JSONEncoder().encode(input).write(to: file)
         let outcome = try await Assessor(installation: CLIInstallation(executable: fixture.command))
-            .run(packDir: fixture.directory, sources: [], options: AssessmentOptions(engine: engine)) { _ in }
+            .run(packDir: fixture.directory, sources: [], options: .fixture(engine)) { _ in }
         let saved = try JSONDecoder().decode(ScoreCard.self, from: outcome.rawJSON)
         #expect(saved.ordered[1].score == 3)
         #expect(saved.ordered[1].assessment!.competencies.allSatisfy { $0.level == .low })
@@ -148,42 +148,6 @@ struct CompetencyScoringTests {
     }
 
     @Test(arguments: AssessmentEngine.allCases)
-    func earlyUnknownResultContinuesTheSavedInvestigation(_ engine: AssessmentEngine) async throws {
-        let fixture = try CLIFixture()
-        defer { fixture.remove() }
-        for name in ["one.md", "two.md"] {
-            try "A fictional task record.".write(to: fixture.directory.appendingPathComponent("sessions/\(name)"), atomically: true, encoding: .utf8)
-        }
-        let file = fixture.directory.appendingPathComponent("fixture-card.json")
-        var input = try JSONDecoder().decode(ScoreCard.self, from: Data(contentsOf: file))
-        input.scope.sessionsExamined = 1
-        try JSONEncoder().encode(input).write(to: file)
-        let outcome = try await Assessor(installation: CLIInstallation(executable: fixture.command))
-            .run(packDir: fixture.directory, sources: [], options: AssessmentOptions(engine: engine)) { _ in }
-        #expect(outcome.sessionID == CLIFixture.forkID)
-        #expect(outcome.card.knownTotal == 68)
-        #expect(outcome.costUSD == (engine == .claude ? 0.04 : nil))
-        let args = try String(contentsOf: fixture.directory.appendingPathComponent("received-arguments.txt"), encoding: .utf8)
-        #expect(args.contains(engine == .claude ? "--resume\n\(CLIFixture.sessionID)\n--fork-session" : "fork\n\(CLIFixture.sessionID)"))
-    }
-
-    @Test func investigationCompletionSignalPreservesContinuationCriteria() throws {
-        let original = try card()
-        #expect(original.hasCompletedInvestigation)
-        for mode in 0..<5 {
-            var result = original
-            switch mode {
-            case 0: result.scope.unknownInvestigations = nil
-            case 1: result.scope.unknownInvestigations![0].status = .incomplete
-            case 2: result.scope.unknownInvestigations![0].status = .unavailable
-            case 3: result.scope.unknownInvestigations![0].remainingLeads = ["An identified fictional continuation is unread."]
-            default: result.scope.unknownInvestigations![0].searches = []
-            }
-            #expect(!result.hasCompletedInvestigation)
-        }
-    }
-
-    @Test(arguments: AssessmentEngine.allCases)
     func unfinishedInvestigationReturnsScoreCard(_ engine: AssessmentEngine) async throws {
         let fixture = try CLIFixture()
         defer { fixture.remove() }
@@ -193,7 +157,7 @@ struct CompetencyScoringTests {
         input.scope.unknownInvestigations![0].remainingLeads = ["A fictional related session was not opened."]
         try JSONEncoder().encode(input).write(to: file)
         let outcome = try await Assessor(installation: CLIInstallation(executable: fixture.command))
-            .run(packDir: fixture.directory, sources: [], options: AssessmentOptions(engine: engine)) { _ in }
+            .run(packDir: fixture.directory, sources: [], options: .fixture(engine)) { _ in }
         #expect(outcome.card.knownTotal == 68)
         #expect(outcome.card.scope.unknownInvestigations?[0].status == .incomplete)
         #expect(outcome.card.scope.unknownInvestigations?[0].remainingLeads == input.scope.unknownInvestigations?[0].remainingLeads)

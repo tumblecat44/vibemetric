@@ -30,7 +30,7 @@ struct AssessmentTests {
         let fixture = try CLIFixture()
         defer { fixture.remove() }
         let assessor = Assessor(installation: CLIInstallation(executable: fixture.command, version: "fixture"))
-        let outcome = try await assessor.run(packDir: fixture.directory, sources: [], options: AssessmentOptions(engine: engine)) { _ in }
+        let outcome = try await assessor.run(packDir: fixture.directory, sources: [], options: .fixture(engine)) { _ in }
         #expect(outcome.card.knownTotal == 68)
         #expect(outcome.card.dimensions[0].score == 5)
         #expect(outcome.card.dimensions.dropFirst().allSatisfy { $0.score == 7 })
@@ -55,10 +55,13 @@ struct AssessmentTests {
                 #expect(try encoder.encode(after.explanation) == encoder.encode(before.explanation))
             }
         }
-        #expect(outcome.sessionID == CLIFixture.sessionID)
+        // Skim, investigate, and write each continue the session saved by the request before.
+        #expect(outcome.sessionID != CLIFixture.sessionID)
+        #expect(outcome.sessionID != CLIFixture.forkID)
         #expect(outcome.engine == engine)
         #expect(outcome.cliVersion == "fixture")
-        #expect(outcome.costUSD == (engine == .claude ? 0.02 : nil))
+        #expect(abs((outcome.costUSD ?? 0) - (engine == .claude ? 0.06 : 0)) < 0.000_001)
+        #expect((outcome.costUSD == nil) == (engine == .codex))
         let args = try String(contentsOf: fixture.directory.appendingPathComponent("received-arguments.txt"), encoding: .utf8)
         if engine == .claude {
             #expect(args.contains("--tools\nRead\nGrep\nGlob\n--allowedTools\nRead\nGrep\nGlob\n--permission-mode\ndontAsk"))
@@ -158,7 +161,7 @@ struct AssessmentTests {
         try Data(CoreTests.sampleCard.utf8).write(to: fixture.directory.appendingPathComponent("assessment-result.json"))
         await #expect(throws: AssessmentError.self) {
             try await Assessor(installation: CLIInstallation(executable: fixture.command))
-                .run(packDir: fixture.directory, sources: [], options: AssessmentOptions(engine: .codex)) { _ in }
+                .run(packDir: fixture.directory, sources: [], options: .fixture(.codex)) { _ in }
         }
     }
 
@@ -182,7 +185,7 @@ struct AssessmentTests {
         try JSONEncoder().encode(card).write(to: fixture.directory.appendingPathComponent("fixture-card.json"))
         await #expect(throws: AssessmentError.self) {
             try await Assessor(installation: CLIInstallation(executable: fixture.command))
-                .run(packDir: fixture.directory, sources: [], options: AssessmentOptions(engine: .codex)) { _ in }
+                .run(packDir: fixture.directory, sources: [], options: .fixture(.codex)) { _ in }
         }
     }
 
@@ -192,7 +195,7 @@ struct AssessmentTests {
         let assessor = Assessor(installation: CLIInstallation(executable: fixture.command))
         assessor.cancel()
         await #expect(throws: CancellationError.self) {
-            try await assessor.run(packDir: fixture.directory, sources: [], options: AssessmentOptions(engine: .codex)) { _ in }
+            try await assessor.run(packDir: fixture.directory, sources: [], options: .fixture(.codex)) { _ in }
         }
         #expect(!FileManager.default.fileExists(atPath: fixture.directory.appendingPathComponent("received-prompt.txt").path))
     }
@@ -202,7 +205,7 @@ struct AssessmentTests {
         let fixture = try CLIFixture(mode: "sleep")
         defer { fixture.remove() }
         let assessor = Assessor(installation: CLIInstallation(executable: fixture.command))
-        var options = AssessmentOptions(engine: .codex)
+        var options = AssessmentOptions.fixture(.codex)
         options.timeout = cancel ? 10 : 0.15
         let started = Date()
         let task = Task { try await assessor.run(packDir: fixture.directory, sources: [], options: options) { _ in } }
@@ -249,9 +252,31 @@ struct AssessmentTests {
         }
     }
 
-    @Test func scoresStopReadingEarlyWithinAThirtyMinuteLimit() {
-        #expect(AssessmentOptions().wrapUpAfter < AssessmentOptions.scoreTimeLimit)
-        #expect(AssessmentOptions.scoreTimeLimit == 30 * 60)
+    @Test func readingPhasesFitWithinTheOneHourLimit() {
+        let phases = AssessmentOptions().reading
+        #expect(AssessmentOptions.scoreTimeLimit == 60 * 60)
+        #expect(phases.skimMinimum == 2 * 60 && phases.investigateMinimum == 3 * 60 && phases.skimDigests == 50)
+        #expect(phases.skimLimit + phases.investigateLimit < AssessmentOptions.scoreTimeLimit)
+    }
+
+    @Test(arguments: AssessmentEngine.allCases)
+    func anEarlyCheckpointIsSentBackUntilTheSkimTargetIsMet(_ engine: AssessmentEngine) async throws {
+        let fixture = try CLIFixture()
+        defer { fixture.remove() }
+        for name in ["cc-aaaa.md", "cc-bbbb.md"] {
+            try "A fictional task record.".write(to: fixture.directory.appendingPathComponent("sessions/\(name)"), atomically: true, encoding: .utf8)
+        }
+        var options = AssessmentOptions.fixture(engine)
+        options.reading.skimDigests = 2
+        options.reading.maxRequests = 3
+        let outcome = try await Assessor(installation: CLIInstallation(executable: fixture.command))
+            .run(packDir: fixture.directory, sources: [], options: options) { _ in }
+        #expect(outcome.card.knownTotal == 68)
+        let prompts = try String(contentsOf: fixture.directory.appendingPathComponent("prompt-log.txt"), encoding: .utf8)
+        // The fixture never opens a digest, so skimming is sent back until its request limit, then the run moves on.
+        #expect(prompts.components(separatedBy: "Keep skimming").count - 1 == 2)
+        #expect(prompts.contains("Phase 2 of 3: investigate"))
+        #expect(prompts.contains("Phase 3 of 3: write"))
     }
 
     @Test func incompatibleCodexGetsAnActionableError() {
@@ -313,11 +338,18 @@ struct CLIFixture {
         session_id="\#(Self.sessionID)"
         is_fork=0
         for arg in "$@"; do
-          if [ "$arg" = "fork" ] || [ "$arg" = "--fork-session" ]; then session_id="\#(Self.forkID)"; is_fork=1; fi
+          if [ "$arg" = "fork" ] || [ "$arg" = "--fork-session" ]; then is_fork=1; fi
         done
+        # Every continuation gets a new session: the first is forkID, later ones count up.
+        if [ "$is_fork" = 1 ]; then
+          forks=$(cat fork-count 2>/dev/null || echo 0)
+          echo $((forks + 1)) > fork-count
+          if [ "$forks" = 0 ]; then session_id="\#(Self.forkID)"; else session_id=$(printf '33333333-3333-4333-8333-%012d' "$forks"); fi
+        fi
         if [ "\#(mode)" = "same-session" ]; then session_id="\#(Self.sessionID)"; fi
         if [ "\#(mode)" = "no-session" ]; then session_id=""; fi
         cat > received-prompt.txt
+        cat received-prompt.txt >> prompt-log.txt
         if [ "\#(mode)" = "sleep" ]; then sleep 30; exit 1; fi
         # A first run that is still reading at its time limit, after saving its session (or not).
         if [ "$is_fork" = 0 ] && { [ "\#(mode)" = "slow-first" ] || [ "\#(mode)" = "slow-unsaved" ]; }; then
@@ -366,5 +398,14 @@ private final class Events: @unchecked Sendable {
             case let .reading(text), let .thinking(text): values.append(text)
             }
         }
+    }
+}
+
+extension AssessmentOptions {
+    /// Options for fixture runs: no reading minimums, so each phase is one request.
+    static func fixture(_ engine: AssessmentEngine) -> AssessmentOptions {
+        var options = AssessmentOptions(engine: engine)
+        options.reading = .immediate
+        return options
     }
 }

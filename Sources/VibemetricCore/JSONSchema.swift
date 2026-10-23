@@ -6,6 +6,9 @@ enum JSONSchema {
         scoreCard(for: .codex)
     }
 
+    /// The only answer a reading phase accepts, so the score card cannot be returned before reading is done.
+    static let readingCheckpoint = #"{"type":"object","additionalProperties":false,"properties":{"note":{"type":"string"}},"required":["note"]}"#
+
     static func scoreCard(for engine: AssessmentEngine) -> String {
         let str: [String: Any] = ["type": "string"]
         let int: [String: Any] = ["type": "integer"]
