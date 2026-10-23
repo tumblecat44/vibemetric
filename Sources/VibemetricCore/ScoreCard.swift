@@ -405,7 +405,6 @@ public struct ScoreCard: Codable, Sendable {
 
     public enum ScoringError: Error {
         case invalidAssessments
-        case incompleteInvestigation
     }
 
     var unknownCompetencyKeys: Set<String> {
@@ -416,15 +415,15 @@ public struct ScoreCard: Codable, Sendable {
         })
     }
 
-    /// A reader's unfinished work is not a zero-point judgment about the person.
-    public func validateCompletedInvestigation() throws {
+    /// Reading-phase signal for the existing focused continuation, never a condition for saving a card.
+    var hasCompletedInvestigation: Bool {
         let reviews = scope.unknownInvestigations ?? []
-        guard Set(reviews.map(\.key)) == unknownCompetencyKeys,
-              reviews.count == unknownCompetencyKeys.count,
-              reviews.allSatisfy({ review in
-                  review.status == .notFound && review.remainingLeads.isEmpty && !review.searches.isEmpty
-                      && review.searches.allSatisfy { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-              }) else { throw ScoringError.incompleteInvestigation }
+        return Set(reviews.map(\.key)) == unknownCompetencyKeys
+            && reviews.count == unknownCompetencyKeys.count
+            && reviews.allSatisfy { review in
+                review.status == .notFound && review.remainingLeads.isEmpty && !review.searches.isEmpty
+                    && review.searches.allSatisfy { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            }
     }
 
     /// Keep project-relative detail while hiding personal home-directory prefixes in all report text.

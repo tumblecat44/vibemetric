@@ -43,7 +43,6 @@ public enum AssessmentError: LocalizedError {
     case failed(AssessmentEngine, String)
     case timedOut
     case noStructuredOutput(AssessmentEngine, String)
-    case incompleteInvestigation
 
     public var errorDescription: String? {
         switch self {
@@ -51,7 +50,6 @@ public enum AssessmentError: LocalizedError {
         case let .failed(engine, msg): "\(engine.name) stopped: \(msg)"
         case .timedOut: "The assessment took longer than the time limit and was stopped."
         case let .noStructuredOutput(engine, msg): "\(engine.name) did not return a valid score card. \(msg)"
-        case .incompleteInvestigation: "The investigation is incomplete. Unread records were not counted as zero points. Your saved scores were kept."
         }
     }
 }
@@ -110,7 +108,7 @@ public final class Assessor: Sendable {
         let remainingReading = options.wrapUpAfter - Date().timeIntervalSince(started)
         let readingTarget = min(Self.digestCount(packDir), AssessmentOptions.readingTarget)
         // One focused continuation uses only the original remaining reading budget, never a fresh deadline.
-        let incomplete = (try? card.validateCompletedInvestigation()) == nil
+        let incomplete = !card.hasCompletedInvestigation
         if !raw.wrappedUp, remainingReading > 1, !unknown.isEmpty,
            card.scope.sessionsExamined < readingTarget || incomplete {
             onProgress(.thinking("Continuing investigation of unverified practices before the reading deadline."))
@@ -127,7 +125,7 @@ public final class Assessor: Sendable {
                 target until that evidence pass is complete or the app sends its reading-stop message. No new time budget
                 is granted. Then return the complete card under the existing rubric and schema, with cumulative unique
                 sessions examined and honest remaining limits. Keep observed Low practice distinct from Unknown and omit numeric scores. For every Unknown, report scope.unknownInvestigations
-                honestly; incomplete or inaccessible investigation cannot be finalized as a zero-point judgment.
+                honestly and describe the investigation limits without discarding the inspected evidence.
                 """, schema: JSONSchema.scoreCard(for: options.engine), packDir: packDir, sources: sources,
                 options: rest, forkSessionID: previous.sessionID, wrapUp: (remainingReading, Self.wrapUpPrompt),
                 onProgress: onProgress)
@@ -135,8 +133,6 @@ public final class Assessor: Sendable {
             raw.costUSD = previous.costUSD.flatMap { first in raw.costUSD.map { first + $0 } }
             raw.turns = previous.turns.flatMap { first in raw.turns.map { first + $0 } }
         }
-        do { try card.validateCompletedInvestigation() }
-        catch { throw AssessmentError.incompleteInvestigation }
         card = try card.hidingUserPaths()
         raw.elapsed = Date().timeIntervalSince(started)
         card.scope.elapsedMinutes = (raw.elapsed / 60 * 10).rounded() / 10
@@ -393,8 +389,8 @@ public final class Assessor: Sendable {
         Return every competency's exact ID, two-sentence personal summary, four-part explanation and supported solution.
         For every Unknown, return a scope.unknownInvestigations entry naming its dimension and competencyID, actual
         searches, remainingLeads, and status. Use not_found only after targeted accessible leads were exhausted. Use
-        incomplete for unread identified leads or research cut short, and unavailable for an access obstacle. The app
-        rejects incomplete/unavailable investigations instead of saving a zero score; do not disguise them as not_found.
+        incomplete for unread identified leads or research cut short, and unavailable for an access obstacle.
+        Return the card with those honest investigation limits; do not disguise them as not_found.
         Show only project names and relevant project-relative paths. Never print personal home-directory prefixes.
         Planning also returns its sources and High/Medium/Low criteria. Every dimension has status scored.
         Omit numeric scores: the app calculates them with equal competency weights, High=1, Medium=2/3, Low=1/3,
@@ -631,8 +627,8 @@ public final class Assessor: Sendable {
         passages inspected using project names, relevant relative paths, or session IDs. Do not copy a generic claim of
         exhaustive research. not_found requires exhausted accessible leads with no supported level and no remainingLeads.
         Use incomplete if relevant leads remain unread or time ran out; use unavailable if needed records could not be
-        accessed. These states are not personal failures and the app will not save a zero-point card from them. Never
-        pretend investigation is complete to force a valid result. Preserve any already established High/Medium/Low.
+        accessed. Return the card with those honest investigation limits. Never pretend investigation is complete
+        to force a valid result. Preserve any already established High/Medium/Low.
         - `scope`: assessedAt is today's date; recordDates covers each tool. Give honest sessionsExamined/tasksCheckedInDetail
         and elapsedMinutes=0 (the app measures it). Put reading shortfalls, selection limits, project screening, and
         inapplicability reasons in limits. Do not add a calculation audit.

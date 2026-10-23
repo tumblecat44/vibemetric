@@ -167,9 +167,9 @@ struct CompetencyScoringTests {
         #expect(args.contains(engine == .claude ? "--resume\n\(CLIFixture.sessionID)\n--fork-session" : "fork\n\(CLIFixture.sessionID)"))
     }
 
-    @Test func unknownRequiresCompletedTargetedSearchWithoutUnreadLeads() throws {
+    @Test func investigationCompletionSignalPreservesContinuationCriteria() throws {
         let original = try card()
-        try original.validateCompletedInvestigation()
+        #expect(original.hasCompletedInvestigation)
         for mode in 0..<5 {
             var result = original
             switch mode {
@@ -179,12 +179,12 @@ struct CompetencyScoringTests {
             case 3: result.scope.unknownInvestigations![0].remainingLeads = ["An identified fictional continuation is unread."]
             default: result.scope.unknownInvestigations![0].searches = []
             }
-            #expect(throws: ScoreCard.ScoringError.self) { try result.validateCompletedInvestigation() }
+            #expect(!result.hasCompletedInvestigation)
         }
     }
 
     @Test(arguments: AssessmentEngine.allCases)
-    func unfinishedInvestigationCannotBecomeASavedZeroScore(_ engine: AssessmentEngine) async throws {
+    func unfinishedInvestigationReturnsScoreCard(_ engine: AssessmentEngine) async throws {
         let fixture = try CLIFixture()
         defer { fixture.remove() }
         let file = fixture.directory.appendingPathComponent("fixture-card.json")
@@ -192,11 +192,11 @@ struct CompetencyScoringTests {
         input.scope.unknownInvestigations![0].status = .incomplete
         input.scope.unknownInvestigations![0].remainingLeads = ["A fictional related session was not opened."]
         try JSONEncoder().encode(input).write(to: file)
-        do {
-            _ = try await Assessor(installation: CLIInstallation(executable: fixture.command))
-                .run(packDir: fixture.directory, sources: [], options: AssessmentOptions(engine: engine)) { _ in }
-            Issue.record("An unfinished investigation must not return a score card.")
-        } catch AssessmentError.incompleteInvestigation { }
+        let outcome = try await Assessor(installation: CLIInstallation(executable: fixture.command))
+            .run(packDir: fixture.directory, sources: [], options: AssessmentOptions(engine: engine)) { _ in }
+        #expect(outcome.card.knownTotal == 68)
+        #expect(outcome.card.scope.unknownInvestigations?[0].status == .incomplete)
+        #expect(outcome.card.scope.unknownInvestigations?[0].remainingLeads == input.scope.unknownInvestigations?[0].remainingLeads)
     }
 
     @Test func reportTextHidesPersonalHomePrefixesWithoutChangingScoresOrSourceURLs() throws {
