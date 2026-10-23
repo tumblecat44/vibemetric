@@ -387,7 +387,7 @@ public final class Assessor: Sendable {
         Time is up for reading. Do not read any more files. Return the complete score card matching the schema
         from the evidence already inspected. Judge every competency as high, medium, low, or unknown.
         Preserve any level already established; missing higher-level proof does not erase confirmed partial practice.
-        Low includes deficient practice or confirmed non-practice at an observed relevant opportunity.
+        Low means low-level practice where the competency applies: absent, minimal, ineffective, or wrong.
         Apply the rubric's shared Unknown handling rule to the inspected material. Explain any investigation cut short
         by the deadline without discarding the evidence already available.
         Return every competency's exact ID, two-sentence personal summary, four-part explanation and supported solution.
@@ -402,10 +402,10 @@ public final class Assessor: Sendable {
         Judge each competency from as many relevant tasks as the reading budget allows, including tasks where the
         practice was partial or missing, not only the first task that shows it.
         Apply the rubric's task aggregation: K=H+M+L excludes Unknown tasks. K=0 means Unknown; otherwise use the
-        most frequent level. Ties return Medium, and High also requires H/K >= 50%. Use exact fractions.
+        most frequent level. Ties return Medium, and High also requires H/K >= 2/3. Use exact fractions.
         In each overallJudgment, give all three counts and percentages, including zeros, with a representative
         actual directory/task and defining behavior for every nonzero group. State in everyday language which
-        level recurred most and, for High, whether it reached 50%. With no rated tasks, explain the evidence limit
+        level recurred most and, for High, whether it reached two thirds. With no rated tasks, explain the evidence limit
         without percentages or invented cases. Keep internal variable notation out of displayed prose.
         Summaries name the actual directory, task, explicit person or AI actor, and supported result.
         Keep every explanation in its existing field; do not add a task array or helper properties.
@@ -437,13 +437,15 @@ public final class Assessor: Sendable {
         invoke StructuredOutput or return the final card only after that evidence pass, or when the app explicitly ends
         reading. If the app sends the reading-stop message first, use only what you already inspected and report the shortfall.
 
+        Read steadily until the reading target is met or the app sends its reading-stop message. Keep issuing
+        read and search calls in small batches and note brief judgments as you go; do not pause for long stretches
+        of reasoning without reading new sessions. Compose the card only after the evidence pass.
         The pack has \(digestCount) digests. Read \(min(digestCount, AssessmentOptions.readingTarget) == digestCount ? "all of them" : "about \(AssessmentOptions.readingTarget) of them"), batching independent reads across projects, tools, and dates.
         Prioritize changed sessions in `changes.md` when present, then leads for every dimension, including contrary cases.
         Read relevant requests, then-effective guidance, actions, and results; connect continuing sessions for one outcome.
         Digests provide breadth. When a competency lacks action/result evidence there, search the original transcripts
         behind its leads and inspect the surrounding passages. Keyword matches alone are not the action or result.
-        Keep partial practice at its supported level. Deficient practice or confirmed non-practice at an observed opportunity is Low.
-        Missing keywords or truncated output do not establish missing evidence.
+        Keep partial practice at its supported level. Low-level practice where the competency applies is Low.
 
         Start with `overview.md` and `leads.md`. Use these pack files for their distinct purposes:
         - `overview.md`: tool/project/date coverage and links between saved knowledge and later sessions.
@@ -507,13 +509,13 @@ public final class Assessor: Sendable {
         If only a parent directory is recorded, use its directory name and describe the actual task there;
         do not invent a more specific directory. Do not leave a skill name to stand for an unexplained project.
         For Unknown, identify the actual inspected directory scope, follow-up searches performed, and what remains unverified.
-        For Low based on non-practice, identify the observed opportunity and actual actions showing that no attempt was made. Do not invent an action or speculate that sensitive work may have happened.
+        For Low, name the inspected task and what the low-level practice looked like there.
         A count or project name alone does not explain a case. Keep detailed rating arguments in the expanded explanation.
         - `level`: high, medium, low, or unknown. Consider all relevant inspected practice, including contrary cases.
-        Low requires observed deficient practice or non-practice at a relevant opportunity.
+        Low means low-level practice in inspected tasks where the competency applies.
         Apply the rubric's shared Unknown rule.
         Aggregate distinct inspected tasks with K=H+M+L, excluding unjudgeable tasks. If K=0, use Unknown.
-        Otherwise use the most frequent level; ties return Medium, and High also requires H/K >= 50%.
+        Otherwise use the most frequent level; ties return Medium, and High also requires H/K >= 2/3.
         Use exact fractions.
         Do not return not_applicable or drop competencies.
         - Planning `sources`: exact adopted titles/URLs with localized notes from its source basis. Use pstack Prove It Works
@@ -532,7 +534,7 @@ public final class Assessor: Sendable {
         for the other dimensions. Keep the URL inside the link destination, not on a separate line or in a reference
         list. Do not invent a URL, omit the reference metadata, or copy the example's source into unrelated competencies.
           - `criteria`: explain in complete everyday sentences what is present for High, what remains missing for
-        Medium, and what observed deficient practice or non-practice establishes Low. Preserve the competency's actual distinctions.
+        Medium, and what low-level practice looks like for Low. Preserve the competency's actual distinctions.
           - `observedBehavior`: representative actual tasks, relevant actions or missing conditions, and why each receives
         its level. Explain the concrete request/action and completion check or missing condition; a project name and
         a rating alone do not explain the case. Say who did what and when it matters for the criterion. Include a
@@ -541,7 +543,7 @@ public final class Assessor: Sendable {
           - `overallJudgment`: explain the rated task total and all three High, Medium and Low counts and
         percentages, including zero groups. Every nonzero group needs a representative actual directory/task, explicit
         actor and defining behavior in this paragraph itself. Use connected sentences, not a bare tally or task ledger.
-        Explain which level recurred most, whether High reached 50%, and Medium for ties, with
+        Explain which level recurred most, whether High reached two thirds, and Medium for ties, with
         the actual shares and resulting level. Unknown tasks do not enter these percentages. Never invent cases, counts,
         or a distribution for unread records; one intended outcome across continuations, retries and delegated pieces is
         one task. With no rated tasks, explain the targeted investigation, relevant scope, and remaining limit honestly
@@ -622,7 +624,8 @@ public final class Assessor: Sendable {
         and stating what remains unverified, null instruction/counts, empty evidence, and no invented failure or benefit.
         Use the first dimension only as a schema placeholder and one roadmap entry saying no change plan is established.
         - `followUp`: always null.
-        - `roadmap`: up to three stages; `change` and `result` are one short sentence each.
+        - `roadmap`: up to three items, each with `stage` (1, 2, 3 in order), `change`, and `result`;
+        `change` and `result` are one short sentence each.
         - `scope.unknownInvestigations`: exactly one entry per Unknown competency, otherwise an empty array. Each entry
         names dimension, competencyID, status, searches, and remainingLeads. Describe the actual targeted searches and
         passages inspected using project names, relevant relative paths, or session IDs. Do not copy a generic claim of
