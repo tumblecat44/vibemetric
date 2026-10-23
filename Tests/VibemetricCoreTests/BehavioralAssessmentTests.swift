@@ -101,9 +101,9 @@ struct BehavioralAssessmentTests {
         }
     }
 
-    @Test func all32CompetenciesNormalizeToCanonicalOrderAndMetadataWithoutChangingAIResults() throws {
+    @Test func allCompetenciesNormalizeToCanonicalOrderAndMetadataWithoutChangingAIResults() throws {
         let catalog = try RubricGuide.load()
-        #expect(catalog.dimensions.flatMap(\.competencies).count + PlanningAssessment.CompetencyID.allCases.count == 32)
+        #expect(catalog.dimensions.flatMap(\.competencies).count + PlanningAssessment.CompetencyID.allCases.count == 34)
         for guide in catalog.dimensions {
             var result = try card()
             let index = try #require(result.dimensions.firstIndex { $0.dimension == guide.dimension })
@@ -187,7 +187,7 @@ struct BehavioralAssessmentTests {
             let entryFields = try #require(entry["properties"] as? [String: Any])
             #expect(entryFields["tasks"] == nil)
             let level = try #require(entryFields["level"] as? [String: Any])
-            #expect(level["enum"] as? [String] == Level.allCases.map(\.rawValue))
+            #expect(level["enum"] as? [String] == Level.assessmentCases.map(\.rawValue))
         }
     }
 }

@@ -57,7 +57,7 @@ public enum Dimension: String, Codable, CaseIterable, Sendable, Identifiable {
         case .taskMapping: "Is big work split into the right pieces?"
         case .feedbackLoops: "Do results decide the next step?"
         case .testingEvals: "Do you check the AI's work?"
-        case .humanSteering: "Do you review and redirect the AI with clear reasons?"
+        case .humanSteering: "Do you make informed decisions, redirect AI, and reconsider your own assumptions?"
         case .security: "Is the agent limited to what each task needs?"
         case .efficiencyCost: "Do the model and effort match each task?"
         }
@@ -338,6 +338,24 @@ public struct ScoreCard: Codable, Sendable {
     }
 
     public struct Scope: Codable, Sendable {
+        public struct UnknownInvestigation: Codable, Sendable {
+            public enum Status: String, Codable, Sendable { case notFound = "not_found", unavailable, incomplete }
+            public var dimension: Dimension
+            public var competencyID: String
+            public var status: Status
+            public var searches: [String]
+            public var remainingLeads: [String]
+
+            public init(dimension: Dimension, competencyID: String, status: Status, searches: [String], remainingLeads: [String]) {
+                self.dimension = dimension
+                self.competencyID = competencyID
+                self.status = status
+                self.searches = searches
+                self.remainingLeads = remainingLeads
+            }
+
+            var key: String { "\(dimension.rawValue)/\(competencyID)" }
+        }
         public struct ToolRange: Codable, Sendable {
             public var tool: String
             public var from: String
@@ -351,6 +369,7 @@ public struct ScoreCard: Codable, Sendable {
         public var tasksCheckedInDetail: Int
         public var elapsedMinutes: Double
         public var limits: [String]
+        public var unknownInvestigations: [UnknownInvestigation]?
     }
 
     public var language: String
@@ -383,6 +402,83 @@ public struct ScoreCard: Codable, Sendable {
 
     /// The sum of the scored dimensions, before deductions.
     public var dimensionSum: Int { ordered.compactMap(\.score).reduce(0, +) }
+
+    public enum ScoringError: Error {
+        case invalidAssessments
+        case incompleteInvestigation
+    }
+
+    var unknownCompetencyKeys: Set<String> {
+        Set(ordered.flatMap { result -> [String] in
+            let ids = result.planning?.competencies.filter { $0.level == .unknown }.map { $0.id.rawValue }
+                ?? result.assessment?.competencies.filter { $0.level == .unknown }.map(\.id) ?? []
+            return ids.map { "\(result.dimension.rawValue)/\($0)" }
+        })
+    }
+
+    /// A reader's unfinished work is not a zero-point judgment about the person.
+    public func validateCompletedInvestigation() throws {
+        let reviews = scope.unknownInvestigations ?? []
+        guard Set(reviews.map(\.key)) == unknownCompetencyKeys,
+              reviews.count == unknownCompetencyKeys.count,
+              reviews.allSatisfy({ review in
+                  review.status == .notFound && review.remainingLeads.isEmpty && !review.searches.isEmpty
+                      && review.searches.allSatisfy { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+              }) else { throw ScoringError.incompleteInvestigation }
+    }
+
+    /// Keep project-relative detail while hiding personal home-directory prefixes in all report text.
+    /// Reference URLs remain exact. This also covers older saved cards and exported Markdown.
+    public func hidingUserPaths() throws -> Self {
+        let pattern = try NSRegularExpression(pattern: #"/(?:Users|home)/[^/\s]+/"#)
+        func hide(_ value: Any) -> Any {
+            if let text = value as? String {
+                if text.hasPrefix("https://") || text.hasPrefix("http://") { return text }
+                return pattern.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
+            }
+            if let array = value as? [Any] { return array.map(hide) }
+            if let object = value as? [String: Any] { return object.mapValues(hide) }
+            return value
+        }
+        let encoded = try JSONEncoder().encode(self)
+        let object = try JSONSerialization.jsonObject(with: encoded)
+        return try JSONDecoder().decode(Self.self, from: JSONSerialization.data(withJSONObject: hide(object)))
+    }
+
+    /// Only called for new assessments. Loading an older result preserves its original scoring policy.
+    public mutating func calculateCompetencyScores() throws {
+        guard dimensions.count == Dimension.allCases.count,
+              Set(dimensions.map(\.dimension)) == Set(Dimension.allCases),
+              dimensions.allSatisfy({ $0.status == .scored }) else {
+            throw ScoringError.invalidAssessments
+        }
+        let catalog = try RubricGuide.load()
+        let scores = try dimensions.map { result -> Int in
+            let levels: [PlanningAssessment.Level]
+            if result.dimension == .planningSpecs {
+                guard let planning = result.planning, result.assessment == nil else {
+                    throw ScoringError.invalidAssessments
+                }
+                try planning.validate()
+                levels = planning.competencies.map(\.level)
+            } else {
+                guard let assessment = result.assessment, result.planning == nil,
+                      let guide = catalog.guide(for: result.dimension) else {
+                    throw ScoringError.invalidAssessments
+                }
+                try assessment.validate(expectedIDs: guide.competencies.map(\.id))
+                levels = assessment.competencies.map(\.level)
+            }
+            guard levels.allSatisfy(PlanningAssessment.Level.assessmentCases.contains) else {
+                throw ScoringError.invalidAssessments
+            }
+            return Int((Double(10 * levels.reduce(0) { $0 + $1.thirds }) / Double(3 * levels.count)).rounded())
+        }
+        for index in dimensions.indices { dimensions[index].score = scores[index] }
+        deductions = nil
+        deductionAppliedTo = nil
+        scoreBeforeDeduction = nil
+    }
 
     public mutating func normalizePlanningAssessment() throws {
         guard let index = dimensions.firstIndex(where: { $0.dimension == .planningSpecs }),

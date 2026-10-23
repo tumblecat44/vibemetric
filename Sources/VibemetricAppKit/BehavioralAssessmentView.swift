@@ -11,7 +11,7 @@ struct BehavioralAssessmentView: View {
     }
 
     private var problems: [BehavioralAssessment.Competency] {
-        assessment.competencies.filter { $0.level == .medium || $0.level == .low }
+        assessment.competencies.filter { $0.level.isProblem }
     }
 
     private var unassessed: [BehavioralAssessment.Competency] {

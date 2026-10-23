@@ -31,9 +31,11 @@ struct AssessmentTests {
         defer { fixture.remove() }
         let assessor = Assessor(installation: CLIInstallation(executable: fixture.command, version: "fixture"))
         let outcome = try await assessor.run(packDir: fixture.directory, sources: [], options: AssessmentOptions(engine: engine)) { _ in }
-        #expect(outcome.card.knownTotal == 50)
-        #expect(outcome.card.dimensions.allSatisfy { $0.score == 5 })
-        let input = try JSONDecoder().decode(ScoreCard.self, from: Data(contentsOf: fixture.directory.appendingPathComponent("fixture-card.json")))
+        #expect(outcome.card.knownTotal == 68)
+        #expect(outcome.card.dimensions[0].score == 5)
+        #expect(outcome.card.dimensions.dropFirst().allSatisfy { $0.score == 7 })
+        var input = try JSONDecoder().decode(ScoreCard.self, from: Data(contentsOf: fixture.directory.appendingPathComponent("fixture-card.json")))
+        try input.calculateCompetencyScores()
         let saved = try JSONDecoder().decode(ScoreCard.self, from: outcome.rawJSON)
         #expect(saved.highlights == input.highlights)
         let encoder = JSONEncoder()
@@ -263,7 +265,7 @@ struct AssessmentTests {
     }
 }
 
-private struct CLIFixture {
+struct CLIFixture {
     static let sessionID = "11111111-1111-4111-8111-111111111111"
     static let forkID = "22222222-2222-4222-8222-222222222222"
     let directory: URL
@@ -285,6 +287,9 @@ private struct CLIFixture {
             observedBehavior: "Cedar's export request names its expected output.",
             overallJudgment: "One observed task supports the stated level; unread work is outside this judgment.")
         let levels: [PlanningAssessment.Level] = [.high, .medium, .low, .unknown]
+        card.scope.unknownInvestigations = [.init(
+            dimension: .planningSpecs, competencyID: "ambiguity_resolution", status: .notFound,
+            searches: ["Inspected fictional task records and their available continuations."], remainingLeads: [])]
         card.dimensions[0].planning = PlanningAssessment(competencies: zip(PlanningAssessment.CompetencyID.allCases, levels).map { id, level in
             PlanningAssessment.Competency(id: id, level: level, summary: "Cedar defines its export work. The acceptance check is recorded.",
                 sources: [.init(title: "Prove It Works", url: "https://raw.githubusercontent.com/cursor/plugins/main/pstack/skills/principle-prove-it-works/SKILL.md", note: "A fictional practice guide.")],

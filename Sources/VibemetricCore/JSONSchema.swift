@@ -25,7 +25,7 @@ enum JSONSchema {
         let planning = object([
             "competencies": array(object([
                 "id": ["type": "string", "enum": PlanningAssessment.CompetencyID.allCases.map(\.rawValue)],
-                "level": ["type": "string", "enum": PlanningAssessment.Level.allCases.map(\.rawValue)],
+                "level": ["type": "string", "enum": PlanningAssessment.Level.assessmentCases.map(\.rawValue)],
                 "summary": str,
                 "explanation": explanation,
                 "sources": array(object(["title": str, "url": str, "note": str])),
@@ -36,8 +36,7 @@ enum JSONSchema {
         let dimensionID: [String: Any] = ["type": "string", "enum": Dimension.allCases.map(\.rawValue)]
         let dimensionProperties: [String: Any] = [
             "dimension": dimensionID,
-            "score": ["type": ["integer", "null"], "minimum": 0, "maximum": 10],
-            "status": ["type": "string", "enum": ["scored", "not_assessable"]],
+            "status": ["type": "string", "enum": ["scored"]],
             "headline": str,
             "saw": str,
             "issueLine": str,
@@ -67,7 +66,7 @@ enum JSONSchema {
             properties["assessment"] = object([
                 "competencies": array(object([
                     "id": ["type": "string", "enum": guide.competencies.map(\.id)],
-                    "level": ["type": "string", "enum": PlanningAssessment.Level.allCases.map(\.rawValue)],
+                    "level": ["type": "string", "enum": PlanningAssessment.Level.assessmentCases.map(\.rawValue)],
                     "summary": str,
                     "explanation": explanation,
                     "solution": ["type": ["string", "null"]],
@@ -111,6 +110,13 @@ enum JSONSchema {
                 "sessionsExamined": int, "tasksCheckedInDetail": int,
                 "elapsedMinutes": ["type": "number"],
                 "limits": array(str),
+                "unknownInvestigations": array(object([
+                    "dimension": dimensionID,
+                    "competencyID": str,
+                    "status": ["type": "string", "enum": ["not_found", "unavailable", "incomplete"]],
+                    "searches": array(str),
+                    "remainingLeads": array(str),
+                ])),
             ]),
         ])
         let data = try! JSONSerialization.data(withJSONObject: schema, options: [.sortedKeys])

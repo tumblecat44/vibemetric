@@ -29,7 +29,23 @@ public struct PlanningAssessment: Codable, Sendable {
 
     public enum Level: String, Codable, CaseIterable, Sendable {
         case high, medium, low, unknown
+        // Older saved cards remain readable, but new assessments cannot return these levels.
+        case absent
         case notApplicable = "not_applicable"
+
+        public static let assessmentCases: [Self] = [.high, .medium, .low, .unknown]
+
+        public var isProblem: Bool { self == .medium || self == .low || self == .absent }
+
+        /// Integer thirds avoid rounding individual competency contributions.
+        var thirds: Int {
+            switch self {
+            case .high: 3
+            case .medium: 2
+            case .low: 1
+            case .absent, .unknown, .notApplicable: 0
+            }
+        }
 
         public func label(language: String) -> String {
             let korean = language.lowercased().hasPrefix("ko")
@@ -37,6 +53,7 @@ public struct PlanningAssessment: Codable, Sendable {
             case .high: return korean ? "상" : "High"
             case .medium: return korean ? "중" : "Medium"
             case .low: return korean ? "하" : "Low"
+            case .absent: return "Absent"
             case .unknown: return korean ? "미확인" : "Unknown"
             case .notApplicable: return korean ? "해당 없음" : "Not applicable"
             }
@@ -59,11 +76,17 @@ public struct PlanningAssessment: Codable, Sendable {
         public var high: String
         public var medium: String
         public var low: String
+        public var absent: String?
 
         public init(high: String, medium: String, low: String) {
+            self.init(high: high, medium: medium, low: low, absent: nil)
+        }
+
+        public init(high: String, medium: String, low: String, absent: String?) {
             self.high = high
             self.medium = medium
             self.low = low
+            self.absent = absent
         }
     }
 
@@ -173,7 +196,7 @@ public struct PlanningAssessment: Codable, Sendable {
                     ? "저장된 평가는 \(level)입니다. 이 이전 결과에는 판정 설명이 없습니다."
                     : "The stored rating is \(level). This older result does not include a written judgment.")
             parts.append(explanation.markdown(language: language, sources: competency.sources))
-            if [.medium, .low].contains(competency.level),
+            if competency.level.isProblem,
                let solution = competency.solution, !solution.isEmpty {
                 parts.append((korean ? "**해결 방법**\n" : "**Solution**\n") + solution)
             }

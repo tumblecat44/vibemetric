@@ -12,7 +12,7 @@ public struct AssessmentOptions: Sendable {
     public static let readingTarget = 70
     /// The person's own notes for the judge, e.g. "the demo-skill sessions were only a test".
     public var instructions: String?
-    public static let rubricVersion = "34"
+    public static let rubricVersion = "37"
     public static let maxInstructionsLength = 2000
 
     public init(engine: AssessmentEngine = .claude, model: String? = nil, instructions: String? = nil) {
@@ -43,6 +43,7 @@ public enum AssessmentError: LocalizedError {
     case failed(AssessmentEngine, String)
     case timedOut
     case noStructuredOutput(AssessmentEngine, String)
+    case incompleteInvestigation
 
     public var errorDescription: String? {
         switch self {
@@ -50,6 +51,7 @@ public enum AssessmentError: LocalizedError {
         case let .failed(engine, msg): "\(engine.name) stopped: \(msg)"
         case .timedOut: "The assessment took longer than the time limit and was stopped."
         case let .noStructuredOutput(engine, msg): "\(engine.name) did not return a valid score card. \(msg)"
+        case .incompleteInvestigation: "The investigation is incomplete. Unread records were not counted as zero points. Your saved scores were kept."
         }
     }
 }
@@ -88,18 +90,55 @@ public final class Assessor: Sendable {
                                  digestCount: Self.digestCount(packDir), engine: options.engine, instructions: options.instructions)
         var options = options
         options.timeout = min(options.timeout, AssessmentOptions.scoreTimeLimit)
-        let raw = try await runStructured(prompt: prompt, schema: JSONSchema.scoreCard(for: options.engine), packDir: packDir, sources: sources,
+        var raw = try await runStructured(prompt: prompt, schema: JSONSchema.scoreCard(for: options.engine), packDir: packDir, sources: sources,
                                           options: options, wrapUp: (options.wrapUpAfter, Self.wrapUpPrompt),
                                           onProgress: onProgress)
-        var card: ScoreCard
-        do {
-            card = try JSONDecoder().decode(ScoreCard.self, from: raw.data)
-            try card.normalizePlanningAssessment()
-            try card.normalizeBehavioralAssessments()
-            try Self.validate(card, requirePlanning: true, requireAssessments: true, requireExplanations: true)
-        } catch {
-            throw AssessmentError.noStructuredOutput(options.engine, "The response did not match the score-card format. Try again.")
+        func decodeCard(_ data: Data) throws -> ScoreCard {
+            do {
+                var card = try JSONDecoder().decode(ScoreCard.self, from: data)
+                try card.normalizePlanningAssessment()
+                try card.normalizeBehavioralAssessments()
+                try card.calculateCompetencyScores()
+                try Self.validate(card, requirePlanning: true, requireAssessments: true, requireExplanations: true)
+                return card
+            } catch {
+                throw AssessmentError.noStructuredOutput(options.engine, "The response did not match the score-card format. Try again.")
+            }
         }
+        var card = try decodeCard(raw.data)
+        let unknown = card.unknownCompetencyKeys.sorted()
+        let remainingReading = options.wrapUpAfter - Date().timeIntervalSince(started)
+        let readingTarget = min(Self.digestCount(packDir), AssessmentOptions.readingTarget)
+        // One focused continuation uses only the original remaining reading budget, never a fresh deadline.
+        let incomplete = (try? card.validateCompletedInvestigation()) == nil
+        if !raw.wrappedUp, remainingReading > 1, !unknown.isEmpty,
+           card.scope.sessionsExamined < readingTarget || incomplete {
+            onProgress(.thinking("Continuing investigation of unverified practices before the reading deadline."))
+            var rest = options
+            rest.timeout = max(options.timeout - Date().timeIntervalSince(started), 1)
+            let previous = raw
+            raw = try await runStructured(prompt: """
+                The draft returned before the reading target of \(readingTarget) sessions and still has unverified competencies:
+                \(unknown.joined(separator: ", ")).
+                Continue the existing evidence investigation, prioritizing these specific behaviors and known relevant
+                continuations. Open the actual action/result passages behind promising leads; try another eligible
+                candidate when one chain is incomplete. Preserve levels already established and do not inflate counts.
+                Do not return another card merely because the earlier draft exists. Continue toward the original reading
+                target until that evidence pass is complete or the app sends its reading-stop message. No new time budget
+                is granted. Then return the complete card under the existing rubric and schema, with cumulative unique
+                sessions examined and honest remaining limits. Keep observed Low practice distinct from Unknown and omit numeric scores. For every Unknown, report scope.unknownInvestigations
+                honestly; incomplete or inaccessible investigation cannot be finalized as a zero-point judgment.
+                """, schema: JSONSchema.scoreCard(for: options.engine), packDir: packDir, sources: sources,
+                options: rest, forkSessionID: previous.sessionID, wrapUp: (remainingReading, Self.wrapUpPrompt),
+                onProgress: onProgress)
+            card = try decodeCard(raw.data)
+            raw.costUSD = previous.costUSD.flatMap { first in raw.costUSD.map { first + $0 } }
+            raw.turns = previous.turns.flatMap { first in raw.turns.map { first + $0 } }
+        }
+        do { try card.validateCompletedInvestigation() }
+        catch { throw AssessmentError.incompleteInvestigation }
+        card = try card.hidingUserPaths()
+        raw.elapsed = Date().timeIntervalSince(started)
         card.scope.elapsedMinutes = (raw.elapsed / 60 * 10).rounded() / 10
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -346,30 +385,29 @@ public final class Assessor: Sendable {
     /// Sent to the stopped scoring session when its reading time runs out.
     static let wrapUpPrompt = """
         Time is up for reading. Do not read any more files. Return the complete score card matching the schema
-        from the evidence you already inspected. Directly judge every competency as High, Medium, Low, unknown, or
-        not_applicable, and directly assign each dimension an integer score from 0 to 10 under the rubric.
-        Return each competency's explicit `level`, two-sentence summary, four-part `explanation`, and supported solution.
-        Planning also includes its supplied sources and full criteria; other dimensions use their exact competency IDs.
-        Do not return a task-by-task array or dimension-score arithmetic audit. In each overallJudgment, report
-        the examined task counts, percentages and representative cases for High, Medium and Low. Apply the rubric's aggregate rule: High when H/K >= 80%, Low when L/K >= 50%, otherwise Medium;
-        K=H+M+L. Explain the actual percentages, thresholds and resulting level in everyday language.
-        Keep K, H/K and L/K notation and raw unknown/not_applicable codes out of displayed prose. Explain insufficient
-        evidence as "the records examined did not show enough to assess this behavior" and inapplicability as
-        "this work did not call for this behavior", with the actual reason. Never invent counts or divide by zero.
-        Each summary must name the actual project directory, the task, who acted, and the supported result.
-        Keep an explicit person or AI as the sentence subject, including in Korean. Each nonzero High/Medium/Low
-        count needs a directory/task example and its defining behavior in overallJudgment itself; do not reduce it
-        to counts alone or refer the reader to another paragraph. Whenever any tasks can be rated, give all three
-        labels separately with their counts AND percentages, including every 0 tasks (0%) group. Never combine
-        Medium and Low into "both zero" or omit a zero percentage. Do not invent examples for zero groups.
-        The first summary sentence must explicitly name the person or AI who acted; a file or skill as its subject
-        does not identify that actor. State an unverified actor honestly instead of inventing one.
-        Keep every explanation inside its existing schema field. Do not add level_note or other helper properties.
-        Explain the supported practice, variation, and remaining gaps using representative connected cases. Missing
-        coverage does not establish a personal weakness. Report the actual sessions examined and the reading shortfall.
-        Match section 3's explanation example: source recommendation, concrete level differences, actual actions,
-        and why the examined evidence supports the overall level. Keep the source name an inline Markdown link using
-        its supplied URL. Do not invent cases or add a separate reference list, bare URLs, or length quotas.
+        from the evidence already inspected. Judge every competency as high, medium, low, or unknown.
+        Preserve any level already established; missing higher-level proof does not erase confirmed partial practice.
+        Low includes deficient practice or confirmed non-practice at an observed relevant opportunity.
+        Apply the rubric's shared Unknown handling rule to the inspected material. Explain any investigation cut short
+        by the deadline without discarding the evidence already available.
+        Return every competency's exact ID, two-sentence personal summary, four-part explanation and supported solution.
+        For every Unknown, return a scope.unknownInvestigations entry naming its dimension and competencyID, actual
+        searches, remainingLeads, and status. Use not_found only after targeted accessible leads were exhausted. Use
+        incomplete for unread identified leads or research cut short, and unavailable for an access obstacle. The app
+        rejects incomplete/unavailable investigations instead of saving a zero score; do not disguise them as not_found.
+        Show only project names and relevant project-relative paths. Never print personal home-directory prefixes.
+        Planning also returns its sources and High/Medium/Low criteria. Every dimension has status scored.
+        Omit numeric scores: the app calculates them with equal competency weights, High=1, Medium=2/3, Low=1/3,
+        Unknown=0, rounding once per dimension. Never return not_applicable or not_assessable.
+        Apply the rubric's task aggregation: K=H+M+L excludes Unknown tasks. K=0 means Unknown;
+        otherwise High when H/K >= 80%, Low when L/K >= 50%, Medium otherwise. Use exact fractions.
+        In each overallJudgment, give all three counts and percentages, including zeros, with a representative
+        actual directory/task and defining behavior for every nonzero group. State the 80% High and
+        50% Low comparisons in everyday language. With no rated tasks, explain the evidence limit
+        without percentages or invented cases. Keep internal variable notation out of displayed prose.
+        Summaries name the actual directory, task, explicit person or AI actor, and supported result.
+        Keep every explanation in its existing field; do not add a task array or helper properties.
+        Match section 3's specificity and source links. Report actual sessions examined and reading shortfalls honestly.
         """
 
     static func prompt(sources: [TranscriptSource], now: Date, previousDate: Date? = nil, digestCount: Int = 0, engine: AssessmentEngine = .claude,
@@ -390,6 +428,8 @@ public final class Assessor: Sendable {
 
         ## Evidence-reading phase
 
+        Apply the rubric's shared Unknown handling rule throughout investigation.
+
         Gather the evidence before composing the card. The app's reading deadline and the time for writing the card are
         separate. Do not shorten investigation to reserve time for the answer. Continue toward the reading target below;
         invoke StructuredOutput or return the final card only after that evidence pass, or when the app explicitly ends
@@ -400,9 +440,8 @@ public final class Assessor: Sendable {
         Read relevant requests, then-effective guidance, actions, and results; connect continuing sessions for one outcome.
         Digests provide breadth. When a competency lacks action/result evidence there, search the original transcripts
         behind its leads and inspect the surrounding passages. Keyword matches alone are not the action or result.
-        Keep partial practice at its supported level. Observed absent or ineffective needed practice is Low. Unknown is
-        for evidence you cannot find or inspect well enough to judge. Missing keywords or truncated output do not establish
-        missing evidence.
+        Keep partial practice at its supported level. Deficient practice or confirmed non-practice at an observed opportunity is Low.
+        Missing keywords or truncated output do not establish missing evidence.
 
         Start with `overview.md` and `leads.md`. Use these pack files for their distinct purposes:
         - `overview.md`: tool/project/date coverage and links between saved knowledge and later sessions.
@@ -435,9 +474,8 @@ public final class Assessor: Sendable {
         # Writing phase: return the app's JSON card
 
         Use the provided schema instead of the standalone card layout. Return all ten dimensions and every competency
-        in rubric order. Judge competency levels and dimension scores directly from the relevant evidence you actually
-        read, using the rubric's behavioral descriptions and the consistency, variation, and gaps in that evidence.
-        The app preserves your levels and scores; it does not calculate them from task counts or a level-to-points formula.
+        in rubric order. Judge competency levels from the relevant evidence you actually read, using the rubric's behavioral descriptions. The app, not AI, assigns numeric scores from those levels.
+        Return the levels, not numeric scores. The app calculates each dimension using the shared equal-weight formula.
         Do not return a task-by-task ledger or dimension-score calculation audit. Put the concise task distribution,
         threshold explanation and representative cases in each competency's overallJudgment. Keep representative cases in the
         explanations. No desired grade or total is a target. A favorable fragment does not establish High, and an
@@ -451,10 +489,10 @@ public final class Assessor: Sendable {
         with the exact table IDs and `id`, `level`, `summary`, `explanation`, and `solution`. The app attaches their canonical
         criteria and sources; do not generate those snapshots or source URLs for non-Planning dimensions.
 
-        Apply these content rules to every competency, including High, unknown, and not_applicable:
+        Apply these content rules to every competency, including High and Unknown:
         - `summary`: two connected everyday sentences. Describe the supported practice and its consequence, grounded in
         a representative project/task: what was wanted, what the person or AI did, and what was achieved or remains open.
-        Every summary must explicitly name the actual project directory from the inspected record's working path,
+        Every summary must name the actual project directory by its project name, without a personal home-directory prefix,
         not just a skill, tool, or feature name. Identify the task in that directory and its actor in complete sentences.
         Use an explicit subject meaning "you" or "AI", including in Korean; a directory followed by subjectless verbs
         such as "changed", "saved" or "chose" is incomplete. Use this structure in the person's language:
@@ -462,17 +500,17 @@ public final class Assessor: Sendable {
         The first sentence must explicitly name that person or AI; a passive sentence about a skill or file being
         updated is insufficient. Keep the actor explicit in every sentence describing an action. If the record does
         not establish who acted, explain that limit honestly instead of inventing an actor.
-        If only a parent directory is recorded, identify that directory honestly and describe the actual task there;
+        If only a parent directory is recorded, use its directory name and describe the actual task there;
         do not invent a more specific directory. Do not leave a skill name to stand for an unexplained project.
-        For unknown or not_applicable, identify the actual inspected directory scope and what is unverified or
-        inapplicable there. Do not invent an action or speculate that sensitive work may have happened.
+        For Unknown, identify the actual inspected directory scope, follow-up searches performed, and what remains unverified.
+        For Low based on non-practice, identify the observed opportunity and actual actions showing that no attempt was made. Do not invent an action or speculate that sensitive work may have happened.
         A count or project name alone does not explain a case. Keep detailed rating arguments in the expanded explanation.
-        - `level`: your overall High, Medium, Low, unknown, or not_applicable judgment for this competency. Consider all
-        relevant practice you inspected, including contrary cases, rather than choosing the most favorable example.
-        Classify the inspected connected tasks using the competency's unchanged behavioral definitions. Let K=H+M+L,
-        excluding unknown and not_applicable tasks. Set High if H/K >= 80%, Low if L/K >= 50%, otherwise Medium.
-        Use the exact fractions to decide, not rounded percentages. If K=0, use unknown unless all inspected relevant
-        opportunities are established as not_applicable. Never turn unread records or missing metadata into Low.
+        - `level`: high, medium, low, or unknown. Consider all relevant inspected practice, including contrary cases.
+        Low requires observed deficient practice or non-practice at a relevant opportunity.
+        Missing records alone do not establish Low. Apply the rubric's shared Unknown rule.
+        Aggregate distinct inspected tasks with K=H+M+L, excluding unjudgeable tasks. If K=0, use Unknown.
+        Otherwise use High when H/K >= 80%, Low when L/K >= 50%, Medium otherwise. Use exact fractions.
+        Do not return not_applicable or drop competencies.
         - Planning `sources`: exact adopted titles/URLs with localized notes from its source basis. Use pstack Prove It Works
         and Anthropic for outcomes, Anthropic for constraints/context, and Matt Pocock grilling with Anthropic for ambiguity.
         Include the supplied URL for every adopted source so the reference metadata remains complete.
@@ -489,44 +527,23 @@ public final class Assessor: Sendable {
         for the other dimensions. Keep the URL inside the link destination, not on a separate line or in a reference
         list. Do not invent a URL, omit the reference metadata, or copy the example's source into unrelated competencies.
           - `criteria`: explain in complete everyday sentences what is present for High, what remains missing for
-        Medium, and what the records establish for Low. Preserve the competency's actual distinctions.
+        Medium, and what observed deficient practice or non-practice establishes Low. Preserve the competency's actual distinctions.
           - `observedBehavior`: representative actual tasks, relevant actions or missing conditions, and why each receives
         its level. Explain the concrete request/action and completion check or missing condition; a project name and
         a rating alone do not explain the case. Say who did what and when it matters for the criterion. Include a
         supported contrasting case when it explains a mixed rating, and preserve later repairs. Use the example's
         amount of detail, without retelling the implementation history or copying fictional cases.
-          - `overallJudgment`: state the number of rated tasks and the High, Medium and Low counts and percentages,
-        including zero groups. Whenever rated tasks exist, give High, Medium and Low separately, each with both
-        its count and percentage, even 0건(0%). Do not merge zero groups or omit their percentages. Use natural
-        language, never internal variables such as K, H/K or L/K.
-        For every nonzero level, connect its count to a short representative actual directory/task, the relevant
-        action or missing condition, and why that case meets that level. Weave examples and counts into connected
-        everyday sentences, not a bare tally or a retelling of every task. Compare the High share with the 80% High
-        threshold and the Low share with the 50% Low threshold, and state the resulting level. Medium applies when
-        neither threshold is met, even if Medium is not the largest group. Tasks with insufficient evidence or no
-        relevant opportunity do not enter the percentages. Describe these limits in ordinary language with the actual
-        reason; never print the raw codes unknown or not_applicable in this paragraph. If no tasks could be rated,
-        say that the records examined did not show enough to assess this behavior, or explain why the work did not
-        call for it. Do not give meaningless zero percentages or invent a distribution in that case. Counts must come only from connected task bodies actually inspected;
-        continued sessions, retries and delegated pieces of one intended outcome are one task. Never estimate counts
-        from indexes, keyword hits, all scanned sessions, or an unread remainder. Distinguish missing coverage from Low.
-        Make this a complete standalone explanation for EVERY competency, including one-task and all-Medium cases.
-        Follow this narrative structure in the person's language, filling it only from inspected records:
-        "Of <rated task count> tasks assessed, <High count> (<High percentage>%) were High, including
-        <actual directory, task and behavior meeting High>; <Medium count> (<Medium percentage>%) were Medium,
-        including <actual directory, task and partial behavior meeting Medium>; and <Low count> (<Low percentage>%)
-        were Low, including <actual directory, task and observed failure meeting Low>. High <observed percentage>%
-        <meets or falls below> the 80% High threshold, and Low <observed percentage>% <meets or falls below>
-        the 50% Low threshold, so the overall level is <the rule's result>."
-        Add a plain-language evidence limit only when material; do not append raw status codes or zero-status tallies.
-        Replace a zero group's example with its explicit zero count AND 0% share. Do not copy these placeholders
-        or invent examples. Before returning, check all three count-percentage pairs in each rated competency and
-        the explicit actor in each summary's first sentence; repair any omission inside the existing fields.
-        In Korean, write task counts naturally with 건 and explicit actors; do not use unexplained K= notation.
-        Do not replace a case with only a project/skill name, or omit examples because they appear in observedBehavior.
-        Do not collapse different intended outcomes into one "same-model sessions" or other vague group to supply a count.
-        Count unknown and not_applicable only among inspected connected tasks; describe unread scope without estimating
-        its distribution. Put all of this in explanation.overallJudgment, never in a new field such as level_note.
+          - `overallJudgment`: explain the rated task total and all three High, Medium and Low counts and
+        percentages, including zero groups. Every nonzero group needs a representative actual directory/task, explicit
+        actor and defining behavior in this paragraph itself. Use connected sentences, not a bare tally or task ledger.
+        Explain the 80% High threshold and 50% Low threshold explicitly, with
+        the actual shares and resulting level. Unknown tasks do not enter these percentages. Never invent cases, counts,
+        or a distribution for unread records; one intended outcome across continuations, retries and delegated pieces is
+        one task. With no rated tasks, explain the targeted investigation, relevant scope, and remaining limit honestly
+        without meaningless percentages. Keep raw codes and K/H/M/L notation out of displayed prose.
+        State counts naturally with 건 in Korean and name the person or AI as actor. A project or skill name alone is not
+        an example. Do not refer the reader to observedBehavior instead of explaining the representative cases here.
+        Put all of this in explanation.overallJudgment; do not add helper properties or task arrays.
         - `solution`: one or two concrete sentences for an observed gap, saying what changes in the next relevant task and
         how it addresses that gap. Null when no useful change is supported. Missing coverage alone is not a personal defect.
 
@@ -536,6 +553,8 @@ public final class Assessor: Sendable {
 
         ## Writing and the remaining schema fields
 
+        Use only project directory names and relevant project-relative paths in all visible text. Never output an
+        absolute personal home prefix such as /Users/<name>/ or /home/<name>/, including summaries, reasons and limits.
         Write in the person's language as a colleague addressing them directly. Attribute each action or omission to its
         actual actor. Preserve subsequent corrections and valid existing procedures. Connect the intended outcome,
         entrusted work, observed action/result, and supported remaining burden. Do not invent motives, benefits, damage,
@@ -560,32 +579,31 @@ public final class Assessor: Sendable {
         Use complete everyday sentences addressed to the person, without rubric terms or unexplained technical shorthand.
         - `highlights`: up to four things the person already does well across the dimensions. One sentence each, about
         8–16 words, saying what they do and why it helps. No invented strengths; empty when none is established.
-        - `dimensions`: all ten in rubric order. Directly assign an integer `score` from 0 to 10 and `scored`
-        from the observed quality, consistency, and material gaps. Do not derive it from competency counts or fixed level
-        weights. An all-unknown dimension remains scored zero for limited confirmed coverage; use null/`not_assessable`
-        only when all competencies are established as not_applicable. Never use `not_reviewed`.
+        - `dimensions`: all ten in rubric order, every defined competency once, status scored. Omit score entirely;
+        the app calculates it from the returned levels. High=1, Medium=2/3, Low=1/3, Unknown=0; each competency
+        has weight 1/N, including Unknown. The app rounds once after the dimension sum and sums displayed scores for the total.
+        Do not remove a competency, invent a numeric grade, add deductions, or return not_assessable/not_reviewed.
           - `headline`: the concrete verdict, at most 10 words.
-          - `issueLine`: below 8, one standalone sentence of about 12–20 words summarizing the same problem as `saw`:
+          - `issueLine`: when an observed gap or coverage limit exists, one standalone sentence of about 12–20 words summarizing the same problem as `saw`:
         what happens and its supported consequence. If only coverage is missing, name that limit without inventing failure
-        or burden. Empty at 8 or above or when the dimension is not_assessable.
-          - `fixLine`: below 8, one sentence of about 10–18 words summarizing the same action as `tryThis` and the competency
+        or burden. Empty when no observed gap or coverage limit exists.
+          - `fixLine`: when a useful action is supported, one sentence of about 10–18 words summarizing the same action as `tryThis` and the competency
         solution it represents. Start with a verb and say what changes and why. For missing coverage, use only a limited
-        verification action. Empty at 8 or above, when not_assessable, or when no useful supported action exists.
+        verification action. Empty when no useful supported action exists.
           - `strengths`: up to three short supported practices in competency order; empty when none is established.
           - `saw`: the first observed useful improvement in competency order, or the specific unverified practice. Explain
         the actual problem first, what was missing, and why it mattered, without inventing burden or repeating the scoring
-        argument. Put strengths in strengths; omit labels such as "Positive:", "Gap:", and "Problem:". Empty at 10.
+        argument. Put strengths in strengths; omit labels such as "Positive:", "Gap:", and "Problem:". Empty when there is no observed gap or coverage limit.
           - `impact`: one sentence of supported remaining burden/risk, without advice or predicted benefit. Empty when none
-        is established or at 10.
+        is established or when all competencies are High.
           - `tryThis`: one concrete action starting with a verb, or a clearly limited verification action for missing
-        records. Null when unsupported or at 10.
+        records. Null when unsupported or when all competencies are High.
           - `solutionSteps`: 2–4 full plain sentences covering what/where to change, how, why, and how to check it. Each adds
-        to the title. No pasted prompts, rubric terms, or vague "consider". Empty when unsupported or at 10.
+        to the title. No pasted prompts, rubric terms, or vague "consider". Empty when unsupported or when all competencies are High.
           - `evidence`: up to three verified references with tool, full session ID, YYYY-MM-DD date, actual project, and a
         short factual note. A parent working directory is not automatically the project that was worked on.
           - `changeReason`: null without a previous card or score change; otherwise the observation/policy change explaining
         the difference. A scoring-policy change does not establish changed ability.
-        A not_assessable dimension has empty strengths/impact/steps, null tryThis, and saw explaining inapplicability.
         An all-unknown dimension describes coverage, not inability or a corrective target based on zero alone.
         - `improvement`: choose a useful supported change, not the lowest score. `title` starts with a verb, at most 10 words.
         `dimension` names that dimension. `situation` uses 2–3 connected sentences about the concrete task, what happened,
@@ -600,6 +618,13 @@ public final class Assessor: Sendable {
         Use the first dimension only as a schema placeholder and one roadmap entry saying no change plan is established.
         - `followUp`: always null.
         - `roadmap`: up to three stages; `change` and `result` are one short sentence each.
+        - `scope.unknownInvestigations`: exactly one entry per Unknown competency, otherwise an empty array. Each entry
+        names dimension, competencyID, status, searches, and remainingLeads. Describe the actual targeted searches and
+        passages inspected using project names, relevant relative paths, or session IDs. Do not copy a generic claim of
+        exhaustive research. not_found requires exhausted accessible leads with no supported level and no remainingLeads.
+        Use incomplete if relevant leads remain unread or time ran out; use unavailable if needed records could not be
+        accessed. These states are not personal failures and the app will not save a zero-point card from them. Never
+        pretend investigation is complete to force a valid result. Preserve any already established High/Medium/Low.
         - `scope`: assessedAt is today's date; recordDates covers each tool. Give honest sessionsExamined/tasksCheckedInDetail
         and elapsedMinutes=0 (the app measures it). Put reading shortfalls, selection limits, project screening, and
         inapplicability reasons in limits. Do not add a calculation audit.
@@ -614,8 +639,8 @@ extension Assessor {
         # The previous assessment
 
         Use earlier records as observational context and reassess every competency in all ten dimensions under the current \
-        behavioral descriptions. Directly judge each competency level and dimension score from the current evidence. \
-        Explain the observed scope in `scope.limits`. Distinguish unknown coverage from observed Low behavior and exclude only not_applicable competencies. \
+        behavioral descriptions. Judge each competency level from current evidence; the app calculates numeric scores. \
+        Explain the observed scope in `scope.limits`. Distinguish Unknown coverage from observed Low behavior; retain every defined competency in scoring. \
         Do not inherit numeric grades from another policy or unavailable scores from an unfinished-draft card. Explain the \
         method change separately from any change in the person's practices. Ignore a draft card's neutral authoring notices \
         when choosing an improvement or roadmap. They are not recommendations about the person's work.
@@ -626,12 +651,12 @@ extension Assessor {
         assessment time, accounting for documented changes that replaced earlier practices.
 
         For each dimension, compare those current practices with the rubric's behavioral descriptions and assign each \
-        competency's supported level and the dimension score directly. Apply the rubric's shared 80% High / 50% Low task aggregation and report its counts and cases in overallJudgment. \
-        Keep dimension scores AI-judged without a level-to-points conversion.
+        competency's supported level. Apply the rubric's shared High/Medium/Low task aggregation and explain its counts and cases in overallJudgment. \
+        The app converts the levels to equal-weight scores; do not return score.
 
         When a score differs from the previous assessment, explain in `changeReason` which current observations and remaining gaps \
-        support the new score, and whether the difference reflects a scoring-policy change. A change from calculated to \
-        AI-judged scores does not itself establish a change in practice.
+        support the new score, and whether the difference reflects a scoring-policy change. A change from AI-judged to \
+        app-calculated scores does not itself establish a change in practice.
 
         # Choosing the improvement after the previous one
 

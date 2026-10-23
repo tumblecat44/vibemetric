@@ -10,7 +10,7 @@ struct PlanningAssessmentView: View {
         assessment.ordered.filter { $0.level == .high }
     }
     private var problems: [PlanningAssessment.Competency] {
-        assessment.ordered.filter { $0.level == .medium || $0.level == .low }
+        assessment.ordered.filter { $0.level.isProblem }
     }
     private var unassessed: [PlanningAssessment.Competency] {
         assessment.ordered.filter { $0.level == .unknown || $0.level == .notApplicable }

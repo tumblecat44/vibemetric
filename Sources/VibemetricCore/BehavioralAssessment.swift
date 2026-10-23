@@ -96,7 +96,7 @@ public struct BehavioralAssessment: Codable, Sendable {
                     ? "저장된 평가는 \(level)입니다. 이 이전 결과에는 판정 설명이 없습니다."
                     : "The stored rating is \(level). This older result does not include a written judgment.")
             parts.append(explanation.markdown(language: language, sources: competency.sources))
-            if [.medium, .low].contains(competency.level),
+            if competency.level.isProblem,
                let solution = competency.solution, !solution.isEmpty {
                 parts.append((korean ? "**해결 방법**\n" : "**Solution**\n") + solution)
             }
