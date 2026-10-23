@@ -26,14 +26,16 @@ struct CompetencyScoringTests {
 
     @Test func equalWeightsIncludeUnknownAndRoundOnlyOncePerDimension() throws {
         var result = try card()
-        setLevels([.medium, .medium, .medium, .unknown], for: .contextEngineering, in: &result)
+        setLevels([.medium, .medium, .unknown], for: .contextEngineering, in: &result)
+        setLevels([.medium, .medium, .medium, .unknown], for: .toolIntegration, in: &result)
         setLevels([.medium], for: .memory, in: &result)
         setLevels([.medium, .unknown, .unknown], for: .security, in: &result)
         setLevels([.low, .low, .low, .unknown], for: .planningSpecs, in: &result)
         try result.calculateCompetencyScores()
         #expect(result.ordered[0].score == 3) // 2.5 rounds up after summing.
-        #expect(result.ordered[1].score == 5)
+        #expect(result.ordered[1].score == 4)
         #expect(result.ordered[2].score == 7) // Not 2 + 2 + 2.
+        #expect(result.ordered[3].score == 5)
         #expect(result.ordered[8].score == 2)
         #expect(result.knownTotal == result.ordered.compactMap(\.score).reduce(0, +))
         let first = try JSONEncoder().encode(result)
@@ -119,6 +121,28 @@ struct CompetencyScoringTests {
         let scores = result.dimensions.map(\.score)
         let index = result.dimensions.firstIndex { $0.dimension == .humanSteering }!
         result.dimensions[index].assessment!.competencies.removeLast()
+        #expect(throws: BehavioralAssessment.ValidationError.self) { try result.calculateCompetencyScores() }
+        #expect(result.dimensions.map(\.score) == scores)
+    }
+
+    @Test(arguments: [
+        ([Level.medium, .medium, .medium], 7),
+        ([Level.high, .medium, .low], 7),
+        ([Level.high, .medium, .unknown], 6),
+        ([Level.medium, .medium, .unknown], 4)
+    ])
+    func mergedContextUsesThreeEqualWeightsAndRejectsMissingDetails(_ entry: ([Level], Int)) throws {
+        var result = try card()
+        setLevels(entry.0, for: .contextEngineering, in: &result)
+        try result.calculateCompetencyScores()
+        let index = try #require(result.dimensions.firstIndex { $0.dimension == .contextEngineering })
+        let assessment = try #require(result.dimensions[index].assessment)
+        #expect(assessment.competencies.map(\.id) == [
+            "essential_project_context", "guidance_delivery", "guidance_upkeep"
+        ])
+        #expect(result.dimensions[index].score == entry.1)
+        let scores = result.dimensions.map(\.score)
+        result.dimensions[index].assessment!.competencies.removeFirst()
         #expect(throws: BehavioralAssessment.ValidationError.self) { try result.calculateCompetencyScores() }
         #expect(result.dimensions.map(\.score) == scores)
     }

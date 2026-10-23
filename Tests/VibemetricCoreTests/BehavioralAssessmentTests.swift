@@ -103,7 +103,7 @@ struct BehavioralAssessmentTests {
 
     @Test func allCompetenciesNormalizeToCanonicalOrderAndMetadataWithoutChangingAIResults() throws {
         let catalog = try RubricGuide.load()
-        #expect(catalog.dimensions.flatMap(\.competencies).count + PlanningAssessment.CompetencyID.allCases.count == 34)
+        #expect(catalog.dimensions.flatMap(\.competencies).count + PlanningAssessment.CompetencyID.allCases.count == 33)
         for guide in catalog.dimensions {
             var result = try card()
             let index = try #require(result.dimensions.firstIndex { $0.dimension == guide.dimension })
