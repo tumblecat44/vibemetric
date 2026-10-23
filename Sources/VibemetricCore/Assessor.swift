@@ -399,11 +399,13 @@ public final class Assessor: Sendable {
         Planning also returns its sources and High/Medium/Low criteria. Every dimension has status scored.
         Omit numeric scores: the app calculates them with equal competency weights, High=1, Medium=2/3, Low=1/3,
         Unknown=0, rounding once per dimension. Never return not_applicable or not_assessable.
-        Apply the rubric's task aggregation: K=H+M+L excludes Unknown tasks. K=0 means Unknown;
-        otherwise High when H/K >= 80%, Low when L/K >= 50%, Medium otherwise. Use exact fractions.
+        Judge each competency from as many relevant tasks as the reading budget allows, including tasks where the
+        practice was partial or missing, not only the first task that shows it.
+        Apply the rubric's task aggregation: K=H+M+L excludes Unknown tasks. K=0 means Unknown; otherwise use the
+        most frequent level. Ties return Medium, and High also requires H/K >= 50%. Use exact fractions.
         In each overallJudgment, give all three counts and percentages, including zeros, with a representative
-        actual directory/task and defining behavior for every nonzero group. State the 80% High and
-        50% Low comparisons in everyday language. With no rated tasks, explain the evidence limit
+        actual directory/task and defining behavior for every nonzero group. State in everyday language which
+        level recurred most and, for High, whether it reached 50%. With no rated tasks, explain the evidence limit
         without percentages or invented cases. Keep internal variable notation out of displayed prose.
         Summaries name the actual directory, task, explicit person or AI actor, and supported result.
         Keep every explanation in its existing field; do not add a task array or helper properties.
@@ -509,9 +511,10 @@ public final class Assessor: Sendable {
         A count or project name alone does not explain a case. Keep detailed rating arguments in the expanded explanation.
         - `level`: high, medium, low, or unknown. Consider all relevant inspected practice, including contrary cases.
         Low requires observed deficient practice or non-practice at a relevant opportunity.
-        Missing records alone do not establish Low. Apply the rubric's shared Unknown rule.
+        Apply the rubric's shared Unknown rule.
         Aggregate distinct inspected tasks with K=H+M+L, excluding unjudgeable tasks. If K=0, use Unknown.
-        Otherwise use High when H/K >= 80%, Low when L/K >= 50%, Medium otherwise. Use exact fractions.
+        Otherwise use the most frequent level; ties return Medium, and High also requires H/K >= 50%.
+        Use exact fractions.
         Do not return not_applicable or drop competencies.
         - Planning `sources`: exact adopted titles/URLs with localized notes from its source basis. Use pstack Prove It Works
         and Anthropic for outcomes, Anthropic for constraints/context, and Matt Pocock grilling with Anthropic for ambiguity.
@@ -538,7 +541,7 @@ public final class Assessor: Sendable {
           - `overallJudgment`: explain the rated task total and all three High, Medium and Low counts and
         percentages, including zero groups. Every nonzero group needs a representative actual directory/task, explicit
         actor and defining behavior in this paragraph itself. Use connected sentences, not a bare tally or task ledger.
-        Explain the 80% High threshold and 50% Low threshold explicitly, with
+        Explain which level recurred most, whether High reached 50%, and Medium for ties, with
         the actual shares and resulting level. Unknown tasks do not enter these percentages. Never invent cases, counts,
         or a distribution for unread records; one intended outcome across continuations, retries and delegated pieces is
         one task. With no rated tasks, explain the targeted investigation, relevant scope, and remaining limit honestly
