@@ -21,7 +21,7 @@ final class StatusItemController: NSObject {
         })
         // Size the popover from the panel's own fixed width, never from a long line of text.
         host.sizingOptions = [.preferredContentSize]
-        popover.contentViewController = host
+        popover.contentViewController = PanelController(host: host)
 
         if let button = item.button {
             button.target = self
@@ -126,5 +126,54 @@ private struct StatusPanelRoot: View {
             // NSPopover's own material is very see-through; a nearly solid window color keeps the text readable
             // over busy windows, in light and dark mode alike.
             .background(Color(nsColor: .windowBackgroundColor).opacity(0.94).ignoresSafeArea())
+    }
+}
+
+/// Holds the panel's SwiftUI content and takes ⌘W before the popover does: the popover would close itself, but ⌘W
+/// is meant for the main window (the File menu's Close Window), and the panel stays open.
+private final class PanelController: NSViewController {
+    private let host: NSViewController
+
+    init(host: NSViewController) {
+        self.host = host
+        super.init(nibName: nil, bundle: nil)
+        addChild(host)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    override func loadView() {
+        let container = KeyEquivalentView()
+        host.view.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(host.view)
+        NSLayoutConstraint.activate([
+            host.view.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            host.view.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            host.view.topAnchor.constraint(equalTo: container.topAnchor),
+            host.view.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+        ])
+        view = container
+    }
+
+    // Size from the SwiftUI content, as the hosting controller alone did.
+    override var preferredContentSize: NSSize {
+        get { host.preferredContentSize }
+        set { host.preferredContentSize = newValue }
+    }
+
+    override func preferredContentSizeDidChange(for viewController: NSViewController) {
+        super.preferredContentSizeDidChange(for: viewController)
+        preferredContentSize = viewController.preferredContentSize
+    }
+
+    private final class KeyEquivalentView: NSView {
+        override func performKeyEquivalent(with event: NSEvent) -> Bool {
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            if flags == .command, event.charactersIgnoringModifiers == "w" {
+                MainActor.assumeIsolated { MainWindow.close() }
+                return true
+            }
+            return super.performKeyEquivalent(with: event)
+        }
     }
 }

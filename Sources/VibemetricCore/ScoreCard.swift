@@ -136,6 +136,10 @@ public struct ScoreCard: Codable, Sendable {
         public var planning: PlanningAssessment?
         /// Direct competency ratings for the other dimensions, including the canonical guide snapshot.
         public var assessment: BehavioralAssessment?
+        /// The problem and its fix in one short line each, for the result's first screen. nil on older cards, which
+        /// show the headline and `tryThis` there instead.
+        public var issueLine: String?
+        public var fixLine: String?
 
         /// True when the card carries the short readable fields.
         public var isReadable: Bool { saw?.isEmpty == false || strengths != nil }
@@ -178,7 +182,8 @@ public struct ScoreCard: Codable, Sendable {
         public var band: Band? { score.map(Band.init(score:)) }
 
         enum CodingKeys: String, CodingKey {
-            case dimension, score, status, headline, reason, points, conclusion, evidence, changeReason, saw, strengths, impact, tryThis, solutionSteps, planning, assessment
+            case dimension, score, status, headline, reason, points, conclusion, evidence, changeReason, saw, strengths, impact, tryThis, solutionSteps,
+                 planning, assessment, issueLine, fixLine
         }
 
         public init(from decoder: Decoder) throws {
@@ -198,6 +203,8 @@ public struct ScoreCard: Codable, Sendable {
             solutionSteps = try c.decodeIfPresent([String].self, forKey: .solutionSteps)
             planning = try c.decodeIfPresent(PlanningAssessment.self, forKey: .planning)
             assessment = try c.decodeIfPresent(BehavioralAssessment.self, forKey: .assessment)
+            issueLine = try c.decodeIfPresent(String.self, forKey: .issueLine)
+            fixLine = try c.decodeIfPresent(String.self, forKey: .fixLine)
             reason = try c.decodeIfPresent(String.self, forKey: .reason)
                 ?? (points?.isEmpty == false || (saw == nil && strengths == nil)
                     ? Self.compose(points: points ?? [], conclusion: conclusion)
@@ -351,6 +358,9 @@ public struct ScoreCard: Codable, Sendable {
     /// The summary at the top of the card: 2–3 plain-language bullets. nil on cards scored before it existed;
     /// those show `diagnosis` instead.
     public var summary: [String]?
+    /// What the person does well, as up to four one-liners for the result's first screen. nil on cards scored before it
+    /// existed; the app then uses the best categories' headlines.
+    public var highlights: [String]?
     public var dimensions: [DimensionResult]
     public var improvement: Improvement
     /// nil when there was no previous card to follow up on.

@@ -33,6 +33,26 @@ struct AssessmentTests {
         let outcome = try await assessor.run(packDir: fixture.directory, sources: [], options: AssessmentOptions(engine: engine)) { _ in }
         #expect(outcome.card.knownTotal == 50)
         #expect(outcome.card.dimensions.allSatisfy { $0.score == 5 })
+        let input = try JSONDecoder().decode(ScoreCard.self, from: Data(contentsOf: fixture.directory.appendingPathComponent("fixture-card.json")))
+        let saved = try JSONDecoder().decode(ScoreCard.self, from: outcome.rawJSON)
+        #expect(saved.highlights == input.highlights)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        for (expected, actual) in zip(input.ordered, saved.ordered) {
+            #expect(actual.score == expected.score)
+            #expect(actual.issueLine == expected.issueLine)
+            #expect(actual.fixLine == expected.fixLine)
+            #expect(actual.saw == expected.saw)
+            #expect(actual.tryThis == expected.tryThis)
+            #expect(try encoder.encode(actual.planning) == encoder.encode(expected.planning))
+            for (before, after) in zip(expected.assessment?.competencies ?? [], actual.assessment?.competencies ?? []) {
+                #expect(after.id == before.id)
+                #expect(after.level == before.level)
+                #expect(after.summary == before.summary)
+                #expect(after.solution == before.solution)
+                #expect(try encoder.encode(after.explanation) == encoder.encode(before.explanation))
+            }
+        }
         #expect(outcome.sessionID == CLIFixture.sessionID)
         #expect(outcome.engine == engine)
         #expect(outcome.cliVersion == "fixture")
@@ -254,6 +274,11 @@ private struct CLIFixture {
         command = directory.appendingPathComponent("fake-cli")
         try FileManager.default.createDirectory(at: directory.appendingPathComponent("sessions"), withIntermediateDirectories: true)
         var card = try JSONDecoder().decode(ScoreCard.self, from: Data(CoreTests.sampleCard.utf8))
+        card.highlights = ["You define the export result before the AI starts.", "Your AI uses a repeatable procedure for export work."]
+        for index in card.dimensions.indices {
+            card.dimensions[index].issueLine = "Your AI's export work still needs a recorded completion check."
+            card.dimensions[index].fixLine = "Record the export check before your AI starts the next task."
+        }
         let explanation = PlanningAssessment.Explanation(
             sourceBasis: "The supplied guide connects a result to its check.",
             criteria: "A connected check is high; an unresolved check is medium; no intended result is low.",

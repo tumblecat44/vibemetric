@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.4.11 (2026-10-22)
+
+- Each engine in the Engine switch says whether it's ready: Ready, Not installed, Not signed in, or Can't start. When the selected engine can't score, Vibemetric says what's missing and gives the Terminal command to fix it, with a Copy button. If you have the Claude desktop app but not Claude Code's `claude` command, it says so plainly.
+- On a new install, Vibemetric uses whichever engine works. Once you've picked or used one, it keeps your choice.
+- Category boxes have a new layout: the name and score centered on top, the issue and the fix side by side, and a "See details" bar at the bottom that opens the full explanation.
+
+## 0.4.10 (2026-10-22)
+
+- The top of a result shows only its date, and in place of the band label, how much the score changed since your previous one (for example "↑ 7 since Oct 21"). "Few sessions were examined" moves into "About this score".
+- The toolbar keeps the same buttons in the same place on every screen; the export buttons are greyed out when no result is open.
+- The past results and deep dives lists no longer have a heading, so a click there no longer folds the list.
+
+## 0.4.9 (2026-10-22)
+
+- Each category box shows its score as dots and "6/10" on the right of its banner, in place of the icon.
+- New scores write "What you're doing well" and each box's issue and fix as plain, complete sentences, without shorthand.
+
+## 0.4.8 (2026-10-22)
+
+- A simpler result screen: your score, what you're doing well, and one box per category with its score, a one-line issue and a one-line fix. Click a box to see the full explanation, evidence and steps. New scores write these short lines; older results use their existing text.
+
+## 0.4.7 (2026-10-22)
+
+- ⌘W closes the main window and leaves the menu bar panel open, even when the panel is in front. Esc or a click elsewhere still closes the panel.
+
 ## 0.4.6 (2026-10-20)
 
 - The sidebar keeps its width when you make the window smaller: the score card narrows instead, and the window stops shrinking once the card reaches its minimum. The sidebar never gets narrower than its minimum and can be dragged much wider than before.

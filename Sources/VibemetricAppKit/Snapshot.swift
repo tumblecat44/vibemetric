@@ -45,9 +45,15 @@ enum Snapshot {
                 try render(view, scheme: scheme).write(to: dir.appendingPathComponent("card-\(scheme == .light ? "light" : "dark").png"))
             }
             // The same card with every category collapsed, as people first see it.
-            let collapsed = CardContent(record: record, baseline: baseline, expandAll: false)
-                .frame(width: 860).background(Theme.paper).environment(\.colorScheme, .light)
-            try render(collapsed, scheme: .light).write(to: dir.appendingPathComponent("card-collapsed-light.png"))
+            // VIBEMETRIC_SNAPSHOT_TEXT_SCALE=1.75 renders the collapsed card at that text size (View > text size).
+            let textScale = env["VIBEMETRIC_SNAPSHOT_TEXT_SCALE"].flatMap(Double.init).map { CGFloat($0) } ?? 1
+            for scheme in [ColorScheme.light, .dark] {
+                let collapsed = CardContent(record: record, baseline: baseline, expandAll: false)
+                    .environment(\.textScale, textScale)
+                    .frame(width: 860 * max(1, textScale)).background(Theme.paper).environment(\.colorScheme, scheme)
+                try render(collapsed, scheme: scheme)
+                    .write(to: dir.appendingPathComponent("card-collapsed-\(scheme == .light ? "light" : "dark").png"))
+            }
             if let share = ShareCard.png(card: card, date: Date()) { try share.write(to: dir.appendingPathComponent("share.png")) }
             // The menu bar panel for the same card, in a throwaway preferences domain.
             let suite = "vibemetric-snapshot-\(UUID())"
@@ -71,6 +77,23 @@ enum Snapshot {
                     let running = RunningView().environment(model).frame(width: 860, height: 520).background(Theme.paper)
                         .environment(\.colorScheme, scheme)
                     try render(running, scheme: scheme).write(to: dir.appendingPathComponent("running-\(scheme == .light ? "light" : "dark").png"))
+                }
+                // The start screen when Claude Code can't score: not installed (Codex ready), then signed out.
+                let codex = CLIInstallation(executable: URL(fileURLWithPath: "/usr/local/bin/codex"), version: "codex-cli 0.163.0")
+                let claude = CLIInstallation(executable: URL(fileURLWithPath: "/usr/local/bin/claude"), version: "2.1.308 (Claude Code)")
+                model.selected = nil
+                model.engine = .claude
+                for (label, checks) in [("missing", [(AssessmentEngine.claude, CLIInstallation?.none, Bool?.none, String?.none),
+                                                     (.codex, codex, true, nil)]),
+                                        ("signedout", [(.claude, claude, false, nil), (.codex, nil, nil, nil)])] {
+                    model.applyEngineChecks(checks)
+                    for scheme in [ColorScheme.light, .dark] {
+                        // The picker alone: ImageRenderer leaves a ScrollView, and so all of HomeView, blank.
+                        let home = AssessmentEnginePicker(compact: true, showsDetails: false).environment(model)
+                            .padding(24).frame(width: 760).background(Theme.paper)
+                            .environment(\.colorScheme, scheme)
+                        try render(home, scheme: scheme).write(to: dir.appendingPathComponent("home-\(label)-\(scheme == .light ? "light" : "dark").png"))
+                    }
                 }
                 defaults.removePersistentDomain(forName: suite)
             }

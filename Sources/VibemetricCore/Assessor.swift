@@ -496,11 +496,22 @@ public final class Assessor: Sendable {
         specific unverified coverage. Do not turn unknown evidence into a weakness.
         - top-level `summary`: 2–3 short strings without bullet characters, at most 15 words each. Give what works, the
         observed problem or coverage limit, and a supported next action in everyday language.
+        - `highlights`, `issueLine`, and `fixLine` appear on the new summary screen. Summarize the same supported
+        practices and gaps explained in the competency details; do not introduce a different finding or recommendation.
+        Use complete everyday sentences addressed to the person, without rubric terms or unexplained technical shorthand.
+        - `highlights`: up to four things the person already does well across the dimensions. One sentence each, about
+        8–16 words, saying what they do and why it helps. No invented strengths; empty when none is established.
         - `dimensions`: all ten in rubric order. Directly assign an integer `score` from 0 to 10 and `scored`
         from the observed quality, consistency, and material gaps. Do not derive it from competency counts or fixed level
         weights. An all-unknown dimension remains scored zero for limited confirmed coverage; use null/`not_assessable`
         only when all competencies are established as not_applicable. Never use `not_reviewed`.
           - `headline`: the concrete verdict, at most 10 words.
+          - `issueLine`: below 8, one standalone sentence of about 12–20 words summarizing the same problem as `saw`:
+        what happens and its supported consequence. If only coverage is missing, name that limit without inventing failure
+        or burden. Empty at 8 or above or when the dimension is not_assessable.
+          - `fixLine`: below 8, one sentence of about 10–18 words summarizing the same action as `tryThis` and the competency
+        solution it represents. Start with a verb and say what changes and why. For missing coverage, use only a limited
+        verification action. Empty at 8 or above, when not_assessable, or when no useful supported action exists.
           - `strengths`: up to three short supported practices in competency order; empty when none is established.
           - `saw`: the first observed useful improvement in competency order, or the specific unverified practice. Explain
         the actual problem first, what was missing, and why it mattered, without inventing burden or repeating the scoring

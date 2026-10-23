@@ -1,6 +1,17 @@
 import SwiftUI
 import VibemetricCore
 
+/// The app's one main window (the `Window` scene with id "main").
+@MainActor
+enum MainWindow {
+    /// The main window, while it's on screen.
+    static var visible: NSWindow? {
+        NSApp.windows.first { $0.isVisible && $0.identifier?.rawValue.contains("main") == true }
+    }
+
+    static func close() { visible?.performClose(nil) }
+}
+
 /// Keeps Vibemetric running in the menu bar after its window is closed.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
@@ -9,8 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `hasVisibleWindows` counts helper windows (status item, popover), so check the main window itself.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         MainActor.assumeIsolated {
-            let mainVisible = NSApp.windows.contains { $0.isVisible && $0.identifier?.rawValue.contains("main") == true }
-            if !mainVisible { AppModel.shared?.showMainWindow(selectLatest: false) }
+            if MainWindow.visible == nil { AppModel.shared?.showMainWindow(selectLatest: false) }
         }
         return true
     }
@@ -74,6 +84,12 @@ public struct VibemetricMain: App {
             CommandGroup(replacing: .appSettings) {
                 Button("Settings…") { model.showSettings() }
                     .keyboardShortcut(",")
+            }
+            // ⌘W closes the main window, even while the menu bar panel is the active window; the panel stays open
+            // until it's dismissed (a click elsewhere, Esc, or the menu bar item).
+            CommandGroup(replacing: .saveItem) {
+                Button("Close Window") { MainWindow.close() }
+                    .keyboardShortcut("w")
             }
             TextScaleCommands()
         }
@@ -161,6 +177,8 @@ struct RootView: View {
                     HomeView()
                 }
             }
+            // The same buttons on every screen, so the toolbar never changes height or layout.
+            .toolbar { CardExportToolbar(record: exportableRecord) }
             // A small ideal width, so the split view lets the detail shrink to its minimum before anything else.
             .frame(minWidth: Self.detailMinWidth, idealWidth: Self.detailMinWidth, maxWidth: .infinity)
             .navigationSplitViewColumnWidth(min: Self.detailMinWidth, ideal: 860)
@@ -175,11 +193,18 @@ struct RootView: View {
 }
 
 extension RootView {
+    /// The result the toolbar's export buttons act on: the one on screen in the General tab.
+    var exportableRecord: CardRecord? {
+        guard !model.showsSettings, !Extensions.sidebarTabs.contains(where: { $0.id == model.sidebarTab }) else { return nil }
+        return model.selected
+    }
+
     /// The score history: new assessment, the run in progress, past results.
     var generalList: some View {
         @Bindable var model = model
         return List(selection: $model.selected) {
-            Section(model.history.isEmpty ? "" : "Past results") {
+            // No header: a sidebar section header folds the list when clicked.
+            Section {
                 // "Run my score" sits above the newest result, the same size as a result row.
                 // While a run is going, the in-progress row takes its place.
                 if !model.isRunning {
@@ -276,7 +301,8 @@ struct RunMyScoreRow: View {
     }
 
     private var subtitle: String {
-        if model.installations[model.engine] == nil { return "Set up \(model.engine.name) first" }
+        if let problem = model.engineProblem { return problem }
+        if model.installations[model.engine] == nil { return "Checking \(model.engine.name)…" }
         if let reason = Extensions.currentBusyReason { return reason }
         return "\(model.engine.name) · about 5 minutes"
     }

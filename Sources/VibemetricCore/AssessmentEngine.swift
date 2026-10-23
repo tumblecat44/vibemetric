@@ -11,6 +11,22 @@ public enum AssessmentEngine: String, Codable, CaseIterable, Identifiable, Senda
     public var setupURL: URL {
         URL(string: self == .claude ? "https://claude.com/code" : "https://developers.openai.com/codex/cli")!
     }
+    /// The Terminal command that installs the command-line tool scoring runs.
+    public var installCommand: String {
+        self == .claude ? "curl -fsSL https://claude.ai/install.sh | bash" : "npm install -g @openai/codex"
+    }
+    /// The Terminal command that signs the command-line tool in.
+    public var signInCommand: String { self == .claude ? "claude auth login" : "codex login" }
+    /// The maker's desktop app. Having it isn't enough for Claude: its Claude Code isn't the `claude` command.
+    public var desktopAppName: String { self == .claude ? "Claude" : "ChatGPT" }
+
+    /// Whether the maker's desktop app is installed, so a missing command can be explained in those terms.
+    public var hasDesktopApp: Bool {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return ["/Applications", "\(home)/Applications"].contains {
+            FileManager.default.fileExists(atPath: "\($0)/\(desktopAppName).app")
+        }
+    }
 }
 
 public struct CLIInstallation: Sendable {
@@ -124,5 +140,33 @@ public enum CLILocator {
         var directory: ObjCBool = false
         return path.hasPrefix("/") && FileManager.default.fileExists(atPath: path, isDirectory: &directory)
             && !directory.boolValue && FileManager.default.isExecutableFile(atPath: path)
+    }
+}
+
+/// Whether a found command-line tool is signed in, asked the tool itself in a few seconds.
+public enum CLISignIn {
+    /// False only when the tool clearly reports no sign-in; nil when it can't tell (an older version, a timeout,
+    /// or a setup it doesn't describe), so an unclear answer never blocks scoring.
+    public static func isSignedIn(_ engine: AssessmentEngine, _ installation: CLIInstallation) async -> Bool? {
+        let arguments = engine == .claude ? ["auth", "status", "--json"] : ["login", "status"]
+        guard let output = try? await CLIProcess().run(executable: installation.executable, arguments: arguments,
+                                                      environment: installation.environment, timeout: 8) else { return nil }
+        let text = String(decoding: output.stdout + output.stderr, as: UTF8.self)
+        return engine == .claude ? claudeSignedIn(output.stdout) : codexSignedIn(status: output.status, output: text)
+    }
+
+    /// `claude auth status --json` reports `loggedIn`, and `authMethod` "none" when nothing at all is set up.
+    static func claudeSignedIn(_ json: Data) -> Bool? {
+        guard let object = try? JSONSerialization.jsonObject(with: json) as? [String: Any],
+              let loggedIn = object["loggedIn"] as? Bool else { return nil }
+        if loggedIn { return true }
+        return (object["authMethod"] as? String) == "none" ? false : nil
+    }
+
+    /// `codex login status` prints "Logged in using …" or "Not logged in".
+    static func codexSignedIn(status: Int32, output: String) -> Bool? {
+        if output.localizedCaseInsensitiveContains("not logged in") { return false }
+        if status == 0, output.localizedCaseInsensitiveContains("logged in") { return true }
+        return nil
     }
 }
