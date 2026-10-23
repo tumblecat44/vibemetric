@@ -12,7 +12,7 @@ public struct AssessmentOptions: Sendable {
     public static let readingTarget = 70
     /// The person's own notes for the judge, e.g. "the demo-skill sessions were only a test".
     public var instructions: String?
-    public static let rubricVersion = "33"
+    public static let rubricVersion = "34"
     public static let maxInstructionsLength = 2000
 
     public init(engine: AssessmentEngine = .claude, model: String? = nil, instructions: String? = nil) {
@@ -350,7 +350,21 @@ public final class Assessor: Sendable {
         not_applicable, and directly assign each dimension an integer score from 0 to 10 under the rubric.
         Return each competency's explicit `level`, two-sentence summary, four-part `explanation`, and supported solution.
         Planning also includes its supplied sources and full criteria; other dimensions use their exact competency IDs.
-        Do not return a task-by-task array, task-frequency tally, percentage threshold, or arithmetic audit.
+        Do not return a task-by-task array or dimension-score arithmetic audit. In each overallJudgment, report
+        the examined task counts, percentages and representative cases for High, Medium and Low. Apply the rubric's aggregate rule: High when H/K >= 80%, Low when L/K >= 50%, otherwise Medium;
+        K=H+M+L. Explain the actual percentages, thresholds and resulting level in everyday language.
+        Keep K, H/K and L/K notation and raw unknown/not_applicable codes out of displayed prose. Explain insufficient
+        evidence as "the records examined did not show enough to assess this behavior" and inapplicability as
+        "this work did not call for this behavior", with the actual reason. Never invent counts or divide by zero.
+        Each summary must name the actual project directory, the task, who acted, and the supported result.
+        Keep an explicit person or AI as the sentence subject, including in Korean. Each nonzero High/Medium/Low
+        count needs a directory/task example and its defining behavior in overallJudgment itself; do not reduce it
+        to counts alone or refer the reader to another paragraph. Whenever any tasks can be rated, give all three
+        labels separately with their counts AND percentages, including every 0 tasks (0%) group. Never combine
+        Medium and Low into "both zero" or omit a zero percentage. Do not invent examples for zero groups.
+        The first summary sentence must explicitly name the person or AI who acted; a file or skill as its subject
+        does not identify that actor. State an unverified actor honestly instead of inventing one.
+        Keep every explanation inside its existing schema field. Do not add level_note or other helper properties.
         Explain the supported practice, variation, and remaining gaps using representative connected cases. Missing
         coverage does not establish a personal weakness. Report the actual sessions examined and the reading shortfall.
         Match section 3's explanation example: source recommendation, concrete level differences, actual actions,
@@ -424,7 +438,8 @@ public final class Assessor: Sendable {
         in rubric order. Judge competency levels and dimension scores directly from the relevant evidence you actually
         read, using the rubric's behavioral descriptions and the consistency, variation, and gaps in that evidence.
         The app preserves your levels and scores; it does not calculate them from task counts or a level-to-points formula.
-        Do not return a task-by-task ledger, percentage tally, or calculation audit. Keep representative cases in the
+        Do not return a task-by-task ledger or dimension-score calculation audit. Put the concise task distribution,
+        threshold explanation and representative cases in each competency's overallJudgment. Keep representative cases in the
         explanations. No desired grade or total is a target. A favorable fragment does not establish High, and an
         unverified higher level does not erase a level already established.
 
@@ -439,10 +454,25 @@ public final class Assessor: Sendable {
         Apply these content rules to every competency, including High, unknown, and not_applicable:
         - `summary`: two connected everyday sentences. Describe the supported practice and its consequence, grounded in
         a representative project/task: what was wanted, what the person or AI did, and what was achieved or remains open.
+        Every summary must explicitly name the actual project directory from the inspected record's working path,
+        not just a skill, tool, or feature name. Identify the task in that directory and its actor in complete sentences.
+        Use an explicit subject meaning "you" or "AI", including in Korean; a directory followed by subjectless verbs
+        such as "changed", "saved" or "chose" is incomplete. Use this structure in the person's language:
+        "In <actual directory>, <you or AI> <did the named task>. <Supported result or remaining limitation>."
+        The first sentence must explicitly name that person or AI; a passive sentence about a skill or file being
+        updated is insufficient. Keep the actor explicit in every sentence describing an action. If the record does
+        not establish who acted, explain that limit honestly instead of inventing an actor.
+        If only a parent directory is recorded, identify that directory honestly and describe the actual task there;
+        do not invent a more specific directory. Do not leave a skill name to stand for an unexplained project.
+        For unknown or not_applicable, identify the actual inspected directory scope and what is unverified or
+        inapplicable there. Do not invent an action or speculate that sensitive work may have happened.
         A count or project name alone does not explain a case. Keep detailed rating arguments in the expanded explanation.
         - `level`: your overall High, Medium, Low, unknown, or not_applicable judgment for this competency. Consider all
         relevant practice you inspected, including contrary cases, rather than choosing the most favorable example.
-        Explain material variation qualitatively. Do not count tasks or apply frequency thresholds to choose the level.
+        Classify the inspected connected tasks using the competency's unchanged behavioral definitions. Let K=H+M+L,
+        excluding unknown and not_applicable tasks. Set High if H/K >= 80%, Low if L/K >= 50%, otherwise Medium.
+        Use the exact fractions to decide, not rounded percentages. If K=0, use unknown unless all inspected relevant
+        opportunities are established as not_applicable. Never turn unread records or missing metadata into Low.
         - Planning `sources`: exact adopted titles/URLs with localized notes from its source basis. Use pstack Prove It Works
         and Anthropic for outcomes, Anthropic for constraints/context, and Matt Pocock grilling with Anthropic for ambiguity.
         Include the supplied URL for every adopted source so the reference metadata remains complete.
@@ -465,9 +495,38 @@ public final class Assessor: Sendable {
         a rating alone do not explain the case. Say who did what and when it matters for the criterion. Include a
         supported contrasting case when it explains a mixed rating, and preserve later repairs. Use the example's
         amount of detail, without retelling the implementation history or copying fictional cases.
-          - `overallJudgment`: explain why the observed practice as a whole supports the resulting level. Connect the
-        representative cases, material variation, and remaining gaps to the behavioral definition. State the level
-        without a task-count tally or percentage calculation. Distinguish missing coverage from observed limitations.
+          - `overallJudgment`: state the number of rated tasks and the High, Medium and Low counts and percentages,
+        including zero groups. Whenever rated tasks exist, give High, Medium and Low separately, each with both
+        its count and percentage, even 0건(0%). Do not merge zero groups or omit their percentages. Use natural
+        language, never internal variables such as K, H/K or L/K.
+        For every nonzero level, connect its count to a short representative actual directory/task, the relevant
+        action or missing condition, and why that case meets that level. Weave examples and counts into connected
+        everyday sentences, not a bare tally or a retelling of every task. Compare the High share with the 80% High
+        threshold and the Low share with the 50% Low threshold, and state the resulting level. Medium applies when
+        neither threshold is met, even if Medium is not the largest group. Tasks with insufficient evidence or no
+        relevant opportunity do not enter the percentages. Describe these limits in ordinary language with the actual
+        reason; never print the raw codes unknown or not_applicable in this paragraph. If no tasks could be rated,
+        say that the records examined did not show enough to assess this behavior, or explain why the work did not
+        call for it. Do not give meaningless zero percentages or invent a distribution in that case. Counts must come only from connected task bodies actually inspected;
+        continued sessions, retries and delegated pieces of one intended outcome are one task. Never estimate counts
+        from indexes, keyword hits, all scanned sessions, or an unread remainder. Distinguish missing coverage from Low.
+        Make this a complete standalone explanation for EVERY competency, including one-task and all-Medium cases.
+        Follow this narrative structure in the person's language, filling it only from inspected records:
+        "Of <rated task count> tasks assessed, <High count> (<High percentage>%) were High, including
+        <actual directory, task and behavior meeting High>; <Medium count> (<Medium percentage>%) were Medium,
+        including <actual directory, task and partial behavior meeting Medium>; and <Low count> (<Low percentage>%)
+        were Low, including <actual directory, task and observed failure meeting Low>. High <observed percentage>%
+        <meets or falls below> the 80% High threshold, and Low <observed percentage>% <meets or falls below>
+        the 50% Low threshold, so the overall level is <the rule's result>."
+        Add a plain-language evidence limit only when material; do not append raw status codes or zero-status tallies.
+        Replace a zero group's example with its explicit zero count AND 0% share. Do not copy these placeholders
+        or invent examples. Before returning, check all three count-percentage pairs in each rated competency and
+        the explicit actor in each summary's first sentence; repair any omission inside the existing fields.
+        In Korean, write task counts naturally with 건 and explicit actors; do not use unexplained K= notation.
+        Do not replace a case with only a project/skill name, or omit examples because they appear in observedBehavior.
+        Do not collapse different intended outcomes into one "same-model sessions" or other vague group to supply a count.
+        Count unknown and not_applicable only among inspected connected tasks; describe unread scope without estimating
+        its distribution. Put all of this in explanation.overallJudgment, never in a new field such as level_note.
         - `solution`: one or two concrete sentences for an observed gap, saying what changes in the next relevant task and
         how it addresses that gap. Null when no useful change is supported. Missing coverage alone is not a personal defect.
 
@@ -567,8 +626,8 @@ extension Assessor {
         assessment time, accounting for documented changes that replaced earlier practices.
 
         For each dimension, compare those current practices with the rubric's behavioral descriptions and assign each \
-        competency's supported level and the dimension score directly. Follow the rubric's qualitative guidance without \
-        task-frequency thresholds or a level-to-points conversion.
+        competency's supported level and the dimension score directly. Apply the rubric's shared 80% High / 50% Low task aggregation and report its counts and cases in overallJudgment. \
+        Keep dimension scores AI-judged without a level-to-points conversion.
 
         When a score differs from the previous assessment, explain in `changeReason` which current observations and remaining gaps \
         support the new score, and whether the difference reflects a scoring-policy change. A change from calculated to \

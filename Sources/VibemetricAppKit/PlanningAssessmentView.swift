@@ -102,7 +102,6 @@ private struct PlanningCompetencyView: View {
                     }
                     Text(inline(competency.summary))
                         .scaledFont(15)
-                        .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                         .help(competency.summary)
                 }

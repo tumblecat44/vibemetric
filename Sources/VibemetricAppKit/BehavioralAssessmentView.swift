@@ -105,8 +105,6 @@ private struct BehavioralCompetencyView: View {
                     }
                     Text(inline(competency.summary))
                         .scaledFont(15)
-                        .lineLimit(2)
-                        .truncationMode(.tail)
                         .fixedSize(horizontal: false, vertical: true)
                         .help(competency.summary)
                 }

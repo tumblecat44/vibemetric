@@ -588,7 +588,7 @@
         "Feedback Loops assesses how a result chooses the next attempt, repair, stop, or escalation. This dimension assesses the check's reach and validity, repeated execution, and the evidence allowed to support completion. Human Steering assesses the person's own interpretation and intervention; valid automatic or delegated verification does not establish that personal judgment.",
         "Tool Integration assesses whether a reusable tool procedure is executable and usable. Context Engineering assesses how project instructions are supplied. Their presence does not establish that verification ran or that its result controlled completion here.",
         "Judge recorded behavior, not test counts, coverage totals, tool brands, framework installation, or asserted success. A detected failure can demonstrate effective verification. A blocked run does not establish the blocked behavior, and missing evidence is unknown rather than Low. Do not invent failures, additional sessions, or unrelated risk cases to demand more activity.",
-        "Use connected work and its observed outcomes to judge the practice qualitatively. This category adds no thresholds, project quotas, incident requirements, or statistical claims."
+        "Use connected work and its observed outcomes to judge the practice qualitatively. This category adds no thresholds beyond the shared aggregation policy, project quotas, incident requirements, or statistical claims."
       ],
       "example": {
         "notice": "Fictional output example, not this user's score.",
