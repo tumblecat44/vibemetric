@@ -128,17 +128,7 @@ private struct BehavioralCompetencyView: View {
     private var details: some View {
         VStack(alignment: .leading, spacing: 14) {
             explanationPart("Why we look for this", text: competency.explanation?.sourceBasis
-                            ?? competency.sources.map(\.note).joined(separator: " "))
-            if !competency.sources.isEmpty {
-                ForEach(Array(competency.sources.enumerated()), id: \.offset) { _, source in
-                    if let url = URL(string: source.url), ["https", "http"].contains(url.scheme?.lowercased() ?? "") {
-                        Link(source.title, destination: url)
-                            .scaledFont(13, weight: .medium)
-                            .foregroundStyle(Theme.muted)
-                            .help(source.note)
-                    }
-                }
-            }
+                            ?? competency.sources.first.map { "[\($0.title)](\($0.url)) \($0.note)" } ?? "")
             explanationPart("How we rate this", text: competency.explanation?.criteria ?? fallbackCriteria)
             explanationPart("What you did", text: competency.explanation?.observedBehavior ?? fallbackObservations)
             explanationPart("Why you got this rating", text: competency.explanation?.overallJudgment ?? fallbackJudgment)
@@ -150,7 +140,7 @@ private struct BehavioralCompetencyView: View {
     private func explanationPart(_ title: String, text: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title).scaledFont(14, weight: .semibold).foregroundStyle(Theme.ink)
-            Text(inline(text)).scaledFont(14).foregroundStyle(Theme.muted)
+            Text(assessmentMarkdown(text)).scaledFont(14).foregroundStyle(Theme.muted)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }

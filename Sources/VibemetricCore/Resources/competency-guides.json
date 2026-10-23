@@ -85,7 +85,7 @@
             },
             {
               "title": "Encode Lessons in Structure",
-              "url": "https://raw.githubusercontent.com/backnotprop/pstack/main/skills/principle-encode-lessons-in-structure/SKILL.md",
+              "url": "https://raw.githubusercontent.com/cursor/plugins/main/pstack/skills/principle-encode-lessons-in-structure/SKILL.md",
               "note": "The skill recommends encoding recurring corrections in executable structure where possible, while retaining clearer instructions and failure examples for judgment calls. Adopt the distinction between repeatable mechanical upkeep and human policy judgment; do not turn every documentation edit into a new automation system."
             }
           ]
@@ -166,7 +166,7 @@
           "sources": [
             {
               "title": "pstack — Recall (skills/recall/SKILL.md)",
-              "url": "https://github.com/backnotprop/pstack/blob/main/skills/recall/SKILL.md",
+              "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/recall/SKILL.md",
               "note": "Reconstructs relevant goals, decisions, and corrections before work resumes, limits retrieval to the intended workspace and topic, and checks findings against live state. This supports relevant, current recall; invoking the skill alone does not prove that its findings changed the work."
             },
             {
@@ -253,7 +253,7 @@
           "sources": [
             {
               "title": "Automate me",
-              "url": "https://raw.githubusercontent.com/backnotprop/pstack/main/skills/automate-me/SKILL.md",
+              "url": "https://raw.githubusercontent.com/cursor/plugins/main/pstack/skills/automate-me/SKILL.md",
               "note": "Its update path reuses the existing skill, considers evidence since its last edit, preserves uncontradicted sections, and revises changed rules in place. The adopted mechanism is targeted maintenance of retained instructions; its personal-mode evaluation advice is not treated as proof of executable workflow behavior."
             },
             {
@@ -345,7 +345,7 @@
             },
             {
               "title": "Swarm — skills/swarm/SKILL.md",
-              "url": "https://github.com/backnotprop/pstack/blob/main/skills/swarm/SKILL.md",
+              "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/swarm/SKILL.md",
               "note": "Requires a defined final artifact and completion condition, self-contained briefs, inspection of terminal results, and coverage of required slices before consolidation. The adopted mechanism is checking returns against their briefs and exposing missing contributions instead of treating them as success."
             }
           ]
@@ -386,7 +386,7 @@
           "sources": [
             {
               "title": "Encode Lessons in Structure — skills/principle-encode-lessons-in-structure/SKILL.md",
-              "url": "https://github.com/backnotprop/pstack/blob/main/skills/principle-encode-lessons-in-structure/SKILL.md",
+              "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/principle-encode-lessons-in-structure/SKILL.md",
               "note": "Recommends encoding repeated corrections in an executable or structural mechanism, while leaving judgment-dependent lessons as clearer guidance with an example. This supports a reusable assignment mechanism without automating personal judgment. Actual later application and maintained handoffs are rubric requirements, not claimed validation from this source."
             }
           ]
@@ -430,8 +430,8 @@
               "note": "Its gate reads actual output before making a status claim and checks a delegated executor's result. Adopted mechanism: the reported endpoint follows observed evidence, including a fresh result after a repair, rather than a completion message."
             },
             {
-              "title": "backnotprop/pstack — Fix Root Causes",
-              "url": "https://github.com/backnotprop/pstack/blob/main/skills/principle-fix-root-causes/SKILL.md",
+              "title": "pstack — Fix Root Causes",
+              "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/principle-fix-root-causes/SKILL.md",
               "note": "Reproduce, inspect actual state, and trace a symptom to the first wrong decision. It warns that swallowed errors and inappropriate retries can hide the fault. Adopted mechanism: direct corrective action at the supported cause without erasing the failure signal."
             }
           ]
@@ -458,8 +458,8 @@
               "note": "Reads errors, reproduces behavior, inspects configuration across component boundaries, tests a specific hypothesis, and changes course after unsuccessful fixes. Adopted mechanism: evidence-guided recovery and a stopping boundary. The source's particular attempt count is not adopted as a universal scoring requirement."
             },
             {
-              "title": "backnotprop/pstack — Create a verification skill",
-              "url": "https://github.com/backnotprop/pstack/blob/main/skills/create-verification-skill/SKILL.md",
+              "title": "pstack — Create a verification skill",
+              "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/create-verification-skill/SKILL.md",
               "note": "Investigates repository facts before asking the user and includes a read-only instance health check. Cleanup removes only instances the run created and preserves evidence. Adopted mechanism: investigate routine setup independently and recover within the owned environment."
             }
           ]
@@ -476,13 +476,13 @@
           "applicability": "Applicable when comparable work recurs or an existing reusable loop has a genuine upkeep opportunity. High requires observed use without per-task reminders, whether a harness invokes the loop or AI applies an adopted standing procedure. Personal judgment need not be automated. If no reusable need occurs, use not_applicable; if a reusable need exists but later operation cannot be inspected, use unknown. Do not prescribe an extra run, hook, schedule, skill, or procedural change merely to create scoring evidence.",
           "sources": [
             {
-              "title": "backnotprop/pstack — Maintain a verification skill",
-              "url": "https://github.com/backnotprop/pstack/blob/main/skills/maintain-verification-skill/SKILL.md",
+              "title": "pstack — Maintain a verification skill",
+              "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/maintain-verification-skill/SKILL.md",
               "note": "Distinguishes procedure drift, harness gaps, and product regressions; checks instance health after surprising behavior; reruns harness fixes; and reports clean, changed, or blocked outcomes. Adopted mechanism: maintain the existing feedback route against actual execution and preserve honest outcomes."
             },
             {
-              "title": "backnotprop/pstack — Encode Lessons in Structure",
-              "url": "https://github.com/backnotprop/pstack/blob/main/skills/principle-encode-lessons-in-structure/SKILL.md",
+              "title": "pstack — Encode Lessons in Structure",
+              "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/principle-encode-lessons-in-structure/SKILL.md",
               "note": "Recurring corrections should become an appropriate executable check or structural mechanism where possible. Lessons that require judgment remain guidance with a concrete example. Adopted mechanism: replace repeated manual reminders with an applied reusable connection when the lesson can be operationalized."
             }
           ]
@@ -524,7 +524,7 @@
             },
             {
               "title": "Create a verification skill",
-              "url": "https://github.com/backnotprop/pstack/blob/main/skills/create-verification-skill/SKILL.md",
+              "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/create-verification-skill/SKILL.md",
               "note": "Its Evidence section calls for the real user path, the action and resulting state, and relevant side effects. Its Launch and Doctor sections distinguish a usable connected environment from a merely responding process. These mechanisms support the required connection between a run and its claimed outcome."
             }
           ]
@@ -547,12 +547,12 @@
             },
             {
               "title": "Create a verification skill",
-              "url": "https://github.com/backnotprop/pstack/blob/main/skills/create-verification-skill/SKILL.md",
+              "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/create-verification-skill/SKILL.md",
               "note": "Generates a project-specific launch, drive, evidence, and cleanup procedure and requires an actual end-to-end proof before handing it over. Supports a reusable verified procedure rather than treating a newly written skill as a working mechanism."
             },
             {
               "title": "Maintain a verification skill",
-              "url": "https://github.com/backnotprop/pstack/blob/main/skills/maintain-verification-skill/SKILL.md",
+              "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/maintain-verification-skill/SKILL.md",
               "note": "Rechecks the feature map against source and live behavior, distinguishes harness drift from product regressions, and reports clean, changed, or blocked outcomes. Supports maintenance tied to observed behavior; its particular agent arrangement is not a scoring requirement."
             }
           ]
@@ -612,7 +612,7 @@
           "sources": [
             {
               "title": "pstack — Poteto mode: Bug fix playbook",
-              "url": "https://github.com/backnotprop/pstack/blob/main/skills/poteto-mode/playbooks/bug-fix.md",
+              "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/bug-fix.md",
               "note": "The playbook requires runtime evidence to eliminate hypotheses, discarding changes motivated by refuted hypotheses, and verification on the original surface. Adopted mechanism: a person can use the returned evidence to reject an unsupported repair direction and judge the replacement against the original failure. This is an agent procedure, not evidence that the person made those decisions; its delegation and commit steps are not scoring requirements."
             },
             {
@@ -672,7 +672,7 @@
             },
             {
               "title": "pstack: Prove It Works (skills/principle-prove-it-works/SKILL.md)",
-              "url": "https://github.com/backnotprop/pstack/blob/main/skills/principle-prove-it-works/SKILL.md",
+              "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/principle-prove-it-works/SKILL.md",
               "note": "Requires checking the actual artifact or behavior rather than a proxy or self-report. Adopted only as an evidence principle for observed control outcomes, not as a security guarantee."
             }
           ]
@@ -728,7 +728,7 @@
             },
             {
               "title": "pstack: Boundary Discipline (skills/principle-boundary-discipline/SKILL.md)",
-              "url": "https://github.com/backnotprop/pstack/blob/main/skills/principle-boundary-discipline/SKILL.md",
+              "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/principle-boundary-discipline/SKILL.md",
               "note": "Places parsing, validation, and defensive error handling at external boundaries. Adopted as a supporting implementation mechanism; parsed or typed data still requires authorization and safe use."
             },
             {
@@ -771,8 +771,8 @@
               "note": "Explains the effort control and its quality, latency, and token tradeoffs; supported settings depend on the model. This supports assessing effort alongside model choice rather than using a model name as the entire assignment. It does not establish a suitable effort for an unobserved task."
             },
             {
-              "title": "backnotprop/pstack — skills/poteto-mode/SKILL.md, Subagents",
-              "url": "https://github.com/backnotprop/pstack/blob/main/skills/poteto-mode/SKILL.md",
+              "title": "pstack — skills/poteto-mode/SKILL.md, Subagents",
+              "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/SKILL.md",
               "note": "The public procedure starts from per-role settings, adjusts reasoning effort for task difficulty, and distinguishes difficult changes from mechanical edits. Adopt the task-based selection mechanism, not its named model defaults or a requirement to use subagents."
             }
           ]
@@ -812,13 +812,13 @@
           "applicability": "Applicable when assignment decisions recur or the work has a reusable routing need. If no recurring need exists, not applicable. If a reusable rule is introduced but no later relevant opportunity is observed, its later follow-through is unknown, while any fully established current level remains credited; do not invent a later run or score missing history as Low. Credit delegated or automatic routing only when its operation is observed. Human judgment on a new substantive decision need not be automated.",
           "sources": [
             {
-              "title": "backnotprop/pstack — skills/setup-pstack/SKILL.md",
-              "url": "https://github.com/backnotprop/pstack/blob/main/skills/setup-pstack/SKILL.md",
+              "title": "pstack — skills/setup-pstack/SKILL.md",
+              "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/setup-pstack/SKILL.md",
               "note": "Writes persistent per-role model and budget settings, validates available model identifiers, and explains how later skills consume the settings in each harness. This supplies a concrete reusable-policy mechanism; the rubric still requires observed later execution rather than credit for the settings file alone."
             },
             {
-              "title": "backnotprop/pstack — skills/poteto-mode/SKILL.md, Match the model to the job",
-              "url": "https://github.com/backnotprop/pstack/blob/main/skills/poteto-mode/SKILL.md",
+              "title": "pstack — skills/poteto-mode/SKILL.md, Match the model to the job",
+              "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/SKILL.md",
               "note": "Applies saved role settings at dispatch and adjusts effort to the job. This supports automatic task-based selection under a person's standing policy. Its specific defaults are examples, not universal efficiency targets."
             },
             {

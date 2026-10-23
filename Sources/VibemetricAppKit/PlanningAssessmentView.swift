@@ -123,14 +123,8 @@ private struct PlanningCompetencyView: View {
     private var details: some View {
         VStack(alignment: .leading, spacing: 14) {
             detailSection("Why we look for this") {
-                detailText(competency.explanation?.sourceBasis ?? competency.sources.map(\.note).joined(separator: " "))
-                ForEach(Array(competency.sources.enumerated()), id: \.offset) { _, source in
-                    if let url = URL(string: source.url), url.scheme?.lowercased() == "https" {
-                        Link(source.title, destination: url)
-                            .scaledFont(13, weight: .medium)
-                            .foregroundStyle(Theme.muted)
-                    }
-                }
+                detailText(competency.explanation?.sourceBasis
+                           ?? competency.sources.first.map { "[\($0.title)](\($0.url)) \($0.note)" } ?? "")
             }
             detailSection("How we rate this") {
                 detailText(competency.explanation?.criteria ?? "High. \(competency.criteria.high)\nMedium. \(competency.criteria.medium)\nLow. \(competency.criteria.low)")
@@ -162,7 +156,7 @@ private struct PlanningCompetencyView: View {
     }
 
     private func detailText(_ text: String) -> some View {
-        Text(inline(text)).scaledFont(14).foregroundStyle(Theme.muted)
+        Text(assessmentMarkdown(text)).scaledFont(14).foregroundStyle(Theme.muted)
             .fixedSize(horizontal: false, vertical: true)
     }
 }
