@@ -13,7 +13,7 @@ public struct AssessmentOptions: Sendable {
     public static let readingTarget = 70
     /// The person's own notes for the judge, e.g. "the demo-skill sessions were only a test".
     public var instructions: String?
-    public static let rubricVersion = "39"
+    public static let rubricVersion = "40"
     public static let maxInstructionsLength = 2000
 
     public init(engine: AssessmentEngine = .claude, model: String? = nil, instructions: String? = nil) {
@@ -596,10 +596,11 @@ public final class Assessor: Sendable {
         - `settings.md` and `model-settings.md`: available permissions and model/effort settings, not proof of execution.
         - Additional evidence linked from `overview.md`: changes, verification, and prior application judgments.
 
-        Follow prior judgments only as observational context. A prior score is comparable only when its source card,
-        project scope, dimension, and rubric match. Do not inherit it or count already-reviewed application facts as new
-        improvement. Reassess from later unreviewed behavior, a policy change, or a specific prior error, and state which.
-        Incomplete or mismatched records do not establish the current level.
+        When `previous-card.json` is present, its competency levels are this card's starting point, not background. The
+        section "The previous assessment" below says when a level may move; reading more sessions, a different subset of
+        the same history, or a different impression of the same evidence never moves one. Do not count application facts
+        the previous card already reviewed as new improvement. Incomplete or mismatched records do not establish the
+        current level.
 
         Original transcript roots:
         \(roots)
@@ -749,8 +750,8 @@ public final class Assessor: Sendable {
         to the title. No pasted prompts, rubric terms, or vague "consider". Empty when unsupported or when all competencies are High.
           - `evidence`: up to three verified references with tool, full session ID, YYYY-MM-DD date, actual project, and a
         short factual note. A parent working directory is not automatically the project that was worked on.
-          - `changeReason`: null without a previous card or score change; otherwise the observation/policy change explaining
-        the difference. A scoring-policy change does not establish changed ability.
+          - `changeReason`: null without a previous card or level change; otherwise which of the three allowed reasons
+        moved a level, with the sessions behind it. A scoring-policy change does not establish changed ability.
         An all-unknown dimension describes coverage, not inability or a corrective target based on zero alone.
         - `improvement`: choose a useful supported change, not the lowest score. `title` starts with a verb, at most 10 words.
         `dimension` names that dimension. `situation` uses 2–3 connected sentences about the concrete task, what happened,
@@ -786,25 +787,26 @@ extension Assessor {
 
         # The previous assessment
 
-        Use earlier records as observational context and reassess every competency in all ten dimensions under the current \
-        behavioral descriptions. Judge each competency level from current evidence; the app calculates numeric scores. \
-        Explain the observed scope in `scope.limits`. Distinguish Unknown coverage from observed Low behavior; retain every defined competency in scoring. \
-        Do not inherit numeric grades from another policy or unavailable scores from an unfinished-draft card. Explain the \
-        method change separately from any change in the person's practices. Ignore a draft card's neutral authoring notices \
-        when choosing an improvement or roadmap. They are not recommendations about the person's work.
-
         A previous assessment from \(previousDate) is in `previous-card.json`, and `changes.md` lists the sessions and settings \
-        that are new or changed since then. Use `previous-card.json` together with the supplied session records and summaries to \
-        understand how the person's ways of working have changed over time. Determine which practices remain in use at the \
-        assessment time, accounting for documented changes that replaced earlier practices.
+        that are new or changed since then. Each competency's previous level is its default for this card. Read every session in \
+        `changes.md` first and judge its tasks under the current competency definitions, then apply the rubric's shared \
+        High/Medium/Low task aggregation to the tasks judged this run and explain its counts and cases in overallJudgment.
 
-        For each dimension, compare those current practices with the rubric's behavioral descriptions and assign each \
-        competency's supported level. Apply the rubric's shared High/Medium/Low task aggregation and explain its counts and cases in overallJudgment. \
-        The app converts the levels to equal-weight scores; do not return score.
+        A competency moves away from its previous level only for one of these three reasons, named in `changeReason` with \
+        the sessions behind it:
+        - the tasks from `changes.md` show different behavior in that competency, and at least three such tasks were judged;
+        - `rule-changes.md` or the rubric changed what that competency counts;
+        - a specific judgment in the previous card was wrong, named by its session.
+        Opening more or different sessions of the same history, or a different impression of the same evidence, is not a \
+        reason. When fewer than three new tasks touch a competency, keep its previous level and say so in overallJudgment \
+        with the counts. A previous Unknown is not a default: judge that competency from this run's reading.
 
-        When a score differs from the previous assessment, explain in `changeReason` which current observations and remaining gaps \
-        support the new score, and whether the difference reflects a scoring-policy change. A change from AI-judged to \
-        app-calculated scores does not itself establish a change in practice.
+        Judge each competency level; the app calculates numeric scores and converts the levels to equal-weight scores, so do \
+        not return score. Explain the observed scope in `scope.limits`. Distinguish Unknown coverage from observed Low behavior; \
+        retain every defined competency in scoring. Do not inherit numeric grades from another policy or unavailable scores \
+        from an unfinished-draft card; a change from AI-judged to app-calculated scores does not itself establish a change in \
+        practice. Ignore a draft card's neutral authoring notices when choosing an improvement or roadmap. They are not \
+        recommendations about the person's work.
 
         # Choosing the improvement after the previous one
 
