@@ -31,7 +31,8 @@ struct AssessmentTests {
         defer { fixture.remove() }
         let assessor = Assessor(installation: CLIInstallation(executable: fixture.command, version: "fixture"))
         let outcome = try await assessor.run(packDir: fixture.directory, sources: [], options: AssessmentOptions(engine: engine)) { _ in }
-        #expect(outcome.card.knownTotal == 68)
+        #expect(outcome.card.knownTotal == 50)
+        #expect(outcome.card.dimensions.allSatisfy { $0.score == 5 })
         #expect(outcome.sessionID == CLIFixture.sessionID)
         #expect(outcome.engine == engine)
         #expect(outcome.cliVersion == "fixture")
