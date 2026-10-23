@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.13 (2026-10-22)
+
+- "What you're doing well" shows its points in a rounded card that matches the category list, with a green dot for each point and more space between lines.
+
 ## 0.4.12 (2026-10-22)
 
 - "Focus on these next" lists every category in one card. Each row has a ring filled to the score, the category's name with its issue underneath, and a chevron. Click a row to see the full explanation and the fix.
