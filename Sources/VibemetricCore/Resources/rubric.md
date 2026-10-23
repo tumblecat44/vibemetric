@@ -54,7 +54,7 @@ These rules apply to every competency. Each dimension below adds only its own "W
 
 1. **Judge actual actions and results.** A saved file, tool definition, installation, keyword, quoted example, automatically injected memory, request for evidence, or AI completion claim alone does not establish use, success, or review. Follow the connection to the actual action or result.
 2. **Connect the evidence.** Establish connections through the same call, task, file, artifact, check, or revision; nearby timestamps and unrelated successes do not establish a workflow. Follow an intended outcome through its request, investigation, execution, and review, and count it once across continuing sessions, retries, and delegated pieces. Consider supporting and contrary evidence actually read, state the examined scope, and never fabricate cases or imply that unread records were examined.
-3. **Low is a low level.** Low means the practice reached only a low level where the competency's "When to assess" line applies: absent, minimal, ineffective, or wrong. It does not require a demonstrated failure, an uncorrected harm, or proof that nothing was attempted.
+3. **Low is a low level.** Low means the practice reached only a low level where the competency's "When to assess" line applies: absent, minimal, ineffective, or wrong. It does not require a demonstrated failure, an uncorrected harm, or proof that nothing was attempted. Sample by situation, not by practice: include ordinary tasks where the competency's situation is present even when the practice is absent, judge little or no practice there as Low, and leave out only tasks that contain nothing of that kind.
 4. **Keep established levels.** Credit partial practice at the level it establishes. An unconfirmed later effect or missing later reuse limits the higher level without erasing the lower one already established. Do not invent incidents, failures, conflicts, later runs, or comparisons to create evidence.
 5. **Credit the person and AI accurately.** Credit work the person performs or delegates based on actual execution; personal code writing and doing AI's routine work are unnecessary. Required approvals and genuine human decisions are not penalties and do not prevent High. Attribute human decisions separately from AI or automatic-loop decisions; delegation alone does not establish that the person examined alternatives. Copying material or using an AI-written draft is neither a fault nor proof of skill; credit what the person does with it. Adopted third-party, built-in, and AI-written tools count when they support the same behavior.
 6. **Automation only where the competency asks for it.** Automation is part of High only where a competency explicitly assesses it: knowledge storage and maintenance, context maintenance, workflow maintenance, automated checks, and automatic model selection. An installed mechanism without observed application is insufficient. Automatic execution earns no separate credit for the same action, explicit instructions satisfy competencies that do not require automation, and personal judgment need not be automated.
@@ -142,9 +142,9 @@ Return Planning's four competencies in table order with explicit levels, two-sen
 
 #### When to assess
 
-- **Essential project context.** Assess when work depends on project meaning, an established decision, or a project-specific operating reference. Do not demand documentation of routine facts AI can reliably discover.
-- **Context file organization.** Assess when an executor must receive maintained project guidance. Evaluate only the tools and reading paths used in the work. Do not impose modular files on an already usable small guide or reward splitting content into imports that all load together.
-- **Context maintenance.** Assess when an observed change or demonstrated defect creates a real guidance-maintenance need. AI can maintain confirmed facts automatically without inventing new policy.
+- **Essential project context.** Assess any task done inside a project that has its own conventions, business rules, or prior decisions an executor needs in order to work correctly, whether or not a project guide exists, was read, or covered them. Do not demand documentation of routine facts AI can reliably discover.
+- **Context file organization.** Assess any task run inside a project where guidance that would help the executor exists or should exist, including tasks where no guide was loaded and the person supplied directions by hand. Evaluate only the tools and reading paths used in the work. Do not impose modular files on an already usable small guide or reward splitting content into imports that all load together.
+- **Context maintenance.** Assess any task that changes commands, file locations, constraints, or decisions a project guide covers or should cover, or that runs into guidance that no longer matches the project, whether or not anyone updated the guide. AI can maintain confirmed facts automatically without inventing new policy.
 - Judge content, delivery, and maintenance from their own evidence. Missing context, a failed reading route, contradictory content, and AI ignoring a rule it already read are different causes.
 
 #### Adopted public source basis
@@ -168,9 +168,9 @@ Return Planning's four competencies in table order with explicit levels, two-sen
 
 #### When to assess
 
-- **Knowledge storage.** Assess when work introduces reusable preferences, corrections, decisions, or facts worth retaining. AI or native memory can do the saving; the person need not choose a store or write a file.
-- **Knowledge maintenance.** Assess when retained knowledge is reviewed or a change, conflict, duplicate, expiry, or confirmation creates a maintenance need. Automatic means a demonstrated reusable procedure runs when needed; no background service or fixed schedule is required.
-- **Knowledge reuse.** Assess when a separate later conversation can use retained knowledge. A correction in the original conversation establishes neither persistence nor later use.
+- **Knowledge storage.** Assess any task in which the person states a preference, corrects AI, or settles a decision that would plausibly matter again in a later conversation, whether or not anything was saved. AI or native memory can do the saving; the person need not choose a store or write a file.
+- **Knowledge maintenance.** Assess any task where retained knowledge touching the work already exists, so that a changed fact, conflicting or duplicate entry, or stale instruction could affect it, whether or not anyone reviewed the memory. Automatic means a demonstrated reusable procedure runs when needed; no background service or fixed schedule is required.
+- **Knowledge reuse.** Assess any later conversation whose work touches something the person had already stated, decided, or had saved in an earlier conversation, whether or not that knowledge was used. A correction in the original conversation establishes neither persistence nor later use.
 - For storage and maintenance, High requires a working automatic procedure and an observed correct operation; correct on-demand management is Medium. Storage, maintenance, and reuse need separate evidence, so do not merge failures to save, retrieve, scope, update, or follow knowledge into one presumed memory failure. Identify whether the person, AI, or storage mechanism was responsible.
 
 #### Adopted public source basis
@@ -195,10 +195,10 @@ Return Planning's four competencies in table order with explicit levels, two-sen
 
 #### When to assess
 
-- **Tool connections.** Assess when the task needs service records or actions that an available connection can appropriately handle. The person need not write the integration.
-- **Reusable skills.** Assess when recurring work or a concrete reuse need is observed. An actual first invocation can establish Medium.
-- **Tool maintenance.** Assess when a maintenance need or suitability check occurs. An inspected targeted repair can establish Medium while its effect remains unconfirmed; upkeep need not expand access or bypass decisions.
-- **Skill sharing.** Assess when the person has built or adapted a working reusable skill, tool, or procedure. Anyone can share such work by publishing it or distributing it to a team, so keeping it unshared is non-practice and is Low. A repository link or guide alone establishes no execution; independent setup and use by another person or in a fresh environment distinguishes High from Medium. Private team distribution qualifies regardless of audience size.
+- **Tool connections.** Assess any task whose work involves an external service, repository host, database, issue tracker, or similar system, whether AI reached it through a connection or the person relayed the data by hand. The person need not write the integration.
+- **Reusable skills.** Assess any task whose kind of work recurs in the records (release, report, deploy, data refresh, the same check across sessions) or that the person says they do repeatedly, whether or not a procedure was saved. An actual first invocation can establish Medium.
+- **Tool maintenance.** Assess any task where a saved tool, script, skill, or configuration the person relies on is used and misbehaves, is out of date, or no longer fits the task, whether or not it was repaired. An inspected targeted repair can establish Medium while its effect remains unconfirmed; upkeep need not expand access or bypass decisions.
+- **Skill sharing.** Assess any task where the person has, or in this task creates, a working reusable skill, tool, or procedure that another person or team could use, whether or not it was shared. Anyone can share such work by publishing it or distributing it to a team, so keeping it unshared is non-practice and is Low. A repository link or guide alone establishes no execution; independent setup and use by another person or in a fresh environment distinguishes High from Medium. Private team distribution qualifies regardless of audience size.
 
 #### Adopted public source basis
 
@@ -224,10 +224,10 @@ Return Planning's four competencies in table order with explicit levels, two-sen
 
 #### When to assess
 
-- **Task breakdown.** Assess when work needs an execution scope and completion condition, including a small task kept whole. The person need not divide work personally.
-- **Result integration.** Assess when outputs depend on or must be assembled with other outputs, whether one executor or several do the work. A failure wholly inside a correctly connected part is not a mapping failure.
-- **Work assignment.** Assess when choosing who or which step does work, including keeping a small or tightly coupled task with one executor.
-- **Reusable workflows.** Assess when changed responsibilities or dependencies need upkeep, or recurring work needs reuse.
+- **Task breakdown.** Assess any task that produces a deliverable, large or small, whether the work was divided, kept whole on purpose, or simply started without a stated scope or completion condition. The person need not divide work personally.
+- **Result integration.** Assess any task whose result is built from more than one piece (several steps, files, sessions, or executors whose outputs feed each other), whether or not anyone checked that the pieces fit. A failure wholly inside a correctly connected part is not a mapping failure.
+- **Work assignment.** Assess any task where there was a choice about who or what does the work (one agent, subagents, parallel runs, the person, or a sequence of steps), including tasks where a single executor was used by default.
+- **Reusable workflows.** Assess any task whose arrangement of parts and handoffs has appeared before in the records or will plausibly recur, whether the arrangement was reused, rebuilt from scratch, or left stale.
 - Credit the arrangement the person requests or adopts when it is actually applied, and attribute an AI-designed division to AI.
 
 #### Adopted public source basis
@@ -252,9 +252,9 @@ Return Planning's four competencies in table order with explicit levels, two-sen
 
 #### When to assess
 
-- **Results and next steps.** Assess when a task returns a result that can inform a next action. The person need not run the check or write the fix.
-- **Execution recovery.** Assess when an actual obstacle, interruption, or resource boundary requires recovery, stopping, or resumption. An evidence-backed stop can be High even though the blocked operation stays unverified; this judges handling of the obstacle, not the blocked behavior.
-- **Workflow maintenance.** Assess when work recurs or a reusable loop needs upkeep. High requires observed later use without additional user intervention for each task.
+- **Results and next steps.** Assess any task in which a command, test, build, review, or product observation produced output, whether or not that output changed what happened next. The person need not run the check or write the fix.
+- **Execution recovery.** Assess any task in which something stopped execution (a failed command, missing dependency, permission denial, timeout, or limit), whether AI diagnosed it, handed the raw error to the person, or ignored it. An evidence-backed stop can be High even though the blocked operation stays unverified; this judges handling of the obstacle, not the blocked behavior.
+- **Workflow maintenance.** Assess any task of a kind that recurs in the records (the same verification, check, or result-handling need in more than one session), whether a reusable loop handled it, the person re-requested it, or it was skipped. High requires observed later use without additional user intervention for each task.
 - Retries need a diagnostic purpose or a supported transient-recovery reason and must respect applicable limits. Never reward endless retries, suppressed failed checks, widened permissions, unauthorized side effects, or claiming blocked work complete. Preserve successful evidence when resuming unless changed inputs require rechecking.
 
 #### Adopted public source basis
@@ -280,9 +280,9 @@ Return Planning's four competencies in table order with explicit levels, two-sen
 
 #### When to assess
 
-- **User workflow testing.** Assess when work changes behavior that a user, operator, API caller, CLI user, or library consumer relies on. Use that surface's genuine entry point; a graphical interface is unnecessary for a CLI or library, and a supported sandbox or test mode can be appropriate. If a required external step cannot safely run, keep it unverified rather than demanding an unsafe live transaction. Manual verification can reach High. Unit, integration, static, or mocked checks support a scoped conclusion but not a workflow they never exercise.
-- **Automated checks.** Assess when verification needs to recur across changes, releases, or deliveries. Existing or adapted CI, hooks, scripts, and agent workflows count. High requires observed working automatic execution and result handling; a fully observed check that depends on additional user intervention can establish Medium.
-- **AI output evaluation.** Assess when work develops, changes, or assesses the quality of AI-generated answers, recommendations, decisions, or other AI-dependent behavior. Using AI to write ordinary software does not create this opportunity. Repeated trials are needed when variability could change the conclusion; a rerun is needed only after a relevant later change.
+- **User workflow testing.** Assess any task that changes code or configuration someone will run or use, whether the change was exercised through its real entry point, checked only by build or unit test, or not checked at all. Use that surface's genuine entry point; a graphical interface is unnecessary for a CLI or library, and a supported sandbox or test mode can be appropriate. If a required external step cannot safely run, keep it unverified rather than demanding an unsafe live transaction. Manual verification can reach High. Unit, integration, static, or mocked checks support a scoped conclusion but not a workflow they never exercise.
+- **Automated checks.** Assess any task that changes a project worked on repeatedly, whether checks ran automatically, were requested by hand each time, or did not run. Existing or adapted CI, hooks, scripts, and agent workflows count. High requires observed working automatic execution and result handling; a fully observed check that depends on additional user intervention can establish Medium.
+- **AI output evaluation.** Assess any task that touches a prompt, model call, agent, or other AI-dependent feature of the person's product or workflow, whether quality was evaluated systematically, judged from a single reply, or not judged at all. Using AI to write ordinary software does not create this opportunity. Repeated trials are needed when variability could change the conclusion; a rerun is needed only after a relevant later change.
 - A detected failure can demonstrate effective verification. A blocked run does not establish the blocked behavior.
 
 #### Adopted public source basis
@@ -307,9 +307,9 @@ Return Planning's four competencies in table order with explicit levels, two-sen
 
 #### When to assess
 
-- **AI proposal review.** Assess when a proposal presents a material choice about the intended outcome, approach, or consequences. Routine execution within an established decision needs no further comparison or approval, and multiple alternatives are unnecessary when the evidence already supports one suitable approach.
-- **AI work correction.** Assess when a proposed or ongoing approach creates a concrete mismatch, unsupported direction, or unjustified scope. Correct autonomous work need not be interrupted. A redirection may begin with further investigation rather than a prescribed fix.
-- **Assumption checks.** Assess when a finding challenges an identifiable earlier instruction or assumption. A reversal is not required; a supported decision to keep the original direction can demonstrate the same practice.
+- **AI proposal review.** Assess any task in which AI proposed or chose an approach, design, library, data change, or scope with consequences beyond the immediate edit, whether the person examined it, waved it through, or did not respond. Routine execution within an established decision needs no further comparison or approval, and multiple alternatives are unnecessary when the evidence already supports one suitable approach.
+- **AI work correction.** Assess any task where AI's work drifted from what was asked, rested on an unverified explanation, or exceeded the asked scope, whether the person corrected it precisely, said only "try again", or accepted it as is. Correct autonomous work need not be interrupted. A redirection may begin with further investigation rather than a prescribed fix.
+- **Assumption checks.** Assess any task in which investigation, output, or results contradicted something the person had assumed or instructed earlier, whether the person reconsidered, pushed on regardless, or did not notice. A reversal is not required; a supported decision to keep the original direction can demonstrate the same practice.
 - Choosing among proposals, correcting AI's approach, and reconsidering one's own earlier position are separate decisions. One episode supports more than one competency only when it contains a distinct decision and evidence for each.
 
 #### Adopted public source basis
@@ -332,9 +332,9 @@ Return Planning's four competencies in table order with explicit levels, two-sen
 
 #### When to assess
 
-- **Access control.** Assess when AI work accesses protected resources, performs consequential actions, or changes protected product operations. Assess only boundaries relevant to that task; safe fixtures can demonstrate prevention without an incident.
-- **Sensitive data protection.** Assess when the task handles secrets, private records, confidential material, or a path that could expose them. Use synthetic markers for checks and never require disclosure of real secrets. An approved connector or secret store counts when the observed path preserves the boundary.
-- **External input safety.** Assess when externally controlled content can influence AI instructions, executable behavior, tool parameters, or security-sensitive output. A passing fixture establishes only that tested protection, not universal prompt-injection resistance. Existing parsers, tool policies, and framework escaping count when used and observed.
+- **Access control.** Assess any task in which AI ran with write, delete, network, credential, or production-affecting capability, or edited code that decides who may do what, whether the boundary was enforced, merely promised, or left open. Assess only boundaries relevant to that task; safe fixtures can demonstrate prevention without an incident.
+- **Sensitive data protection.** Assess any task where secrets, credentials, personal or customer data, or confidential material were present in the files, environment, tool output, or conversation, or where the work builds a path that will carry such data, whether or not they were protected. Use synthetic markers for checks and never require disclosure of real secrets. An approved connector or secret store counts when the observed path preserves the boundary.
+- **External input safety.** Assess any task in which AI read or acted on content someone else controls (fetched pages, documents, emails, issues, third-party skills or packages, or another model's output), whether that content was handled with separation or simply followed. A passing fixture establishes only that tested protection, not universal prompt-injection resistance. Existing parsers, tool policies, and framework escaping count when used and observed.
 - No repository-wide audit, every scanner, or fixed control count is required. A clean scan, successful build, or saved configuration does not substitute for connected evidence, and no separate permission-bypass deduction applies.
 
 #### Adopted public source basis
@@ -362,9 +362,9 @@ Return Planning's four competencies in table order with explicit levels, two-sen
 
 #### When to assess
 
-- **Model and effort selection.** Assess whenever AI performs a task with a resource assignment, including small one-off tasks. If effort is unavailable or not exposed, state that limit without inventing hidden settings or treating missing telemetry as a failure.
-- **Quality and total effort.** Assess when an execution episode's quality and resource burden can be reviewed, or when approaches are compared. Do not demand new benchmark runs, invent human review minutes from message gaps, or convert session wall time into active labor.
-- **Automatic model selection.** Assess when assignment decisions recur or the work has a reusable routing need. An actual assignment governed by a reusable rule can establish Medium. High requires automatic application through a workflow, harness behavior, or instructions AI follows; a commercial router or multiple models are not required.
+- **Model and effort selection.** Assess every task AI performed, including small one-off tasks, whether the model and effort were chosen deliberately or left at default. If effort is unavailable or not exposed, state that limit without inventing hidden settings or treating missing telemetry as a failure.
+- **Quality and total effort.** Assess any completed task whose outcome and effort are visible in the records (attempts, retries, corrections, delegated runs), whether or not the person weighed that cost against the result. Do not demand new benchmark runs, invent human review minutes from message gaps, or convert session wall time into active labor.
+- **Automatic model selection.** Assess any task of a kind the person does repeatedly (the same size or type of work across sessions), whether a standing rule chose the model and effort, the person picked each time, or the default was always used. An actual assignment governed by a reusable rule can establish Medium. High requires automatic application through a workflow, harness behavior, or instructions AI follows; a commercial router or multiple models are not required.
 - Keep token categories, monetary charges, API estimates, subscription usage, elapsed time, active work, and human review distinct. Report unavailable quantities and make no unsupported savings or labor claims.
 
 #### Adopted public source basis
