@@ -3,6 +3,10 @@ import Foundation
 /// Shared structured-output schema for Claude Code and Codex, mirroring `ScoreCard`.
 enum JSONSchema {
     static var scoreCard: String {
+        scoreCard(for: .codex)
+    }
+
+    static func scoreCard(for engine: AssessmentEngine) -> String {
         let str: [String: Any] = ["type": "string"]
         let int: [String: Any] = ["type": "integer"]
         func object(_ props: [String: Any], optional: Set<String> = []) -> [String: Any] {
@@ -69,9 +73,11 @@ enum JSONSchema {
                     "solution": ["type": ["string", "null"]],
                 ]), min: guide.competencies.count, max: guide.competencies.count),
             ])
-            return object(properties)
+            let optional = engine == .claude ? Set(["planning", "changeReason"]) : []
+            return object(properties, optional: optional)
         }
-        let dimension: [String: Any] = ["anyOf": [object(planningDimension)] + otherDimensions]
+        let planningOptional = engine == .claude ? Set(["assessment", "changeReason"]) : []
+        let dimension: [String: Any] = ["anyOf": [object(planningDimension, optional: planningOptional)] + otherDimensions]
         let schema = object([
             "language": str,
             "diagnosis": str,

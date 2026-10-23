@@ -88,7 +88,7 @@ public final class Assessor: Sendable {
                                  digestCount: Self.digestCount(packDir), engine: options.engine, instructions: options.instructions)
         var options = options
         options.timeout = min(options.timeout, AssessmentOptions.scoreTimeLimit)
-        let raw = try await runStructured(prompt: prompt, schema: JSONSchema.scoreCard, packDir: packDir, sources: sources,
+        let raw = try await runStructured(prompt: prompt, schema: JSONSchema.scoreCard(for: options.engine), packDir: packDir, sources: sources,
                                           options: options, wrapUp: (options.wrapUpAfter, Self.wrapUpPrompt),
                                           onProgress: onProgress)
         var card: ScoreCard
