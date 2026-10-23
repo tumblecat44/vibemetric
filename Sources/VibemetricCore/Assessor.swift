@@ -463,7 +463,9 @@ public final class Assessor: Sendable {
     /// Phase 3: the card, written once from everything read in phases 1 and 2.
     static let writePrompt = """
         Phase 3 of 3: write. Reading is complete; do not read any more files. Return the complete score card matching
-        the schema from the evidence inspected in phases 1 and 2. \(cardRules)
+        the schema from the evidence inspected in phases 1 and 2. Every task whose request, action, and result you read
+        in a digest in phase 1 is a judged task and counts toward that competency's High/Medium/Low totals, the same as a
+        task read in an original transcript in phase 2; do not reduce the counts to the originals you opened. \(cardRules)
         """
 
     private static let cardRules = """
@@ -581,8 +583,9 @@ public final class Assessor: Sendable {
         The pack has \(digestCount) digests. Over phases 1 and 2, read \(min(digestCount, AssessmentOptions.readingTarget) == digestCount ? "all of them" : "about \(AssessmentOptions.readingTarget) of them"), batching independent reads across projects, tools, and dates.
         Prioritize changed sessions in `changes.md` when present, then leads for every dimension, including contrary cases.
         Read relevant requests, then-effective guidance, actions, and results; connect continuing sessions for one outcome.
-        Digests provide breadth. When a competency lacks action/result evidence there, search the original transcripts
-        behind its leads and inspect the surrounding passages. Keyword matches alone are not the action or result.
+        Digests provide breadth, and a task judged from a digest is a judged task. When a digest does not show a task's
+        action or result, search the original transcripts behind its leads and inspect the surrounding passages.
+        Keyword matches alone are not the action or result.
         Keep partial practice at its supported level. Low-level practice where the competency applies is Low.
 
         Start with `overview.md` and `leads.md`. Use these pack files for their distinct purposes:
