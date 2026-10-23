@@ -447,7 +447,9 @@ public final class Assessor: Sendable {
         - `overview.md`: tool/project/date coverage and links between saved knowledge and later sessions.
         - `sessions.tsv`: session index and digest paths. Index entries do not establish that behavior was examined.
         - `leads.md`: candidate sessions for each dimension, not proof of a level.
-        - `sessions/*.md`: condensed user turns, AI replies, tool calls/results, and runtime events.
+        - `sessions/*.md`: condensed user turns, AI replies, runtime events, and tool calls with ✓/✗. Successful
+        file lookups are folded into `READ ×N` lines naming any guidance files opened, and only failures keep an
+        error excerpt. Open the original transcript when a judgment needs a call's actual output.
         - `context-files.md`: maintained project guidance. Inspect relevant sections for Context Engineering.
         - `settings.md` and `model-settings.md`: available permissions and model/effort settings, not proof of execution.
         - Additional evidence linked from `overview.md`: changes, verification, and prior application judgments.

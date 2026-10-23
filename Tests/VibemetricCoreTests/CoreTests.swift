@@ -499,3 +499,52 @@ final class ToneTests: XCTestCase {
         XCTAssertFalse(md.contains("• ⚠️"))
     }
 }
+
+final class DigestTests: XCTestCase {
+    private func digest(_ kinds: [TimelineEvent.Kind]) -> String {
+        let session = Session(id: "fixture", tool: .claudeCode, file: URL(fileURLWithPath: "/tmp/fixture.jsonl"),
+                              project: "demo", events: kinds.map { TimelineEvent(time: nil, kind: $0) })
+        return EvidencePack.timeline(session)
+    }
+
+    func testLookupsFoldIntoOneReadLineNamingGuidanceFiles() {
+        let md = digest([
+            .tool(name: "Read", input: "/work/demo/AGENTS.md", failed: false, result: "rules"),
+            .tool(name: "Bash", input: "cd /work/demo && cat src/app.ts | grep fetch 2>/dev/null", failed: false, result: "lots of code"),
+            .tool(name: "exec", input: "git -C /work/demo status", failed: false, result: "clean"),
+            .tool(name: "Bash", input: "ls docs/skills/release/SKILL.md", failed: false, result: "found"),
+            .user("next"),
+        ])
+        XCTAssertTrue(md.contains("READ ×4: demo/AGENTS.md, release/SKILL.md"), md)
+        XCTAssertFalse(md.contains("lots of code"))
+        XCTAssertFalse(md.contains("TOOL Bash"))
+    }
+
+    func testKeptCallsShowOnlyCommandAndOutcome() {
+        let md = digest([
+            .tool(name: "Bash", input: "swift test", failed: false, result: "Test run with 133 tests passed"),
+            .tool(name: "Bash", input: "npm run build", failed: true, result: "error TS2345: bad argument"),
+            .tool(name: "Bash", input: "sed -i '' 's/a/b/' CLAUDE.md", failed: false, result: ""),
+            .tool(name: "Bash", input: "echo done > notes.txt", failed: false, result: ""),
+        ])
+        XCTAssertTrue(md.contains("TOOL Bash ✓: swift test\n"), md)
+        XCTAssertFalse(md.contains("133 tests"))
+        XCTAssertTrue(md.contains("TOOL Bash ✗: npm run build → error TS2345: bad argument"))
+        XCTAssertTrue(md.contains("TOOL Bash ✓: sed -i '' 's/a/b/' CLAUDE.md"))
+        XCTAssertTrue(md.contains("TOOL Bash ✓: echo done > notes.txt"))
+        XCTAssertFalse(md.contains("READ ×"))
+    }
+
+    func testFailedLookupStaysVisible() {
+        let md = digest([.tool(name: "Read", input: "/work/demo/missing.md", failed: true, result: "File does not exist")])
+        XCTAssertTrue(md.contains("TOOL Read ✗: /work/demo/missing.md → File does not exist"), md)
+    }
+
+    func testDestructiveFindIsNotALookup() {
+        XCTAssertFalse(EvidencePack.isLookup(name: "Bash", input: "find . -name '*.tmp' -delete"))
+        XCTAssertFalse(EvidencePack.isLookup(name: "Bash", input: "git push origin main"))
+        XCTAssertTrue(EvidencePack.isLookup(name: "Bash", input: "FOO=1 head -n 5 README.md"))
+        XCTAssertTrue(EvidencePack.isLookup(name: "Bash", input: #"grep -rn "alpha\|beta" src | sed -E 's/=.+/=<redacted>/'"#))
+        XCTAssertFalse(EvidencePack.isLookup(name: "Bash", input: "cat >> docs/NOTES.md <<'EOF'"))
+    }
+}
