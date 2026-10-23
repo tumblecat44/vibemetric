@@ -10,8 +10,9 @@ public enum EvidencePack {
             .appendingPathComponent(isDev ? "Vibemetric Dev/packs" : "Vibemetric/packs", isDirectory: true)
     }
 
-    /// Digests written per pack. A score reads `AssessmentOptions.readingTarget` of them; the rest give it room to choose.
-    public static let maxDigests = 150
+    /// Digests written per pack: exactly `AssessmentOptions.readingTarget`, so every run on the same history reads
+    /// the same sessions instead of choosing a different subset each time.
+    public static let maxDigests = AssessmentOptions.readingTarget
     static let digestCharLimit = 12_000
 
     /// The last saved assessment, so the judge can keep scores steady unless new evidence moves them.
