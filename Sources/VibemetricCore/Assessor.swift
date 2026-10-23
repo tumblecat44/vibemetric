@@ -12,7 +12,7 @@ public struct AssessmentOptions: Sendable {
     public static let readingTarget = 70
     /// The person's own notes for the judge, e.g. "the demo-skill sessions were only a test".
     public var instructions: String?
-    public static let rubricVersion = "38"
+    public static let rubricVersion = "39"
     public static let maxInstructionsLength = 2000
 
     public init(engine: AssessmentEngine = .claude, model: String? = nil, instructions: String? = nil) {
@@ -490,6 +490,8 @@ public final class Assessor: Sendable {
         criteria and sources; do not generate those snapshots or source URLs for non-Planning dimensions.
 
         Apply these content rules to every competency, including High and Unknown:
+        Describe automatic practice as "without additional user intervention" (Korean: "추가 사용자 개입 없이"),
+        rather than vague references to reminders or notifications. Use plain words for the behavior being assessed.
         - `summary`: two connected everyday sentences. Describe the supported practice and its consequence, grounded in
         a representative project/task: what was wanted, what the person or AI did, and what was achieved or remains open.
         Every summary must name the actual project directory by its project name, without a personal home-directory prefix,
@@ -532,7 +534,7 @@ public final class Assessor: Sendable {
         its level. Explain the concrete request/action and completion check or missing condition; a project name and
         a rating alone do not explain the case. Say who did what and when it matters for the criterion. Include a
         supported contrasting case when it explains a mixed rating, and preserve later repairs. Use the example's
-        amount of detail, without retelling the implementation history or copying fictional cases.
+        amount of detail, without retelling the implementation history or copying illustrative examples.
           - `overallJudgment`: explain the rated task total and all three High, Medium and Low counts and
         percentages, including zero groups. Every nonzero group needs a representative actual directory/task, explicit
         actor and defining behavior in this paragraph itself. Use connected sentences, not a bare tally or task ledger.

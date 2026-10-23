@@ -11,18 +11,18 @@ public struct PlanningAssessment: Codable, Sendable {
             switch self {
             case .outcomesCompletion: "Goals and completion checks"
             case .constraints: "Limits and requirements"
-            case .taskContext: "Background for the task"
-            case .ambiguityResolution: "Clearing up unclear requests"
+            case .taskContext: "Task background"
+            case .ambiguityResolution: "Requirement clarity"
             }
         }
 
         public func title(language: String) -> String {
             guard language.lowercased().hasPrefix("ko") else { return title }
             switch self {
-            case .outcomesCompletion: return "최종 사용자 결과와 완료 기준"
-            case .constraints: return "제약 조건"
-            case .taskContext: return "작업 맥락"
-            case .ambiguityResolution: return "모호한 요구사항 명확화"
+            case .outcomesCompletion: return "목표와 완료 기준"
+            case .constraints: return "작업 범위와 제약"
+            case .taskContext: return "작업 배경"
+            case .ambiguityResolution: return "요구사항 명확성"
             }
         }
     }

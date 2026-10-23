@@ -141,7 +141,7 @@ struct PlanningAssessmentTests {
             planning.competencies[index].solution = "solution-\(index)"
         }
         let korean = planning.markdown(language: "ko")
-        #expect(korean.contains("### 최종 사용자 결과와 완료 기준 · 상"))
+        #expect(korean.contains("### 목표와 완료 기준 · 상"))
         #expect(korean.contains("**해결 방법**"))
         #expect(!korean.contains("solution-0"))
         #expect(korean.contains("solution-1"))
