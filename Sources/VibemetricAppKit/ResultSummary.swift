@@ -58,19 +58,29 @@ struct ResultSummary: View {
             .map(\.headline))
     }
 
+    /// The heading, then the bullets in a rounded card like the category list below: a round green dot per point,
+    /// with roomy lines and gaps.
     private var doingWell: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             SummaryHeading(text: "What you're doing well", symbol: "checkmark.circle", color: Theme.color(for: .strong))
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 10) {
                 ForEach(Array(highlights.enumerated()), id: \.offset) { _, line in
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text("•").foregroundStyle(Theme.color(for: .strong))
-                        Text(inline(line)).fixedSize(horizontal: false, vertical: true)
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Circle().fill(Theme.color(for: .strong))
+                            .frame(width: 6 * scale, height: 6 * scale)
+                            .alignmentGuide(.firstTextBaseline) { $0[.bottom] + 4 * scale }
+                            .accessibilityHidden(true)
+                        Text(inline(line)).scaledFont(15).foregroundStyle(Theme.ink)
+                            .lineSpacing(3)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
-            .scaledFont(15)
-            .foregroundStyle(Theme.ink)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.rule, lineWidth: 1))
         }
     }
 
