@@ -1,8 +1,8 @@
 import SwiftUI
 import VibemetricCore
 
-/// The first screen of a result: the score, what's going well, and what to fix, one short box per category.
-/// Each category opens its full explanation, evidence and steps with "See details".
+/// The first screen of a result: the score, strengths card, and category list.
+/// Each category row opens its full explanation, evidence and steps.
 struct ResultSummary: View {
     @Environment(\.textScale) private var scale
     var record: CardRecord
@@ -58,19 +58,29 @@ struct ResultSummary: View {
             .map(\.headline))
     }
 
+    /// The heading, then the bullets in a rounded card like the category list below: a round green dot per point,
+    /// with roomy lines and gaps.
     private var doingWell: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             SummaryHeading(text: "What you're doing well", symbol: "checkmark.circle", color: Theme.color(for: .strong))
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 10) {
                 ForEach(Array(highlights.enumerated()), id: \.offset) { _, line in
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text("•").foregroundStyle(Theme.color(for: .strong))
-                        Text(inline(line)).fixedSize(horizontal: false, vertical: true)
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Circle().fill(Theme.color(for: .strong))
+                            .frame(width: 6 * scale, height: 6 * scale)
+                            .alignmentGuide(.firstTextBaseline) { $0[.bottom] + 4 * scale }
+                            .accessibilityHidden(true)
+                        Text(inline(line)).scaledFont(15).foregroundStyle(Theme.ink)
+                            .lineSpacing(3)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
-            .scaledFont(15)
-            .foregroundStyle(Theme.ink)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.rule, lineWidth: 1))
         }
     }
 
@@ -86,19 +96,26 @@ struct ResultSummary: View {
     private var toFix: some View {
         let shown = showsAllFixes ? fixes : Array(fixes.prefix(Self.visibleFixes))
         let hidden = fixes.dropFirst(Self.visibleFixes)
-        return VStack(alignment: .leading, spacing: 18) {
+        return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                SummaryHeading(text: "What to fix", symbol: "exclamationmark.triangle", color: Theme.color(for: .developing))
+                SummaryHeading(text: "Focus on these next", symbol: "exclamationmark.triangle", color: Theme.color(for: .developing))
                 if fixes.count > Self.visibleFixes {
                     Text("· \(shown.count) of \(fixes.count)").scaledFont(13).foregroundStyle(Theme.muted)
                 }
             }
-            ForEach(shown) { d in
-                FixBox(result: d, change: changes.first { $0.dimension == d.dimension },
-                       note: card.deductionNote(for: d.dimension),
-                       deductions: card.deductionAppliedTo == d.dimension ? card.deductions ?? [] : [],
-                       footer: deepDiveFooter?(d.dimension), expanded: expandAll)
+            // One card, a row per category, split by inset hairlines.
+            VStack(spacing: 0) {
+                ForEach(Array(shown.enumerated()), id: \.element.id) { i, d in
+                    if i > 0 { Rectangle().fill(Theme.rule).frame(height: 1).padding(.leading, 18 + 40 * scale + 14) }
+                    FixBox(result: d, change: changes.first { $0.dimension == d.dimension },
+                           note: card.deductionNote(for: d.dimension),
+                           deductions: card.deductionAppliedTo == d.dimension ? card.deductions ?? [] : [],
+                           footer: deepDiveFooter?(d.dimension), expanded: expandAll)
+                }
             }
+            .background(Theme.card)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.rule, lineWidth: 1))
             if !hidden.isEmpty {
                 Button {
                     withAnimation(.easeOut(duration: 0.2)) { showsAllFixes.toggle() }
@@ -117,8 +134,8 @@ struct ResultSummary: View {
     }
 }
 
-/// One category: a centered banner with its name and score, the issue and the fix side by side, and "See details",
-/// which opens the full explanation. A click anywhere on the box does the same.
+/// One category as a row of the list: a score ring, its name with the issue under it, and a chevron. A click opens the
+/// full explanation, with the fix, below.
 private struct FixBox: View {
     var result: ScoreCard.DimensionResult
     var change: ScoreChange?
@@ -158,96 +175,56 @@ private struct FixBox: View {
         }
         return sentence
     }
-    private var fix: String? {
-        if let line = result.fixLine, !line.trimmingCharacters(in: .whitespaces).isEmpty { return line }
-        return result.tryThis.flatMap { $0.isEmpty ? nil : $0 }
-    }
 
     private var bandColor: Color { result.band.map(Theme.color(for:)) ?? Theme.muted }
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
             Button(action: toggle) { summary.contentShape(Rectangle()) }
                 .buttonStyle(.plain)
+                .pointingHandCursor()
+                .onHover { hovering = $0 }
                 .accessibilityHint(expanded ? "Hides the details" : "Shows the details")
             if expanded {
-                divider
                 CategoryDetails(result: result, note: note, deductions: deductions, footer: footer, expandAll: expandAll)
-                    .padding(16)
+                    .padding(.leading, 18 + ringSize + 14)
+                    .padding(.trailing, 18)
+                    .padding(.bottom, 18)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            divider
-            // "See details" across the bottom, tinted in the score's band color; unscored categories stay neutral.
-            Button(action: toggle) {
-                Label {
-                    Text(expanded ? "Hide details" : "See details")
-                } icon: {
-                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
-                }
-                    .labelStyle(TrailingIconLabelStyle())
-                    .scaledFont(13, weight: .semibold)
-                    .foregroundStyle(bandColor)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 13)
-                    .background(result.band.map { Theme.color(for: $0).opacity(0.16) } ?? Theme.paper)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .pointingHandCursor()
         }
-        .frame(maxWidth: .infinity)
-        .background(Theme.card)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.rule, lineWidth: 1))
+        .background(hovering || expanded ? Theme.ink.opacity(0.035) : .clear)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
+
+    @Environment(\.textScale) private var scale
+    @State private var hovering = false
+    private var ringSize: CGFloat { 40 * scale }
 
     private func toggle() { withAnimation(.easeOut(duration: 0.15)) { expanded.toggle() } }
 
-    private var divider: some View {
-        Rectangle().fill(result.band.map { Theme.color(for: $0).opacity(0.3) } ?? Theme.rule).frame(height: 1)
-    }
-
+    /// The score as a ring, then the category's name with the issue under it, and a chevron.
     private var summary: some View {
-        VStack(spacing: 0) {
-            // A centered banner: the name, then the score as dots and "6/10".
-            VStack(spacing: 5) {
-                Text(result.dimension.title).scaledFont(15, weight: .semibold).foregroundStyle(Theme.ink)
+        HStack(alignment: .center, spacing: 14) {
+            ScoreRing(score: result.score, color: bandColor, size: ringSize)
+            VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
-                    ScorePips(score: result.score, size: 9)
-                    Text(result.score.map { "\($0)/10" } ?? result.status.label)
-                        .scaledFont(15, weight: .semibold)
-                        .monospacedDigit()
-                        .foregroundStyle(bandColor)
+                    Text(result.dimension.title).scaledFont(15, weight: .semibold).foregroundStyle(Theme.ink)
                     if let change { DeltaBadge(change: change) }
                 }
+                Text(inline(issue)).scaledFont(13).foregroundStyle(Theme.muted)
+                    .lineSpacing(1)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .multilineTextAlignment(.center)
-            .padding(.vertical, 11)
-            .padding(.horizontal, 16)
-            .frame(maxWidth: .infinity)
-            divider
-            // Issue and fix side by side, split by a thin rule.
-            HStack(alignment: .top, spacing: 0) {
-                column(label: "Issue", text: issue, color: Theme.color(for: .bottleneck))
-                if let fix {
-                    Rectangle().fill(Theme.rule).frame(width: 1).padding(.vertical, 2)
-                    column(label: "Fix", text: fix, color: Theme.color(for: .strong))
-                }
-            }
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Image(systemName: "chevron.right")
+                .scaledFont(11, weight: .semibold)
+                .foregroundStyle(Theme.muted.opacity(hovering ? 1 : 0.5))
+                .rotationEffect(.degrees(expanded ? 90 : 0))
         }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
         .accessibilityElement(children: .combine)
-    }
-
-    private func column(label: String, text: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label).scaledFont(13, weight: .semibold).foregroundStyle(color)
-            Text(inline(text)).scaledFont(14).foregroundStyle(Theme.ink)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, 16)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -290,15 +267,6 @@ private struct ChangePill: View {
     }
 }
 
-/// The title, then its icon: "See details ⌄".
-private struct TrailingIconLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 5) {
-            configuration.title
-            configuration.icon
-        }
-    }
-}
 
 private extension View {
     /// The pointing-hand cursor while the pointer is over this view, as for a link.
@@ -306,5 +274,32 @@ private extension View {
         onHover { inside in
             if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
         }
+    }
+}
+
+/// A category's score as a ring filled to the score, with the number inside: the same round shape as the
+/// sidebar's score badges.
+private struct ScoreRing: View {
+    var score: Int?
+    var color: Color
+    var size: CGFloat
+
+    var body: some View {
+        ZStack {
+            Circle().stroke(Theme.rule, lineWidth: size * 0.08)
+            if let score {
+                Circle()
+                    .trim(from: 0, to: CGFloat(score) / 10)
+                    .stroke(color, style: StrokeStyle(lineWidth: size * 0.08, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
+            Text(score.map(String.init) ?? "–")
+                .font(.system(size: size * 0.38, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(score == nil ? Theme.muted : color)
+        }
+        .frame(width: size, height: size)
+        .accessibilityElement()
+        .accessibilityLabel(score.map { "\($0) out of 10" } ?? "Not scored")
     }
 }

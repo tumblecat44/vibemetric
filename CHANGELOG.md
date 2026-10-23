@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.13 (2026-10-22)
+
+- "What you're doing well" shows its points in a rounded card that matches the category list, with a green dot for each point and more space between lines.
+
+## 0.4.12 (2026-10-22)
+
+- "Focus on these next" lists every category in one card. Each row has a ring filled to the score, the category's name with its issue underneath, and a chevron. Click a row to see the full explanation and the fix.
+
 ## 0.4.11 (2026-10-22)
 
 - Each engine in the Engine switch says whether it's ready: Ready, Not installed, Not signed in, or Can't start. When the selected engine can't score, Vibemetric says what's missing and gives the Terminal command to fix it, with a Copy button. If you have the Claude desktop app but not Claude Code's `claude` command, it says so plainly.
