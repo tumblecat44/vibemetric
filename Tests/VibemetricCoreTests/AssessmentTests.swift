@@ -415,7 +415,7 @@ struct AssessmentTests {
     @Test func readingPhasesFitWithinTheOneHourLimit() {
         let phases = AssessmentOptions().reading
         #expect(AssessmentOptions.scoreTimeLimit == 60 * 60)
-        #expect(phases.skimMinimum == 2 * 60 && phases.investigateMinimum == 3 * 60)
+        #expect(phases.skimMinimum == 60 && phases.investigateMinimum == 3 * 60)
         #expect(phases.digestShare == 0.15 && phases.investigateShare == 0.20 && phases.writeStartShare == 0.50)
         #expect(AssessmentOptions(engine: .claude).digestTokenBudget == 150_000)
         #expect(AssessmentOptions(engine: .codex).digestTokenBudget == 71_250)

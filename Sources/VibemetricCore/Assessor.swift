@@ -37,7 +37,7 @@ public struct AssessmentOptions: Sendable {
 /// `digestShare` of the engine's context, investigating may add `investigateShare`, and reading stops once the context
 /// reaches `writeStartShare`, so the card is written with room to spare.
 public struct ReadingPhases: Sendable {
-    public var skimMinimum: TimeInterval = 2 * 60
+    public var skimMinimum: TimeInterval = 60
     public var skimLimit: TimeInterval = 10 * 60
     public var investigateMinimum: TimeInterval = 3 * 60
     public var investigateLimit: TimeInterval = 15 * 60
