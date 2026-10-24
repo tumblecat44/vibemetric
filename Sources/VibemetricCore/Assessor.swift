@@ -514,7 +514,10 @@ public final class Assessor: Sendable {
             let allowed = ["Read", "Grep", "Glob"] + (web ? ["WebSearch"] + webFetchDomains.map { "WebFetch(domain:\($0))" } : [])
             args = ["-p", "--output-format", "stream-json", "--verbose", "--json-schema", schema,
                     "--tools"] + tools + ["--allowedTools"] + allowed + [
-                    "--permission-mode", "dontAsk", "--setting-sources", "project"]
+                    "--permission-mode", "dontAsk", "--setting-sources", "project",
+                    // The person's MCP servers and connectors add nothing to judging, yet Claude Code announces their
+                    // tools again in every continued session; a measured score spent about 40% of its context on them.
+                    "--strict-mcp-config", "--mcp-config", #"{"mcpServers":{}}"#]
             if let forkSessionID { args += ["--resume", forkSessionID, "--fork-session"] }
             for dir in readableDirectories { args += ["--add-dir", dir.path] }
             for source in sources where FileManager.default.fileExists(atPath: source.root.path) {

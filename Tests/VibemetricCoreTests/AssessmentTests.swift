@@ -65,6 +65,7 @@ struct AssessmentTests {
         let args = try String(contentsOf: fixture.directory.appendingPathComponent("received-arguments.txt"), encoding: .utf8)
         if engine == .claude {
             #expect(args.contains("--tools\nRead\nGrep\nGlob\n--allowedTools\nRead\nGrep\nGlob\n--permission-mode\ndontAsk"))
+            #expect(args.contains("--strict-mcp-config\n--mcp-config\n{\"mcpServers\":{}}\n"), "The person's MCP servers stay out of judging")
             #expect(!args.contains("WebSearch"))
             #expect(!args.contains("WebFetch"))
         } else {
