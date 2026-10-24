@@ -94,8 +94,19 @@ enum JSONSchema {
     }
 
     static func scoreCard(for engine: AssessmentEngine) -> String {
+        encoded(object(cardProperties(for: engine)))
+    }
+
+    /// The card without its dimensions: everything written after the dimensions are in.
+    static func cardFrame(for engine: AssessmentEngine) -> String {
+        var properties = cardProperties(for: engine)
+        properties["dimensions"] = nil
+        return encoded(object(properties))
+    }
+
+    private static func cardProperties(for engine: AssessmentEngine) -> [String: Any] {
         let dimension: [String: Any] = ["anyOf": dimensionSchemas(for: engine).map(\.1)]
-        let schema = object([
+        return [
             "language": str,
             "diagnosis": str,
             "summary": array(str, min: 2, max: 3),
@@ -136,7 +147,6 @@ enum JSONSchema {
                     "remainingLeads": array(str),
                 ])),
             ]),
-        ])
-        return encoded(schema)
+        ]
     }
 }

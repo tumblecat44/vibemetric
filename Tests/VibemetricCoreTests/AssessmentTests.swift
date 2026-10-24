@@ -60,7 +60,7 @@ struct AssessmentTests {
         #expect(outcome.sessionID != CLIFixture.forkID)
         #expect(outcome.engine == engine)
         #expect(outcome.cliVersion == "fixture")
-        #expect(abs((outcome.costUSD ?? 0) - (engine == .claude ? 0.06 : 0)) < 0.000_001)
+        #expect(abs((outcome.costUSD ?? 0) - (engine == .claude ? 0.10 : 0)) < 0.000_001, "Skim, investigate, and three writing parts")
         #expect((outcome.costUSD == nil) == (engine == .codex))
         let args = try String(contentsOf: fixture.directory.appendingPathComponent("received-arguments.txt"), encoding: .utf8)
         if engine == .claude {
@@ -183,7 +183,8 @@ struct AssessmentTests {
         #expect(outcome.card.dimensions.count == 10)
         #expect(events.texts.contains(Assessor.rewriteNotice))
         let prompts = try String(contentsOf: fixture.directory.appendingPathComponent("prompt-log.txt"), encoding: .utf8)
-        #expect(prompts.components(separatedBy: "Your last reply did not include the score card").count == 2)
+        #expect(prompts.components(separatedBy: "Your last reply did not include the requested part").count - 1 == 3,
+                "Each of the three parts is asked for once more")
     }
 
     @Test func aCardStillMissingAfterTheSecondRequestFails() async throws {
@@ -194,7 +195,23 @@ struct AssessmentTests {
                 .run(packDir: fixture.directory, sources: [], options: .fixture(.claude)) { _ in }
         }
         let prompts = try String(contentsOf: fixture.directory.appendingPathComponent("prompt-log.txt"), encoding: .utf8)
-        #expect(prompts.components(separatedBy: "Your last reply did not include the score card").count == 2)
+        #expect(prompts.components(separatedBy: "Your last reply did not include the requested part").count - 1 == 3,
+                "Each part is asked for once more, never twice")
+    }
+
+    @Test(arguments: AssessmentEngine.allCases)
+    func theCardIsWrittenInThreePartsAndAssembled(_ engine: AssessmentEngine) async throws {
+        let fixture = try CLIFixture()
+        defer { fixture.remove() }
+        let outcome = try await Assessor(installation: CLIInstallation(executable: fixture.command))
+            .run(packDir: fixture.directory, sources: [], options: .fixture(engine)) { _ in }
+        #expect(outcome.card.knownTotal == 68)
+        #expect(Assessor.incompleteDimensions(outcome.card).isEmpty)
+        let prompts = try String(contentsOf: fixture.directory.appendingPathComponent("prompt-log.txt"), encoding: .utf8)
+        for part in ["part 1 of 3", "part 2 of 3", "part 3 of 3"] { #expect(prompts.contains(part)) }
+        #expect(prompts.contains("planning_specs, context_engineering"), "The first part asks for the first five dimensions")
+        #expect(prompts.contains("never write a straight double quote or a backslash"))
+        #expect(!prompts.contains("Your last reply did not include the requested part"))
     }
 
     @Test func aCardClaudeCodeTurnsDownIsKeptInsteadOfWrittenAgain() async throws {
@@ -206,7 +223,7 @@ struct AssessmentTests {
         #expect(outcome.card.knownTotal == 68)
         #expect(Date().timeIntervalSince(started) < 10, "The app stops the CLI instead of waiting for a rewrite")
         let prompts = try String(contentsOf: fixture.directory.appendingPathComponent("prompt-log.txt"), encoding: .utf8)
-        #expect(!prompts.contains("Your last reply did not include the score card"))
+        #expect(!prompts.contains("Your last reply did not include the requested part"))
     }
 
     @Test(arguments: AssessmentEngine.allCases)
@@ -244,7 +261,7 @@ struct AssessmentTests {
         let prompts = try String(contentsOf: fixture.directory.appendingPathComponent("prompt-log.txt"), encoding: .utf8)
         #expect(prompts.components(separatedBy: "Return only these dimensions").count == 2)
         #expect(prompts.contains("except for these dimensions: security."))
-        #expect(!prompts.contains("Your last reply did not include the score card"))
+        #expect(!prompts.contains("Your last reply did not include the requested part"))
     }
 
     @Test(arguments: AssessmentEngine.allCases)
@@ -276,10 +293,11 @@ struct AssessmentTests {
             .run(packDir: fixture.directory, sources: [], options: .fixture(engine)) { _ in }
         if engine == .claude {
             let thinking = try String(contentsOf: fixture.directory.appendingPathComponent("thinking-log.txt"), encoding: .utf8)
-            #expect(thinking.split(separator: "\n") == ["0", "0", "unset"], "Skim and investigate without thinking; write with it")
+            #expect(thinking.split(separator: "\n") == ["0", "0", "unset", "unset", "unset"],
+                    "Skim and investigate without thinking; the three writing parts with it")
         } else {
             let effort = try String(contentsOf: fixture.directory.appendingPathComponent("effort-log.txt"), encoding: .utf8)
-            #expect(effort.split(separator: "\n") == ["low", "low", "default"])
+            #expect(effort.split(separator: "\n") == ["low", "low", "default", "default", "default"])
         }
     }
 
