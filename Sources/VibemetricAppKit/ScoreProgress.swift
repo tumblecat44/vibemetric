@@ -17,7 +17,7 @@ struct ScoreProgress {
 
     private(set) var stage: Stage = .preparing
     private(set) var digestsRead: Set<String> = []
-    /// Digests that must be opened before skimming may end.
+    /// Digests that must be opened before skimming may end: every digest in the pack, once it is written.
     private(set) var target: Int
     private let phases: ReadingPhases
     private var started: Date
@@ -26,12 +26,12 @@ struct ScoreProgress {
     init(started: Date = Date(), phases: ReadingPhases = .standard) {
         self.started = started
         self.phases = phases
-        target = max(1, phases.skimDigests)
+        target = EvidencePack.maxDigests
     }
 
     /// The evidence pack is ready and the engine starts skimming it.
     mutating func startReading(digests: Int, at now: Date = Date()) {
-        target = max(1, min(digests, phases.skimDigests))
+        target = max(1, digests)
         enter(.skimming, at: now)
     }
 

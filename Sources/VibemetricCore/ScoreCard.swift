@@ -424,6 +424,15 @@ public struct ScoreCard: Codable, Sendable {
     }
 
     /// Only called for new assessments. Loading an older result preserves its original scoring policy.
+    /// Puts each given dimension in place of the card's own (all copies of it), or adds it when the card had none.
+    public mutating func replaceDimensions(_ replacements: [DimensionResult]) {
+        for replacement in replacements {
+            let position = dimensions.firstIndex { $0.dimension == replacement.dimension }
+            dimensions.removeAll { $0.dimension == replacement.dimension }
+            dimensions.insert(replacement, at: min(position ?? dimensions.count, dimensions.count))
+        }
+    }
+
     public mutating func calculateCompetencyScores() throws {
         guard dimensions.count == Dimension.allCases.count,
               Set(dimensions.map(\.dimension)) == Set(Dimension.allCases),

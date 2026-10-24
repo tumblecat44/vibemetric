@@ -494,7 +494,8 @@ public final class AppModel {
                     let report = previous.map { prev in
                         RuleFiles.changesReport(current: snapshot, previous: baselineId.flatMap(Store.loadRules(for:)), since: prev.date)
                     }
-                    try EvidencePack.write(scan, to: packDir, previous: previous, ruleChanges: report, contextFiles: snapshot)
+                    try EvidencePack.write(scan, to: packDir, previous: previous, ruleChanges: report, contextFiles: snapshot,
+                                           digestTokenBudget: options.digestTokenBudget)
                     try EvidencePack.writeSupplementary(scan, to: packDir, inputs: ["usage", "model_settings"])
                     return snapshot
                 }.value

@@ -9,12 +9,18 @@ public struct AssessmentOptions: Sendable {
     public static let scoreTimeLimit: TimeInterval = 60 * 60
     /// How long a score skims and investigates before it may write the card.
     public var reading = ReadingPhases.standard
-    /// The digests a score reads in full: every session since the last score first, then leads, then a spread.
-    public static let readingTarget = 70
+    /// The digests a score is expected to read, for the card's low-coverage warning: about what a Codex pack holds
+    /// within its share of the context, so a smaller pack is not flagged by design.
+    public static let readingTarget = 15
     /// The person's own notes for the judge, e.g. "the demo-skill sessions were only a test".
     public var instructions: String?
     public static let rubricVersion = "40"
     public static let maxInstructionsLength = 2000
+
+    /// The engine's context window for this model, in tokens.
+    public var contextWindow: Int { engine.contextWindow(model: model) }
+    /// The tokens of digests a pack holds for this engine: `ReadingPhases.digestShare` of its context.
+    public var digestTokenBudget: Int { Int(Double(contextWindow) * reading.digestShare) }
 
     public init(engine: AssessmentEngine = .claude, model: String? = nil, instructions: String? = nil) {
         self.engine = engine
@@ -25,18 +31,21 @@ public struct AssessmentOptions: Sendable {
     }
 }
 
-/// A score reads in two app-enforced phases before it writes: skimming digests, then investigating original
-/// transcripts. Each phase sends early returns back to keep reading until its minimum is met, and simply ends at its
-/// limit, so reading is never thrown away. Writing then runs once, uncut, within the score's time limit.
+/// A score reads in two app-enforced phases before it writes: skimming every digest in the pack, then investigating
+/// original transcripts. Each phase sends early returns back to keep reading until its minimum is met, and simply ends
+/// at its limit, so reading is never thrown away. Reading is also bounded by context: the pack's digests take
+/// `digestShare` of the engine's context, investigating may add `investigateShare`, and reading stops once the context
+/// reaches `writeStartShare`, so the card is written with room to spare.
 public struct ReadingPhases: Sendable {
     public var skimMinimum: TimeInterval = 2 * 60
-    /// Digests the app must see opened before skimming may end; capped at the pack's digest count.
-    public var skimDigests = 50
     public var skimLimit: TimeInterval = 10 * 60
     public var investigateMinimum: TimeInterval = 3 * 60
     public var investigateLimit: TimeInterval = 15 * 60
     /// Requests per phase, so a run that keeps answering early cannot loop forever.
     public var maxRequests = 6
+    public var digestShare = 0.15
+    public var investigateShare = 0.20
+    public var writeStartShare = 0.50
 
     public init() {}
     public static let standard = ReadingPhases()
@@ -44,7 +53,6 @@ public struct ReadingPhases: Sendable {
     public static var immediate: ReadingPhases {
         var phases = ReadingPhases()
         phases.skimMinimum = 0
-        phases.skimDigests = 0
         phases.investigateMinimum = 0
         return phases
     }
@@ -117,45 +125,40 @@ public final class Assessor: Sendable {
         let end = started.addingTimeInterval(options.timeout)
         let phases = options.reading
         let digests = Self.digestCount(packDir)
-        let skimTarget = min(digests, phases.skimDigests)
+        let window = options.contextWindow
+        let writeStart = Int(Double(window) * phases.writeStartShare)
         var reading = ReadingState()
 
-        // 1. Skim: digests only, at least `skimMinimum` and `skimTarget` opened digests.
+        // 1. Skim every digest in the pack, for at least `skimMinimum`, stopping early if the context is half full.
         onProgress(.thinking(Self.skimNotice))
         let assessmentPrompt = Self.prompt(sources: sources, now: started, previousDate: previousDate, digestCount: digests,
                                            engine: options.engine, instructions: options.instructions)
-        try await readPhase(assessmentPrompt + Self.skimRequest(target: skimTarget), minimum: phases.skimMinimum, limit: phases.skimLimit, end: end, state: &reading,
-                            packDir: packDir, sources: sources, options: options, onProgress: onProgress) { elapsed, opened in
-            elapsed >= phases.skimMinimum && opened >= skimTarget
-                ? nil : Self.skimNudge(opened: opened, target: skimTarget, elapsed: elapsed, minimum: phases.skimMinimum)
+        try await readPhase(assessmentPrompt + Self.skimRequest(target: digests), minimum: phases.skimMinimum, limit: phases.skimLimit,
+                            contextLimit: writeStart, end: end, state: &reading, packDir: packDir, sources: sources,
+                            options: options, onProgress: onProgress) { elapsed, opened in
+            elapsed >= phases.skimMinimum && opened >= digests
+                ? nil : Self.skimNudge(opened: opened, target: digests, elapsed: elapsed, minimum: phases.skimMinimum)
         }
-        // 2. Investigate: original transcripts behind the leads, for at least `investigateMinimum`.
-        onProgress(.thinking(Self.investigateNotice))
-        try await readPhase(Self.investigateRequest, minimum: phases.investigateMinimum, limit: phases.investigateLimit, end: end,
-                            state: &reading, packDir: packDir, sources: sources, options: options, onProgress: onProgress) { elapsed, _ in
-            elapsed >= phases.investigateMinimum ? nil : Self.investigateNudge(elapsed: elapsed, minimum: phases.investigateMinimum)
+        // 2. Investigate original transcripts, adding at most `investigateShare` of the context and never passing half.
+        if reading.contextFull {
+            onProgress(.thinking(Self.contextNotice))
+        } else {
+            onProgress(.thinking(Self.investigateNotice))
+            let investigateLimit = min(writeStart, reading.contextTokens + Int(Double(window) * phases.investigateShare))
+            try await readPhase(Self.investigateRequest, minimum: phases.investigateMinimum, limit: phases.investigateLimit,
+                                contextLimit: investigateLimit, end: end, state: &reading, packDir: packDir, sources: sources,
+                                options: options, onProgress: onProgress) { elapsed, _ in
+                elapsed >= phases.investigateMinimum ? nil : Self.investigateNudge(elapsed: elapsed, minimum: phases.investigateMinimum)
+            }
         }
-        // 3. Write once, uncut, in the rest of the score's time.
+        // 3. Write in the rest of the score's time.
         onProgress(.thinking(Self.writingNotice))
-        var write = options
-        write.timeout = max(end.timeIntervalSinceNow, 1)
         // Without a saved reading session (no time was left to read), the request carries the whole assessment prompt.
         let writeRequest = reading.sessionID == nil ? assessmentPrompt + "\n\n" + Self.writePrompt : Self.writePrompt
-        var raw = try await runOnce(prompt: writeRequest, schema: JSONSchema.scoreCard(for: options.engine), packDir: packDir,
-                                    sources: sources, options: write, webAccess: false, forkSessionID: reading.sessionID,
-                                    workingDirectory: nil, onProgress: onProgress)
+        var (card, raw) = try await writeCard(writeRequest, forkSessionID: reading.sessionID, end: end, packDir: packDir,
+                                              sources: sources, options: options, onProgress: onProgress)
         raw.costUSD = reading.costUSD.flatMap { spent in raw.costUSD.map { spent + $0 } }
         raw.turns = reading.turns.flatMap { spent in raw.turns.map { spent + $0 } }
-        var card: ScoreCard
-        do {
-            card = try JSONDecoder().decode(ScoreCard.self, from: raw.data)
-            try card.normalizePlanningAssessment()
-            try card.normalizeBehavioralAssessments()
-            try card.calculateCompetencyScores()
-            try Self.validate(card, requirePlanning: true, requireAssessments: true, requireExplanations: true)
-        } catch {
-            throw AssessmentError.noStructuredOutput(options.engine, "The response did not match the score-card format. Try again.")
-        }
         card = try card.hidingUserPaths()
         raw.elapsed = Date().timeIntervalSince(started)
         card.scope.elapsedMinutes = (raw.elapsed / 60 * 10).rounded() / 10
@@ -174,12 +177,105 @@ public final class Assessor: Sendable {
         var costUSD: Double? = 0
         var turns: Int? = 0
         var reachedLimit = false
+        /// The context the saved session holds, and whether reading stopped because it reached its share.
+        var contextTokens = 0
+        var contextFull = false
+    }
+
+    /// Writes the card. A card Claude Code turned down is kept when the app can read it, instead of being written again;
+    /// a card with incomplete dimensions gets just those dimensions asked for; only a reply with no card at all is
+    /// asked for the whole card once more. Each follow-up continues the writing session within the score's time.
+    private func writeCard(_ prompt: String, forkSessionID: String?, end: Date, packDir: URL, sources: [TranscriptSource],
+                           options: AssessmentOptions,
+                           onProgress: @escaping @Sendable (Progress) -> Void) async throws -> (ScoreCard, StructuredOutput) {
+        let schema = JSONSchema.scoreCard(for: options.engine)
+        func request(_ prompt: String, schema: String, fork: String?,
+                     keeps: @escaping @Sendable (Data) -> Bool) async throws -> StructuredOutput {
+            var write = options
+            write.timeout = max(end.timeIntervalSinceNow, 1)
+            return try await runOnce(prompt: prompt, schema: schema, packDir: packDir, sources: sources, options: write,
+                                     webAccess: false, forkSessionID: fork, workingDirectory: nil, requiresOutput: false,
+                                     keepsRejected: keeps, onProgress: onProgress)
+        }
+        var cost: Double? = 0
+        var turns: Int? = 0
+        func spend(_ output: StructuredOutput) {
+            cost = cost.flatMap { spent in output.costUSD.map { spent + $0 } }
+            turns = turns.flatMap { spent in output.turns.map { spent + $0 } }
+        }
+        var raw = try await request(prompt, schema: schema, fork: forkSessionID) { Self.decodeCard($0) != nil }
+        spend(raw)
+        var card = Self.decodeCard(raw.data)
+        if card == nil, end.timeIntervalSinceNow > 60 {
+            onProgress(.thinking(Self.rewriteNotice))
+            raw = try await request(Self.rewritePrompt, schema: schema, fork: raw.sessionID) { Self.decodeCard($0) != nil }
+            spend(raw)
+            card = Self.decodeCard(raw.data)
+        }
+        guard var card else {
+            throw AssessmentError.noStructuredOutput(options.engine, "The final response did not include the score card. Try again.")
+        }
+        let missing = Self.incompleteDimensions(card)
+        if !missing.isEmpty, end.timeIntervalSinceNow > 60 {
+            onProgress(.thinking(Self.repairNotice(missing)))
+            let patch = try await request(Self.repairPrompt(missing), schema: JSONSchema.dimensionsPatch(for: options.engine, dimensions: missing),
+                                          fork: raw.sessionID) { (try? JSONDecoder().decode(DimensionsPatch.self, from: $0)) != nil }
+            spend(patch)
+            if let found = try? JSONDecoder().decode(DimensionsPatch.self, from: patch.data) {
+                card.replaceDimensions(found.dimensions.filter { missing.contains($0.dimension) })
+            }
+            raw.sessionID = patch.sessionID
+        }
+        do {
+            try card.normalizePlanningAssessment()
+            try card.normalizeBehavioralAssessments()
+            try card.calculateCompetencyScores()
+            try Self.validate(card, requirePlanning: true, requireAssessments: true, requireExplanations: true)
+        } catch {
+            throw AssessmentError.noStructuredOutput(options.engine, "The response did not match the score-card format. Try again.")
+        }
+        raw.costUSD = cost
+        raw.turns = turns
+        return (card, raw)
+    }
+
+    struct DimensionsPatch: Decodable {
+        var dimensions: [ScoreCard.DimensionResult]
+    }
+
+    static func decodeCard(_ data: Data) -> ScoreCard? {
+        data.isEmpty ? nil : try? JSONDecoder().decode(ScoreCard.self, from: data)
+    }
+
+    /// Dimensions the card is missing, has twice, or returned without valid competency levels and complete explanations.
+    static func incompleteDimensions(_ card: ScoreCard) -> [Dimension] {
+        let catalog = try? RubricGuide.load()
+        return Dimension.allCases.filter { dimension in
+            let found = card.dimensions.filter { $0.dimension == dimension }
+            guard found.count == 1, let result = found.first, result.status == .scored else { return true }
+            let competencies: [(PlanningAssessment.Level, PlanningAssessment.Explanation?)]
+            if dimension == .planningSpecs {
+                guard let planning = result.planning, result.assessment == nil, (try? planning.validate()) != nil else { return true }
+                competencies = planning.competencies.map { ($0.level, $0.explanation) }
+            } else {
+                guard let assessment = result.assessment, result.planning == nil,
+                      let ids = catalog?.guide(for: dimension)?.competencies.map(\.id),
+                      (try? assessment.validate(expectedIDs: ids)) != nil else { return true }
+                competencies = assessment.competencies.map { ($0.level, $0.explanation) }
+            }
+            return !competencies.allSatisfy { level, explanation in
+                guard PlanningAssessment.Level.assessmentCases.contains(level), let explanation else { return false }
+                return [explanation.sourceBasis, explanation.criteria, explanation.observedBehavior, explanation.overallJudgment]
+                    .allSatisfy { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            }
+        }
     }
 
     /// One reading phase. The CLI may only return a short checkpoint, never the card. While `nudge` returns a message
     /// the saved session is continued with it; the phase ends when `nudge` returns nil, at `limit`, or after
     /// `maxRequests`. Stopping at the limit keeps everything read, because the next step continues the saved session.
-    private func readPhase(_ prompt: String, minimum: TimeInterval, limit: TimeInterval, end: Date, state: inout ReadingState,
+    private func readPhase(_ prompt: String, minimum: TimeInterval, limit: TimeInterval, contextLimit: Int, end: Date,
+                           state: inout ReadingState,
                            packDir: URL, sources: [TranscriptSource], options: AssessmentOptions,
                            onProgress: @escaping @Sendable (Progress) -> Void,
                            nudge: (_ elapsed: TimeInterval, _ opened: Int) -> String?) async throws {
@@ -192,13 +288,18 @@ public final class Assessor: Sendable {
             var bounded = options
             bounded.timeout = left
             do {
+                // Only the saved session matters here, so a reply without the checkpoint still moves the run on.
+                // Reading needs no deliberation, so thinking is off; the run is stopped once the context reaches its limit.
                 let output = try await runOnce(prompt: request, schema: JSONSchema.readingCheckpoint, packDir: packDir, sources: sources,
                                                options: bounded, webAccess: false, forkSessionID: state.sessionID,
-                                               workingDirectory: nil, resumable: true, onProgress: onProgress)
+                                               workingDirectory: nil, resumable: true, requiresOutput: false, reading: true,
+                                               contextBase: state.contextTokens, contextLimit: contextLimit, onProgress: onProgress)
                 state.sessionID = output.sessionID
                 state.digestsOpened.formUnion(output.digestsOpened)
                 state.costUSD = state.costUSD.flatMap { spent in output.costUSD.map { spent + $0 } }
                 state.turns = state.turns.flatMap { spent in output.turns.map { spent + $0 } }
+                state.contextTokens = output.contextTokens
+                if output.contextTokens >= contextLimit { state.contextFull = true; return }
             } catch let stopped as DeadlineReached {
                 // Without a saved session there is nothing to continue.
                 guard let sessionID = stopped.sessionID, UUID(uuidString: sessionID) != nil else { throw AssessmentError.timedOut }
@@ -206,7 +307,12 @@ public final class Assessor: Sendable {
                 state.digestsOpened.formUnion(stopped.digestsOpened)
                 state.costUSD = nil
                 state.turns = nil
-                state.reachedLimit = state.reachedLimit || Date().timeIntervalSince(phaseStarted) < minimum
+                state.contextTokens = stopped.contextTokens
+                if stopped.contextFull {
+                    state.contextFull = true
+                } else {
+                    state.reachedLimit = state.reachedLimit || Date().timeIntervalSince(phaseStarted) < minimum
+                }
                 return
             }
             guard let next = nudge(Date().timeIntervalSince(phaseStarted), state.digestsOpened.count) else { return }
@@ -227,6 +333,8 @@ public final class Assessor: Sendable {
         public var wrappedUp = false
         /// Evidence-pack digests this run opened, by file name.
         public var digestsOpened: Set<String> = []
+        /// The context the saved session holds after this run, in tokens.
+        public var contextTokens = 0
     }
 
     /// Runs the selected CLI on `prompt` inside the evidence pack and returns output matching `schema`.
@@ -273,11 +381,16 @@ public final class Assessor: Sendable {
     struct DeadlineReached: Error {
         var sessionID: String?
         var digestsOpened: Set<String> = []
+        var contextTokens = 0
+        /// True when the app stopped the run because its context reached the limit, rather than its time.
+        var contextFull = false
     }
 
     private func runOnce(prompt: String, schema: String, packDir: URL, sources: [TranscriptSource],
                          options: AssessmentOptions, webAccess: Bool, forkSessionID: String?, workingDirectory: URL?,
-                         resumable: Bool = false, onProgress: @escaping @Sendable (Progress) -> Void) async throws -> StructuredOutput {
+                         resumable: Bool = false, requiresOutput: Bool = true, reading: Bool = false,
+                         contextBase: Int = 0, contextLimit: Int? = nil, keepsRejected: (@Sendable (Data) -> Bool)? = nil,
+                         onProgress: @escaping @Sendable (Progress) -> Void) async throws -> StructuredOutput {
         try Task.checkCancellation()
         let engine = options.engine
         let installed: CLIInstallation
@@ -299,21 +412,50 @@ public final class Assessor: Sendable {
         try prompt.write(to: promptFile, atomically: true, encoding: .utf8)
         try schema.write(to: schemaFile, atomically: true, encoding: .utf8)
         let arguments = Self.arguments(options: options, sources: sources, schema: schema, schemaFile: schemaFile, resultFile: resultFile,
-                                       webAccess: webAccess, forkSessionID: forkSessionID, readableDirectories: workingDirectory == nil ? [] : [packDir])
-        let reader = AssessmentStream(engine: engine, onProgress: onProgress)
+                                       webAccess: webAccess, forkSessionID: forkSessionID,
+                                       readableDirectories: workingDirectory == nil ? [] : [packDir], lowEffort: reading)
+        var environment = installed.environment
+        if reading && engine == .claude { environment["MAX_THINKING_TOKENS"] = "0" }
+        let process = self.process
+        let kept = KeptCard()
+        // Claude Code reports the context with every reply; Codex is estimated from where the session stood.
+        let reader = AssessmentStream(engine: engine, contextBase: contextBase + Self.estimatedPromptTokens(prompt),
+                                      onProgress: onProgress) { card in
+            guard let keepsRejected, kept.data == nil, keepsRejected(card) else { return }
+            kept.data = card
+            process.stopEarly()
+        }
         onProgress(.started)
-        let output: CLIProcess.Output
+        var finished: CLIProcess.Output?
         do {
-            output = try await process.run(executable: installed.executable, arguments: arguments,
-                                           directory: workingDirectory ?? packDir, environment: installed.environment, input: promptFile,
-                                           timeout: options.timeout) { reader.consume($0) }
-        } catch AssessmentError.timedOut where resumable {
+            finished = try await process.run(executable: installed.executable, arguments: arguments,
+                                             directory: workingDirectory ?? packDir, environment: environment, input: promptFile,
+                                             timeout: options.timeout) { chunk in
+                reader.consume(chunk)
+                if let contextLimit, reader.contextTokens >= contextLimit { process.stopEarly() }
+            }
+        } catch AssessmentError.timedOut where resumable || kept.data != nil {
             reader.finish()
-            throw DeadlineReached(sessionID: reader.snapshot.sessionID, digestsOpened: reader.snapshot.digestsOpened)
+            if kept.data == nil {
+                let stopped = reader.snapshot
+                throw DeadlineReached(sessionID: stopped.sessionID, digestsOpened: stopped.digestsOpened,
+                                      contextTokens: stopped.contextTokens,
+                                      contextFull: contextLimit.map { stopped.contextTokens >= $0 } ?? false)
+            }
         }
         reader.finish()
         try Task.checkCancellation()
         let snapshot = reader.snapshot
+        if let card = kept.data {
+            // The app stopped the CLI from writing the card again; the one it turned down is used instead.
+            guard let sessionID = snapshot.sessionID, UUID(uuidString: sessionID) != nil else {
+                throw AssessmentError.failed(engine, "The CLI did not return a new saved session ID.")
+            }
+            return StructuredOutput(data: card, elapsed: Date().timeIntervalSince(started), costUSD: nil, turns: nil,
+                                    cliVersion: installed.version, actualModel: snapshot.model, sessionID: sessionID,
+                                    digestsOpened: snapshot.digestsOpened, contextTokens: snapshot.contextTokens)
+        }
+        guard let output = finished else { throw AssessmentError.timedOut }
         let stderr = Redactor.scrub(String(decoding: output.stderr, as: UTF8.self)).clipped(600)
         guard output.status == 0, snapshot.failure == nil else {
             let detail = snapshot.failure ?? (stderr.isEmpty ? "Exit status \(output.status)." : stderr)
@@ -326,26 +468,35 @@ public final class Assessor: Sendable {
         let data: Data
         switch engine {
         case .claude:
-            guard let result = snapshot.claudeResult else { throw AssessmentError.noStructuredOutput(engine, stderr) }
-            let structured = result["structured_output"] ?? (result["result"] as? String).flatMap {
-                try? JSONSerialization.jsonObject(with: Data($0.utf8))
+            guard let result = snapshot.claudeResult else {
+                guard requiresOutput else { data = Data(); break }
+                throw AssessmentError.noStructuredOutput(engine, stderr)
             }
-            guard let structured, JSONSerialization.isValidJSONObject(structured) else {
-                throw AssessmentError.noStructuredOutput(engine, "Try again with a different model.")
+            if let structured = result["structured_output"], JSONSerialization.isValidJSONObject(structured) {
+                data = try JSONSerialization.data(withJSONObject: structured)
+            } else {
+                guard requiresOutput else { data = Data(); break }
+                throw AssessmentError.noStructuredOutput(engine, "The final response did not include the structured output. Try again.")
             }
-            data = try JSONSerialization.data(withJSONObject: structured)
         case .codex:
-            guard snapshot.completed, let final = try? Data(contentsOf: resultFile), !final.isEmpty else {
+            if snapshot.completed, let final = try? Data(contentsOf: resultFile),
+               (try? JSONSerialization.jsonObject(with: final)) is [String: Any] {
+                data = final
+            } else {
+                guard requiresOutput else { data = Data(); break }
                 throw AssessmentError.noStructuredOutput(engine, "The final response was missing or the run did not finish.")
             }
-            data = final
         }
         return StructuredOutput(data: data, elapsed: Date().timeIntervalSince(started),
                          costUSD: snapshot.claudeResult?["total_cost_usd"] as? Double,
                          turns: snapshot.claudeResult?["num_turns"] as? Int,
                          cliVersion: installed.version, actualModel: snapshot.model, sessionID: sessionID,
-                         digestsOpened: snapshot.digestsOpened)
+                         digestsOpened: snapshot.digestsOpened, contextTokens: snapshot.contextTokens)
     }
+
+    /// The prompt's share of a Codex context, mostly English text at about 3.5 characters per token. Claude Code
+    /// reports its context directly, so the estimate only seeds the Codex count.
+    static func estimatedPromptTokens(_ prompt: String) -> Int { Int(Double(prompt.count) / 3.5) }
 
     public static func digestCount(_ packDir: URL) -> Int {
         (try? FileManager.default.contentsOfDirectory(atPath: packDir.appendingPathComponent("sessions").path).count) ?? 0
@@ -353,7 +504,7 @@ public final class Assessor: Sendable {
 
     static func arguments(options: AssessmentOptions, sources: [TranscriptSource], schema: String = JSONSchema.scoreCard,
                           schemaFile: URL, resultFile: URL, webAccess: Bool = false, forkSessionID: String? = nil,
-                          readableDirectories: [URL] = []) -> [String] {
+                          readableDirectories: [URL] = [], lowEffort: Bool = false) -> [String] {
         var args: [String]
         switch options.engine {
         case .claude:
@@ -385,6 +536,8 @@ public final class Assessor: Sendable {
             }
         }
         if let model = options.model { args += ["--model", model] }
+        // Codex cannot turn reasoning off; reading asks for the least it allows.
+        if lowEffort && options.engine == .codex { args += ["-c", "model_reasoning_effort=\"low\""] }
         if options.engine == .codex {
             if let forkSessionID { args += ["fork", forkSessionID] }
             args.append("-")
@@ -468,6 +621,29 @@ public final class Assessor: Sendable {
         task read in an original transcript in phase 2; do not reduce the counts to the originals you opened. \(cardRules)
         """
 
+    /// Sent once in the writing session when its reply carried no score card at all.
+    static let rewritePrompt = """
+        Your last reply did not include the score card. Do not read any more files. Return the complete score card now
+        as this run's structured output, matching the schema, from the evidence you already inspected. Do not shorten any
+        explanation to make it fit.
+        """
+
+    public static let rewriteNotice = "The score card was missing. Asking for it once more."
+
+    /// Sent once in the writing session for the dimensions a card returned incomplete; the rest of the card is kept.
+    static func repairPrompt(_ dimensions: [Dimension]) -> String {
+        """
+        Your score card is complete except for these dimensions: \(dimensions.map(\.rawValue).joined(separator: ", ")).
+        Each is missing, duplicated, or lacks valid competency levels or a complete four-part explanation. Do not read any
+        more files. Return only these dimensions, complete, as this run's structured output, from the evidence you
+        already inspected. Every other dimension stays as you wrote it.
+        """
+    }
+
+    static func repairNotice(_ dimensions: [Dimension]) -> String {
+        "Asking again only for incomplete dimensions: \(dimensions.map(\.rawValue).joined(separator: ", "))."
+    }
+
     private static let cardRules = """
         Judge every competency as high, medium, low, or unknown.
         Preserve any level already established; missing higher-level proof does not erase confirmed partial practice.
@@ -504,7 +680,7 @@ public final class Assessor: Sendable {
         ## Phase 1 of 3 now: skim
 
         Skim broadly: start with `overview.md`, `leads.md`, and `changes.md`, then open session digests in `sessions/`
-        spread across projects, tools, and dates. Open at least \(target) digests, and more when you can. Note leads for
+        spread across projects, tools, and dates. Open all \(target) digests; the pack holds what fits this run. Note leads for
         every dimension, including weak or missing practice, without opening original transcripts yet. The score card
         is not accepted in this phase: when you have skimmed, return only the reading checkpoint with a short note of
         the leads to investigate and, for each competency, how many relevant tasks you have found so far.
@@ -513,9 +689,9 @@ public final class Assessor: Sendable {
 
     static func skimNudge(opened: Int, target: Int, elapsed: TimeInterval, minimum: TimeInterval) -> String {
         """
-        Keep skimming (phase 1 of 3). The app has seen \(opened) digests opened of the \(target) required, after
-        \(Int(elapsed)) of at least \(Int(minimum)) seconds. Open further unread digests listed in `sessions.tsv`, spread
-        across projects, tools, and dates, then return the reading checkpoint again. Do not write the score card yet.
+        Keep skimming (phase 1 of 3). The app has seen \(opened) of the \(target) digests opened, after
+        \(Int(elapsed)) of at least \(Int(minimum)) seconds. Open the unread digests in `sessions/`, then return the
+        reading checkpoint again. Do not write the score card yet.
         """
     }
 
@@ -540,6 +716,7 @@ public final class Assessor: Sendable {
     public static let skimNotice = "Skimming session digests."
     public static let investigateNotice = "Investigating original transcripts."
     public static let writingNotice = "Reading finished. Writing the score card."
+    public static let contextNotice = "Skimming filled the reading share of the context. Skipping further investigation."
 
     static func prompt(sources: [TranscriptSource], now: Date, previousDate: Date? = nil, digestCount: Int = 0, engine: AssessmentEngine = .claude,
                        instructions: String? = nil) -> String {
@@ -580,7 +757,9 @@ public final class Assessor: Sendable {
         short reading checkpoint; the score card is accepted only in phase 3, after reading. The app sends an early
         checkpoint back with the reading still required, so keep issuing read and search calls in small batches and
         note brief judgments as you go instead of pausing for long reasoning without reading.
-        The pack has \(digestCount) digests. Over phases 1 and 2, read \(min(digestCount, AssessmentOptions.readingTarget) == digestCount ? "all of them" : "about \(AssessmentOptions.readingTarget) of them"), batching independent reads across projects, tools, and dates.
+        The pack has \(digestCount) digests, as many as fit this run's share of the context. Read all of them in phase 1,
+        batching independent reads across projects, tools, and dates. The app stops reading when the context reaches its
+        limit, so spend it on records rather than on long notes.
         Prioritize changed sessions in `changes.md` when present, then leads for every dimension, including contrary cases.
         Read relevant requests, then-effective guidance, actions, and results; connect continuing sessions for one outcome.
         Digests provide breadth, and a task judged from a digest is a judged task. When a digest does not show a task's
@@ -846,5 +1025,15 @@ extension Assessor {
         </notes>
 
         """
+    }
+}
+
+/// The card a writing run handed in and the CLI turned down, kept across the stream reader's thread.
+private final class KeptCard: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: Data?
+    var data: Data? {
+        get { lock.withLock { value } }
+        set { lock.withLock { value = newValue } }
     }
 }

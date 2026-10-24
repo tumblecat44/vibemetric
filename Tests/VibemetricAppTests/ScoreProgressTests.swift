@@ -19,11 +19,11 @@ struct ScoreProgressTests {
         check(10)
         #expect(last < 5, "Preparing stays before the first chapter")
 
-        progress.startReading(digests: 150, at: start.addingTimeInterval(15))
+        progress.startReading(digests: 50, at: start.addingTimeInterval(15))
         check(15)
         for i in 0..<25 { progress.noteRead("Read cc-\(i)abcdef.md", at: start.addingTimeInterval(20)) }
         check(20)
-        #expect(last >= 19, "Half of the 50-digest skim target fills about half of the first chapter")
+        #expect(last >= 19, "Half of the pack's 50 digests fills about half of the first chapter")
         check(2000)
         #expect(last < 37, "Skimming never reaches the next chapter on its own")
 

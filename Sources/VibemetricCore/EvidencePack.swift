@@ -10,10 +10,18 @@ public enum EvidencePack {
             .appendingPathComponent(isDev ? "Vibemetric Dev/packs" : "Vibemetric/packs", isDirectory: true)
     }
 
-    /// Digests written per pack: exactly `AssessmentOptions.readingTarget`, so every run on the same history reads
-    /// the same sessions instead of choosing a different subset each time.
-    public static let maxDigests = AssessmentOptions.readingTarget
+    /// Digests written per pack when no token budget is given.
+    public static let maxDigests = 70
+    /// Sessions digested before a token budget trims them; the selection order decides which fit.
+    static let maxCandidates = 150
     static let digestCharLimit = 12_000
+
+    /// Context tokens a digest takes once the engine reads it. Measured at about 1.14 characters per token for these
+    /// mostly Korean digests, counting the line numbers a file read adds to each line.
+    public static func estimatedTokens(_ text: String) -> Int {
+        let lines = text.reduce(1) { $1 == "\n" ? $0 + 1 : $0 }
+        return Int((Double(text.count + 7 * lines) / 1.14).rounded(.up))
+    }
 
     /// The last saved assessment, so the judge can keep scores steady unless new evidence moves them.
     public struct Previous: Sendable {
@@ -23,32 +31,38 @@ public enum EvidencePack {
     }
 
     @discardableResult
+    /// With `digestTokenBudget`, digests are kept in selection order while their estimated tokens fit the budget,
+    /// so the pack holds as many sessions as the engine can read within its share of the context.
     public static func write(_ scan: ScanResult, to dir: URL, now: Date = Date(), previous: Previous? = nil,
-                             ruleChanges: String? = nil, contextFiles: RuleSnapshot? = nil) throws -> URL {
+                             ruleChanges: String? = nil, contextFiles: RuleSnapshot? = nil,
+                             digestTokenBudget: Int? = nil) throws -> URL {
         let fm = FileManager.default
         try? fm.removeItem(at: dir)
         try fm.createDirectory(at: dir.appendingPathComponent("sessions"), withIntermediateDirectories: true)
 
         // Only the chosen sessions are parsed again in full; everything else comes from the scan's summaries.
-        let chosen = select(scan.sessions, since: previous?.date)
-        var digestPaths: [String: String] = [:]
-        var firstError: Error?
+        let chosen = select(scan.sessions, since: previous?.date, limit: digestTokenBudget == nil ? maxDigests : maxCandidates)
+        var texts = [String?](repeating: nil, count: chosen.count)
         let lock = NSLock()
         DispatchQueue.concurrentPerform(iterations: chosen.count) { i in
             autoreleasepool {
-                let summary = chosen[i]
                 // A transcript deleted since the scan keeps its index row, without a digest.
-                guard let session = Scanner.fullSession(for: summary) else { return }
-                let rel = "sessions/\(slug(summary.tool))-\(summary.id.suffix(12)).md"
-                do {
-                    try Redactor.scrub(timeline(session)).write(to: dir.appendingPathComponent(rel), atomically: true, encoding: .utf8)
-                    lock.lock(); digestPaths[key(summary)] = rel; lock.unlock()
-                } catch {
-                    lock.lock(); firstError = firstError ?? error; lock.unlock()
-                }
+                guard let session = Scanner.fullSession(for: chosen[i]) else { return }
+                let text = Redactor.scrub(timeline(session))
+                lock.lock(); texts[i] = text; lock.unlock()
             }
         }
-        if let firstError { throw firstError }
+        var digestPaths: [String: String] = [:]
+        var tokens = 0
+        for (summary, text) in zip(chosen, texts) {
+            guard let text else { continue }
+            let cost = estimatedTokens(text)
+            if let digestTokenBudget, tokens + cost > digestTokenBudget { continue }
+            tokens += cost
+            let rel = "sessions/\(slug(summary.tool))-\(summary.id.suffix(12)).md"
+            try text.write(to: dir.appendingPathComponent(rel), atomically: true, encoding: .utf8)
+            digestPaths[key(summary)] = rel
+        }
 
         try Redactor.scrub(sessionIndex(scan.sessions, digestPaths: digestPaths))
             .write(to: dir.appendingPathComponent("sessions.tsv"), atomically: true, encoding: .utf8)
@@ -97,26 +111,30 @@ public enum EvidencePack {
 
     // MARK: Selection
 
-    /// Keeps every session when under the cap; otherwise sessions since the previous score first (up to half the cap),
-    /// then balances signal-rich, recent, and per-project coverage.
-    static func select(_ sessions: [SessionSummary], since: Date? = nil) -> [SessionSummary] {
-        guard sessions.count > maxDigests else { return sessions }
-        var picked: [String: SessionSummary] = [:]
+    /// Sessions in priority order, at most `limit`: sessions since the previous score first (up to half the limit),
+    /// then signal-rich sessions of every project, then the richest and the most recent overall.
+    static func select(_ sessions: [SessionSummary], since: Date? = nil, limit: Int = maxDigests) -> [SessionSummary] {
+        var order: [SessionSummary] = []
+        var seen = Set<String>()
+        func pick(_ s: SessionSummary, upTo cap: Int) {
+            guard order.count < cap, seen.insert(key(s)).inserted else { return }
+            order.append(s)
+        }
         if let since {
-            for s in sessions.reversed() where (s.end ?? .distantPast) > since && picked.count < maxDigests / 2 { picked[key(s)] = s }
+            for s in sessions.reversed() where (s.end ?? .distantPast) > since { pick(s, upTo: limit / 2) }
         }
         let byProject = Dictionary(grouping: sessions, by: { "\($0.tool.rawValue)/\($0.project)" })
         // The richest sessions of every project so no project disappears: up to 8 each, fewer when there are many projects.
-        let perProject = max(1, min(8, (maxDigests / 2) / max(byProject.count, 1)))
+        let perProject = max(1, min(8, (limit / 2) / max(byProject.count, 1)))
         for (_, group) in byProject.sorted(by: { $0.key < $1.key }) {
-            for s in group.sorted(by: { (richness($0), $0.file.path) > (richness($1), $1.file.path) }).prefix(perProject) where picked.count < maxDigests {
-                picked[key(s)] = s
+            for s in group.sorted(by: { (richness($0), $0.file.path) > (richness($1), $1.file.path) }).prefix(perProject) {
+                pick(s, upTo: limit)
             }
         }
-        // Then the richest overall, then the most recent, until the cap.
-        for s in sessions.sorted(by: { richness($0) > richness($1) }) where picked.count < maxDigests * 3 / 4 { picked[key(s)] = s }
-        for s in sessions.reversed() where picked.count < maxDigests { picked[key(s)] = s }
-        return picked.values.sorted { ($0.start ?? .distantPast) < ($1.start ?? .distantPast) }
+        // Then the richest overall, then the most recent, until the limit.
+        for s in sessions.sorted(by: { richness($0) > richness($1) }) { pick(s, upTo: limit * 3 / 4) }
+        for s in sessions.reversed() { pick(s, upTo: limit) }
+        return order
     }
 
     static func richness(_ s: SessionSummary) -> Int {

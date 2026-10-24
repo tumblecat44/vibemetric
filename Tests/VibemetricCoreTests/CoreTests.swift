@@ -240,13 +240,13 @@ final class FollowUpTests: XCTestCase {
 
     func testLowCoverageWarning() throws {
         var card = try JSONDecoder().decode(ScoreCard.self, from: Data(CoreTests.sampleCard.utf8))
-        card.scope.sessionsExamined = 17
-        XCTAssertTrue(card.isLowCoverage(sessionsAvailable: 45))
-        card.scope.sessionsExamined = 40
-        XCTAssertFalse(card.isLowCoverage(sessionsAvailable: 45))
-        card.scope.sessionsExamined = 60
-        XCTAssertFalse(card.isLowCoverage(sessionsAvailable: 1000)) // the target caps at the reading target (70)
-        card.scope.sessionsExamined = 40
+        card.scope.sessionsExamined = 5
+        XCTAssertTrue(card.isLowCoverage(sessionsAvailable: 10))
+        card.scope.sessionsExamined = 9
+        XCTAssertFalse(card.isLowCoverage(sessionsAvailable: 10))
+        card.scope.sessionsExamined = 15
+        XCTAssertFalse(card.isLowCoverage(sessionsAvailable: 1000)) // the target caps at the reading target (15)
+        card.scope.sessionsExamined = 10
         XCTAssertTrue(card.isLowCoverage(sessionsAvailable: 1000))
     }
 
