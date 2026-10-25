@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.15 (2026-10-25)
+
+- New scores open with a Summary: 4 to 6 plain-language points, what you do well first, then what holds you back, written so anyone can follow them. Results scored before this version keep "What you're doing well".
+
 ## 0.4.14 (2026-10-25)
 
 - Scoring rubric 5. Each category now lists the habits behind its score, like "Changes are checked in the real flow". Each habit is marked Yes, Partly, Not yet, or Not enough evidence, with a real example from your sessions, and a count when enough tasks were read. Missing evidence never lowers a score, and a score change names the new evidence behind it. Because the rubric changed, your next score starts a new baseline.
