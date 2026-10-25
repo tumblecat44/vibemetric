@@ -1,5 +1,11 @@
 import Foundation
 
+/// Seconds the Mac has been awake. Run time limits and elapsed times use it, so time asleep never counts
+/// against a run that was frozen by sleep. `DispatchQueue.asyncAfter` deadlines skip sleep the same way.
+enum AwakeClock {
+    static var now: TimeInterval { TimeInterval(DispatchTime.now().uptimeNanoseconds) / 1_000_000_000 }
+}
+
 public struct AssessmentOptions: Sendable {
     public var engine: AssessmentEngine
     public var model: String?
@@ -131,12 +137,15 @@ public final class Assessor: Sendable {
                               options: AssessmentOptions, webAccess: Bool = false, forkSessionID: String? = nil,
                               workingDirectory: URL? = nil, wrapUp: (after: TimeInterval, prompt: String)? = nil,
                               onProgress: @escaping @Sendable (Progress) -> Void) async throws -> StructuredOutput {
+        // Idle sleep freezes the CLI mid-run, so keep the Mac awake while it works. The display may still sleep.
+        let activity = ProcessInfo.processInfo.beginActivity(options: .userInitiated, reason: "Vibemetric is scoring AI coding sessions")
+        defer { ProcessInfo.processInfo.endActivity(activity) }
         guard let wrapUp, wrapUp.after < options.timeout else {
             return try await runOnce(prompt: prompt, schema: schema, packDir: packDir, sources: sources, options: options,
                                      webAccess: webAccess, forkSessionID: forkSessionID, workingDirectory: workingDirectory,
                                      onProgress: onProgress)
         }
-        let started = Date()
+        let started = AwakeClock.now
         var first = options
         first.timeout = wrapUp.after
         do {
@@ -148,11 +157,11 @@ public final class Assessor: Sendable {
             guard let sessionID = stopped.sessionID, UUID(uuidString: sessionID) != nil else { throw AssessmentError.timedOut }
             onProgress(.thinking(Self.wrapUpNotice))
             var rest = options
-            rest.timeout = max(options.timeout - Date().timeIntervalSince(started), 30)
+            rest.timeout = max(options.timeout - (AwakeClock.now - started), 30)
             var output = try await runOnce(prompt: wrapUp.prompt, schema: schema, packDir: packDir, sources: sources, options: rest,
                                            webAccess: webAccess, forkSessionID: sessionID, workingDirectory: workingDirectory,
                                            onProgress: onProgress)
-            output.elapsed = Date().timeIntervalSince(started)
+            output.elapsed = AwakeClock.now - started
             output.wrappedUp = true
             return output
         }
@@ -176,7 +185,7 @@ public final class Assessor: Sendable {
         if let forkSessionID, UUID(uuidString: forkSessionID) == nil {
             throw AssessmentError.failed(engine, "The saved session ID is invalid.")
         }
-        let started = Date()
+        let started = AwakeClock.now
         let promptFile = packDir.appendingPathComponent("assessment-prompt.txt")
         let schemaFile = packDir.appendingPathComponent("assessment-schema.json")
         let resultFile = packDir.appendingPathComponent("assessment-result.json")
@@ -229,7 +238,7 @@ public final class Assessor: Sendable {
             }
             data = final
         }
-        return StructuredOutput(data: data, elapsed: Date().timeIntervalSince(started),
+        return StructuredOutput(data: data, elapsed: AwakeClock.now - started,
                          costUSD: snapshot.claudeResult?["total_cost_usd"] as? Double,
                          turns: snapshot.claudeResult?["num_turns"] as? Int,
                          cliVersion: installed.version, actualModel: snapshot.model, sessionID: sessionID)
