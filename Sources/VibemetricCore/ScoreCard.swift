@@ -136,6 +136,12 @@ public struct ScoreCard: Codable, Sendable {
         /// show the headline and `tryThis` there instead.
         public var issueLine: String?
         public var fixLine: String?
+        /// Why this score: the level reached and what the next one needs, in plain words. nil on older cards and at 10
+        /// for `nextLevel`.
+        public var levelNow: String?
+        public var nextLevel: String?
+        /// The rubric's checks for this dimension and what the records showed. nil on older cards.
+        public var checks: [ScoreCheck]?
 
         /// True when the card carries the short readable fields.
         public var isReadable: Bool { saw?.isEmpty == false || strengths != nil }
@@ -179,7 +185,7 @@ public struct ScoreCard: Codable, Sendable {
 
         enum CodingKeys: String, CodingKey {
             case dimension, score, status, headline, reason, points, conclusion, evidence, changeReason, saw, strengths, impact, tryThis, solutionSteps,
-                 issueLine, fixLine
+                 issueLine, fixLine, levelNow, nextLevel, checks
         }
 
         public init(from decoder: Decoder) throws {
@@ -199,6 +205,9 @@ public struct ScoreCard: Codable, Sendable {
             solutionSteps = try c.decodeIfPresent([String].self, forKey: .solutionSteps)
             issueLine = try c.decodeIfPresent(String.self, forKey: .issueLine)
             fixLine = try c.decodeIfPresent(String.self, forKey: .fixLine)
+            levelNow = try c.decodeIfPresent(String.self, forKey: .levelNow)
+            nextLevel = try c.decodeIfPresent(String.self, forKey: .nextLevel)
+            checks = try c.decodeIfPresent([ScoreCheck].self, forKey: .checks)
             reason = try c.decodeIfPresent(String.self, forKey: .reason)
                 ?? (points?.isEmpty == false || (saw == nil && strengths == nil)
                     ? Self.compose(points: points ?? [], conclusion: conclusion)
@@ -207,7 +216,7 @@ public struct ScoreCard: Codable, Sendable {
 
         /// The readable fields as one Markdown text, for the report and other single-block readers.
         static func compose(strengths: [String] = [], saw: String?, impact: String?, tryThis: String?, steps: [String] = []) -> String {
-            var parts = strengths.isEmpty ? [] : ["**What's working:**\n" + strengths.map { "- \($0)" }.joined(separator: "\n")]
+            var parts = strengths.isEmpty ? [] : ["**Strengths:**\n" + strengths.map { "- \($0)" }.joined(separator: "\n")]
             parts += [("What we saw", saw), ("Why it matters", impact), ("Try this", tryThis)]
                 .compactMap { label, text in text.flatMap { $0.isEmpty ? nil : "**\(label):** \($0)" } }
             var text = parts.joined(separator: "\n\n")

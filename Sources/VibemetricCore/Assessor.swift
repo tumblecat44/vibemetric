@@ -1,5 +1,11 @@
 import Foundation
 
+/// Seconds the Mac has been awake. Run time limits and elapsed times use it, so time asleep never counts
+/// against a run that was frozen by sleep. `DispatchQueue.asyncAfter` deadlines skip sleep the same way.
+enum AwakeClock {
+    static var now: TimeInterval { TimeInterval(DispatchTime.now().uptimeNanoseconds) / 1_000_000_000 }
+}
+
 public struct AssessmentOptions: Sendable {
     public var engine: AssessmentEngine
     public var model: String?
@@ -8,11 +14,15 @@ public struct AssessmentOptions: Sendable {
     /// `Assessor.run` caps `timeout` at it, so a score asks for it by setting `timeout` (the default suits deep dives).
     public static let scoreTimeLimit: TimeInterval = 30 * 60
     public var wrapUpAfter: TimeInterval = 6.5 * 60
+    /// The silent reasoning Claude Code may spend on one reply; nil leaves the CLI's default.
+    public var thinkingTokens: Int?
+    /// A score's cap. Uncapped, writing the card could think until the reply's 32,000-token limit and write nothing.
+    public static let scoreThinkingTokens = 8_000
     /// The digests a score reads in full: every session since the last score first, then leads, then a spread.
     public static let readingTarget = 70
     /// The person's own notes for the judge, e.g. "the demo-skill sessions were only a test".
     public var instructions: String?
-    public static let rubricVersion = "4"
+    public static let rubricVersion = "5"
     public static let maxInstructionsLength = 2000
 
     public init(engine: AssessmentEngine = .claude, model: String? = nil, instructions: String? = nil) {
@@ -75,36 +85,173 @@ public final class Assessor: Sendable {
         "nextjs.org", "react.dev", "vercel.com", "docs.railway.com", "stripe.com", "docs.stripe.com",
     ]
 
-    private let process = CLIProcess()
+    private let processes = CLIProcessGroup()
     private let installation: CLIInstallation?
 
     public init(installation: CLIInstallation? = nil) { self.installation = installation }
-    public func cancel() { process.cancel() }
+    public func cancel() { processes.cancel() }
 
+    /// Scores in two steps: one run reads the evidence pack, then copies of its saved session write the card's parts
+    /// at the same time (the overall fields, and each dimension on its own), so writing takes as long as one part.
     public func run(packDir: URL, sources: [TranscriptSource], options: AssessmentOptions = AssessmentOptions(),
                     previousDate: Date? = nil, onProgress: @escaping @Sendable (Progress) -> Void) async throws -> AssessmentOutcome {
-        let started = Date()
+        let started = Date(), clockStarted = AwakeClock.now
         let prompt = Self.prompt(sources: sources, now: started, previousDate: previousDate,
                                  digestCount: Self.digestCount(packDir), engine: options.engine, instructions: options.instructions)
         var options = options
         options.timeout = min(options.timeout, AssessmentOptions.scoreTimeLimit)
-        let raw = try await runStructured(prompt: prompt, schema: JSONSchema.scoreCard, packDir: packDir, sources: sources,
-                                          options: options, wrapUp: (options.wrapUpAfter, Self.wrapUpPrompt),
-                                          onProgress: onProgress)
+        options.thinkingTokens = options.thinkingTokens ?? AssessmentOptions.scoreThinkingTokens
+        // Idle sleep freezes the CLI mid-run, so keep the Mac awake while it works. The display may still sleep.
+        let activity = ProcessInfo.processInfo.beginActivity(options: .userInitiated, reason: "Vibemetric is scoring AI coding sessions")
+        defer { ProcessInfo.processInfo.endActivity(activity) }
+        let end = clockStarted + options.timeout
+
+        // 1. Read, until the model is done or `wrapUpAfter`, keeping at least a few minutes for writing.
+        var reading = options
+        reading.timeout = min(options.wrapUpAfter, max(options.timeout - 3 * 60, options.timeout / 2))
+        let sessionID: String, wrappedUp: Bool
+        var spent: (cost: Double?, turns: Int?) = (0, 0)
+        var cliVersion: String?, actualModel: String?
+        do {
+            let output = try await runOnce(prompt: prompt + Self.readingRequest, schema: Self.readingSchema(options.engine), packDir: packDir,
+                                           sources: sources, options: reading, webAccess: false, forkSessionID: nil, workingDirectory: nil,
+                                           resumable: true, requiresOutput: false, onProgress: onProgress)
+            (sessionID, wrappedUp) = (output.sessionID, false)
+            spent = (output.costUSD, output.turns)
+            (cliVersion, actualModel) = (output.cliVersion, output.actualModel)
+        } catch let stopped as DeadlineReached {
+            // Without a saved session there is nothing to write from.
+            guard let saved = stopped.sessionID, UUID(uuidString: saved) != nil else { throw AssessmentError.timedOut }
+            (sessionID, wrappedUp) = (saved, true)
+            spent = (nil, nil)
+        }
+
+        // 2. Write every part at once from copies of the reading session.
+        onProgress(.thinking(wrappedUp ? Self.wrapUpNotice : Self.writingNotice))
+        let quiet: @Sendable (Progress) -> Void = { event in if case .started = event { return }; onProgress(event) }
+        let parts: [CardPart] = [.frame] + Dimension.allCases.map { .dimension($0) }
+        var outputs: [CardPart: StructuredOutput] = [:]
+        // The parts reuse the reading's prompt cache through the shared format. As a backstop the first part starts
+        // alone, and the others follow at its first reply (or `cacheWait`), when it has cached the session too. With a
+        // different format per part, each paid to load the whole session itself: about four times one writer's cost.
+        let cached = OneTimeSignal()
+        try await withThrowingTaskGroup(of: (CardPart, StructuredOutput).self) { group in
+            group.addTask {
+                defer { cached.fire() }
+                return (parts[0], try await self.writePart(parts[0], of: parts.count, wrappedUp: wrappedUp, sessionID: sessionID,
+                                                           end: end, packDir: packDir, sources: sources, options: options,
+                                                           onFirstReply: { cached.fire() }, onProgress: quiet))
+            }
+            for part in parts.dropFirst() {
+                group.addTask {
+                    await cached.wait(atMost: Self.cacheWait)
+                    return (part, try await self.writePart(part, of: parts.count, wrappedUp: wrappedUp, sessionID: sessionID, end: end,
+                                                           packDir: packDir, sources: sources, options: options, onProgress: quiet))
+                }
+            }
+            for try await (part, output) in group { outputs[part] = output }
+        }
+
         var card: ScoreCard
         do {
-            card = try JSONDecoder().decode(ScoreCard.self, from: raw.data)
+            card = try JSONDecoder().decode(ScoreCard.self, from: Self.assemble(outputs))
             try Self.validate(card)
+            card.normalizeChecks()
         } catch {
             throw AssessmentError.noStructuredOutput(options.engine, "The response did not match the score-card format. Try again.")
         }
-        card.scope.elapsedMinutes = (raw.elapsed / 60 * 10).rounded() / 10
+        let elapsed = AwakeClock.now - clockStarted
+        card.scope.elapsedMinutes = (elapsed / 60 * 10).rounded() / 10
+        for output in outputs.values {
+            spent.cost = spent.cost.flatMap { total in output.costUSD.map { total + $0 } }
+            spent.turns = spent.turns.flatMap { total in output.turns.map { total + $0 } }
+        }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return AssessmentOutcome(card: card, rawJSON: try encoder.encode(card), elapsed: raw.elapsed,
-                                 costUSD: raw.costUSD, turns: raw.turns,
-                                 engine: options.engine, cliVersion: raw.cliVersion, actualModel: raw.actualModel, sessionID: raw.sessionID,
-                                 wrappedUp: raw.wrappedUp)
+        return AssessmentOutcome(card: card, rawJSON: try encoder.encode(card), elapsed: elapsed,
+                                 costUSD: spent.cost, turns: spent.turns, engine: options.engine,
+                                 cliVersion: cliVersion ?? outputs[.frame]?.cliVersion, actualModel: actualModel ?? outputs[.frame]?.actualModel,
+                                 sessionID: sessionID, wrappedUp: wrappedUp)
+    }
+
+    /// The longest the other parts wait for the first part's first reply before starting anyway.
+    static let cacheWait: TimeInterval = 15
+
+    /// One part of the card a writing run returns.
+    enum CardPart: Hashable, Sendable {
+        /// Everything except the dimensions.
+        case frame
+        case dimension(Dimension)
+
+        /// Claude's parts share one format with the reading run, so they reuse its prompt cache. Codex needs every
+        /// field required, so each of its parts keeps an exact format of its own.
+        func schema(_ engine: AssessmentEngine) -> String {
+            if engine == .claude { return JSONSchema.sharedParts }
+            switch self {
+            case .frame: return JSONSchema.cardFrame
+            case let .dimension(dimension): return JSONSchema.cardDimension(dimension)
+            }
+        }
+
+        /// Whether a reply holds this part's fields: the shared format requires none, so the app checks them.
+        func isComplete(_ data: Data) -> Bool {
+            guard let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return false }
+            switch self {
+            case .frame:
+                // The fields the card cannot decode without; summary and highlights are optional there too.
+                return ["language", "diagnosis", "improvement", "roadmap", "scope"].allSatisfy { object[$0] != nil }
+            case let .dimension(dimension):
+                return (object["dimensions"] as? [[String: Any]] ?? []).contains { $0["dimension"] as? String == dimension.rawValue }
+            }
+        }
+    }
+
+    /// The reading run's format: on Claude the shared one, so the writing parts can reuse its cache.
+    static func readingSchema(_ engine: AssessmentEngine) -> String {
+        engine == .claude ? JSONSchema.sharedParts : JSONSchema.readingCheckpoint
+    }
+
+    /// Writes one part from a copy of the reading session, trying once more if the reply did not match its schema.
+    private func writePart(_ part: CardPart, of count: Int, wrappedUp: Bool, sessionID: String, end: TimeInterval, packDir: URL,
+                           sources: [TranscriptSource], options: AssessmentOptions, onFirstReply: (@Sendable () -> Void)? = nil,
+                           onProgress: @escaping @Sendable (Progress) -> Void) async throws -> StructuredOutput {
+        var attempt = 0
+        while true {
+            var write = options
+            write.timeout = end - AwakeClock.now
+            guard write.timeout > 1 else { throw AssessmentError.timedOut }
+            do {
+                let output = try await runOnce(prompt: Self.partRequest(part, of: count, wrappedUp: wrappedUp),
+                                               schema: part.schema(options.engine), packDir: packDir, sources: sources,
+                                               options: write, webAccess: false, forkSessionID: sessionID, workingDirectory: nil,
+                                               onFirstReply: onFirstReply, onProgress: onProgress)
+                guard part.isComplete(output.data) else {
+                    throw AssessmentError.noStructuredOutput(options.engine, "A part of the card came back without its fields.")
+                }
+                return output
+            } catch AssessmentError.noStructuredOutput where attempt == 0 && end - AwakeClock.now > 60 {
+                attempt += 1
+            }
+        }
+    }
+
+    /// The parts' replies as one score card: the frame's fields plus each dimension, in rubric order.
+    static func assemble(_ outputs: [CardPart: StructuredOutput]) throws -> Data {
+        func object(_ part: CardPart) throws -> [String: Any] {
+            guard let data = outputs[part]?.data, let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw AssessmentError.noStructuredOutput(.claude, "A part of the card is missing.")
+            }
+            return object
+        }
+        var card = try object(.frame)
+        card["dimensions"] = try Dimension.allCases.map { dimension -> Any in
+            let entries = try object(.dimension(dimension))["dimensions"] as? [[String: Any]] ?? []
+            guard let entry = entries.first(where: { $0["dimension"] as? String == dimension.rawValue }) else {
+                throw AssessmentError.noStructuredOutput(.claude, "The card has no \(dimension.title) result.")
+            }
+            return entry
+        }
+        return try JSONSerialization.data(withJSONObject: card)
     }
 
     /// What one structured CLI run returned: the JSON that matched the schema, plus how the run went.
@@ -130,12 +277,15 @@ public final class Assessor: Sendable {
                               options: AssessmentOptions, webAccess: Bool = false, forkSessionID: String? = nil,
                               workingDirectory: URL? = nil, wrapUp: (after: TimeInterval, prompt: String)? = nil,
                               onProgress: @escaping @Sendable (Progress) -> Void) async throws -> StructuredOutput {
+        // Idle sleep freezes the CLI mid-run, so keep the Mac awake while it works. The display may still sleep.
+        let activity = ProcessInfo.processInfo.beginActivity(options: .userInitiated, reason: "Vibemetric is scoring AI coding sessions")
+        defer { ProcessInfo.processInfo.endActivity(activity) }
         guard let wrapUp, wrapUp.after < options.timeout else {
             return try await runOnce(prompt: prompt, schema: schema, packDir: packDir, sources: sources, options: options,
                                      webAccess: webAccess, forkSessionID: forkSessionID, workingDirectory: workingDirectory,
                                      onProgress: onProgress)
         }
-        let started = Date()
+        let started = AwakeClock.now
         var first = options
         first.timeout = wrapUp.after
         do {
@@ -147,11 +297,11 @@ public final class Assessor: Sendable {
             guard let sessionID = stopped.sessionID, UUID(uuidString: sessionID) != nil else { throw AssessmentError.timedOut }
             onProgress(.thinking(Self.wrapUpNotice))
             var rest = options
-            rest.timeout = max(options.timeout - Date().timeIntervalSince(started), 30)
+            rest.timeout = max(options.timeout - (AwakeClock.now - started), 30)
             var output = try await runOnce(prompt: wrapUp.prompt, schema: schema, packDir: packDir, sources: sources, options: rest,
                                            webAccess: webAccess, forkSessionID: sessionID, workingDirectory: workingDirectory,
                                            onProgress: onProgress)
-            output.elapsed = Date().timeIntervalSince(started)
+            output.elapsed = AwakeClock.now - started
             output.wrappedUp = true
             return output
         }
@@ -159,13 +309,16 @@ public final class Assessor: Sendable {
 
     /// Shown in the activity log when a run reaches its reading time limit and is asked to write the card.
     public static let wrapUpNotice = "Time limit reached. Writing the score from what was read so far."
+    /// Shown in the activity log when reading finished before its time limit and the card's parts are being written.
+    public static let writingNotice = "Reading done. Writing the score card's parts at the same time."
 
     /// A run stopped at its time limit, with the session it had saved so far.
     struct DeadlineReached: Error { var sessionID: String? }
 
     private func runOnce(prompt: String, schema: String, packDir: URL, sources: [TranscriptSource],
                          options: AssessmentOptions, webAccess: Bool, forkSessionID: String?, workingDirectory: URL?,
-                         resumable: Bool = false, onProgress: @escaping @Sendable (Progress) -> Void) async throws -> StructuredOutput {
+                         resumable: Bool = false, requiresOutput: Bool = true, onFirstReply: (@Sendable () -> Void)? = nil,
+                         onProgress: @escaping @Sendable (Progress) -> Void) async throws -> StructuredOutput {
         try Task.checkCancellation()
         let engine = options.engine
         let installed: CLIInstallation
@@ -175,10 +328,12 @@ public final class Assessor: Sendable {
         if let forkSessionID, UUID(uuidString: forkSessionID) == nil {
             throw AssessmentError.failed(engine, "The saved session ID is invalid.")
         }
-        let started = Date()
-        let promptFile = packDir.appendingPathComponent("assessment-prompt.txt")
-        let schemaFile = packDir.appendingPathComponent("assessment-schema.json")
-        let resultFile = packDir.appendingPathComponent("assessment-result.json")
+        let started = AwakeClock.now
+        // Each run has its own files, so runs in the same pack at the same time never read each other's.
+        let run = UUID().uuidString.prefix(8)
+        let promptFile = packDir.appendingPathComponent("assessment-prompt-\(run).txt")
+        let schemaFile = packDir.appendingPathComponent("assessment-schema-\(run).json")
+        let resultFile = packDir.appendingPathComponent("assessment-result-\(run).json")
         defer {
             for file in [promptFile, schemaFile, resultFile] { try? FileManager.default.removeItem(at: file) }
         }
@@ -188,12 +343,20 @@ public final class Assessor: Sendable {
         try schema.write(to: schemaFile, atomically: true, encoding: .utf8)
         let arguments = Self.arguments(options: options, sources: sources, schema: schema, schemaFile: schemaFile, resultFile: resultFile,
                                        webAccess: webAccess, forkSessionID: forkSessionID, readableDirectories: workingDirectory == nil ? [] : [packDir])
-        let reader = AssessmentStream(engine: engine, onProgress: onProgress)
+        var environment = installed.environment
+        if let thinkingTokens = options.thinkingTokens, engine == .claude {
+            // Claude Code ignores the budget on models with adaptive thinking (Sonnet and Opus 4.6) unless that is turned off.
+            environment["MAX_THINKING_TOKENS"] = String(thinkingTokens)
+            environment["CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING"] = "1"
+        }
+        let reader = AssessmentStream(engine: engine, onProgress: onProgress, onFirstReply: onFirstReply)
         onProgress(.started)
         let output: CLIProcess.Output
+        let process = processes.start()
+        defer { processes.finished(process) }
         do {
             output = try await process.run(executable: installed.executable, arguments: arguments,
-                                           directory: workingDirectory ?? packDir, environment: installed.environment, input: promptFile,
+                                           directory: workingDirectory ?? packDir, environment: environment, input: promptFile,
                                            timeout: options.timeout) { reader.consume($0) }
         } catch AssessmentError.timedOut where resumable {
             reader.finish()
@@ -214,21 +377,30 @@ public final class Assessor: Sendable {
         let data: Data
         switch engine {
         case .claude:
-            guard let result = snapshot.claudeResult else { throw AssessmentError.noStructuredOutput(engine, stderr) }
-            let structured = result["structured_output"] ?? (result["result"] as? String).flatMap {
-                try? JSONSerialization.jsonObject(with: Data($0.utf8))
+            let structured = snapshot.claudeResult.flatMap { result in
+                result["structured_output"] ?? (result["result"] as? String).flatMap {
+                    try? JSONSerialization.jsonObject(with: Data($0.utf8))
+                }
             }
-            guard let structured, JSONSerialization.isValidJSONObject(structured) else {
+            if let structured, JSONSerialization.isValidJSONObject(structured) {
+                data = try JSONSerialization.data(withJSONObject: structured)
+            } else if !requiresOutput {
+                data = Data()
+            } else if snapshot.claudeResult == nil {
+                throw AssessmentError.noStructuredOutput(engine, stderr)
+            } else {
                 throw AssessmentError.noStructuredOutput(engine, "Try again with a different model.")
             }
-            data = try JSONSerialization.data(withJSONObject: structured)
         case .codex:
-            guard snapshot.completed, let final = try? Data(contentsOf: resultFile), !final.isEmpty else {
+            if snapshot.completed, let final = try? Data(contentsOf: resultFile), !final.isEmpty {
+                data = final
+            } else if !requiresOutput {
+                data = Data()
+            } else {
                 throw AssessmentError.noStructuredOutput(engine, "The final response was missing or the run did not finish.")
             }
-            data = final
         }
-        return StructuredOutput(data: data, elapsed: Date().timeIntervalSince(started),
+        return StructuredOutput(data: data, elapsed: AwakeClock.now - started,
                          costUSD: snapshot.claudeResult?["total_cost_usd"] as? Double,
                          turns: snapshot.claudeResult?["num_turns"] as? Int,
                          cliVersion: installed.version, actualModel: snapshot.model, sessionID: sessionID)
@@ -317,6 +489,42 @@ public final class Assessor: Sendable {
         from the evidence you have already read. Score every dimension you have evidence for. Set `sessionsExamined` to the \
         digests and transcripts you actually read, and add a line to `scope.limits` saying the run stopped reading at its time limit.
         """
+
+    /// Added to the assessment prompt for the reading run, which saves what it read for the writing parts.
+    static let readingRequest = """
+
+
+        # This run: reading only
+
+        This run only reads. Do not write the card now, even when you have finished reading. When you are done, or the \
+        reading budget is used, return only a one-sentence `note` saying what you read, and no other field. The app then continues this session in \
+        separate copies that each write part of the card, from what you read here and without reading more. So as you read, \
+        note the counts, cases, session ids, dates, and projects each dimension's fields and checks will need.
+        """
+
+    /// The request one writing part continues the reading session with.
+    static func partRequest(_ part: CardPart, of count: Int, wrappedUp: Bool) -> String {
+        let intro = """
+            Reading is complete\(wrappedUp ? " (it stopped at its time limit)" : ""). Do not read any more files. The score card is \
+            written in \(count) parts at the same time, each in its own copy of this session.
+            """
+        switch part {
+        case .frame:
+            return intro + """
+                 This part returns the card's overall fields: `language`, `diagnosis`, `summary`, `highlights`, `improvement`, \
+                `followUp`, `roadmap`, and `scope`, following the Return format exactly. Other parts write the 10 dimensions. \
+                First decide each dimension's score from the evidence, without writing the dimensions out, so these fields \
+                agree with those scores. Set `sessionsExamined` to the digests and transcripts you actually read\
+                \(wrappedUp ? ", and add a line to `scope.limits` saying the run stopped reading at its time limit" : "").
+                """
+        case let .dimension(dimension):
+            return intro + """
+                 This part returns `dimensions` with exactly one entry: \(dimension.title) (`\(dimension.rawValue)`), with \
+                every field the Return format lists for a dimension, following it exactly. Other parts write the other \
+                dimensions and the overall fields.
+                """
+        }
+    }
 
     static func prompt(sources: [TranscriptSource], now: Date, previousDate: Date? = nil, digestCount: Int = 0, engine: AssessmentEngine = .claude,
                        instructions: String? = nil) -> String {
@@ -429,7 +637,7 @@ public final class Assessor: Sendable {
         like and one case that should fail." An empty string at 8 or above.
           - `strengths`: up to 3 things the person already does well in this dimension, one short sentence each, as it happened \
         in their sessions, with a number where one exists, for example "Commits and pushes go to a cheaper subagent, 12 times in two sessions." \
-        The app shows them under "What's working:" above the problem. An empty array when nothing stands out. Group related habits \
+        The app shows them under "Strengths". An empty array when nothing stands out. Group related habits \
         into one sentence rather than listing them separately.
           - `saw`: the supported problem or limitation in this dimension, written as `situation` below asks. The app shows \
         it under "Problem:" and in the list of issues. Start with the problem, not a list of what already works. Include \
@@ -451,8 +659,17 @@ public final class Assessor: Sendable {
           - `evidence`: up to 3 references you verified: tool, full session id, date (YYYY-MM-DD), `project` (the project's short name; \
         when a session ran in a parent folder such as `Documents` or the home folder, name the project it worked on), \
         and `note`, one short line on what happened there, for example "12 edits, no test run, then reported done".
-          - `changeReason`: null when there is no previous card or the score is unchanged; otherwise one sentence on what in the records \
-        led to a different score than last time.
+          - `changeReason`: null when there is no previous card or the score is unchanged; otherwise one sentence naming the new \
+        evidence that moved it: what changed in the person's practice, with dates. A different subset of the same history is not a reason.
+          - `levelNow`: the anchor this score reached, in one plain sentence of at most 14 words, for example "Checking is common, \
+        but core behavior in your main projects still has gaps." For 2, 4, 6 and 8 it is the anchor below.
+          - `nextLevel`: what the next anchor up needs, in one plain sentence of at most 16 words, for example "Most changes get a \
+        real check, and core tests run and keep passing." null at 10.
+          - `checks`: every check the rubric lists under this dimension's table, once each, in its order, with its exact `id`, \
+        `status` (met, partly, not_met, not_seen) and `note`: one plain sentence with a real case, naming the project and who did \
+        what. not_seen means no task read called for it; it is not enough evidence, never a weakness. `seen` and `of`: how many of \
+        the relevant tasks you read showed it, only when at least 3 relevant tasks were read; otherwise both null and the note says \
+        it rests on few examples. Choose the score from the same evidence: it must not claim an anchor whose checks are not met.
         - `improvement`: "One improvement to make first". `title` is the task, at most 10 words, starting with a verb. `dimension` is the \
         dimension it raises. `situation` explains one problem through 2 or 3 connected, plain sentences. Lead with the \
         consequence for the person, then explain what the person and AI did that produced it. Include the task and intended \
@@ -532,5 +749,38 @@ extension Assessor {
         </notes>
 
         """
+    }
+}
+
+/// Opens once and stays open: waiters return when it fires, or after their own time limit.
+final class OneTimeSignal: @unchecked Sendable {
+    private let lock = NSLock()
+    private var fired = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func fire() {
+        let waiting: [CheckedContinuation<Void, Never>] = lock.withLock {
+            guard !fired else { return [] }
+            fired = true
+            defer { waiters = [] }
+            return waiters
+        }
+        waiting.forEach { $0.resume() }
+    }
+
+    func wait(atMost seconds: TimeInterval) async {
+        let timer = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            self?.fire()
+        }
+        defer { timer.cancel() }
+        await withCheckedContinuation { continuation in
+            let open: Bool = lock.withLock {
+                if fired { return true }
+                waiters.append(continuation)
+                return false
+            }
+            if open { continuation.resume() }
+        }
     }
 }

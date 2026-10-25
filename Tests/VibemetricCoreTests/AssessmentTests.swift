@@ -13,8 +13,13 @@ struct AssessmentTests {
         #expect(outcome.sessionID == CLIFixture.sessionID)
         #expect(outcome.engine == engine)
         #expect(outcome.cliVersion == "fixture")
-        #expect(outcome.costUSD == (engine == .claude ? 0.02 : nil))
+        // One reading run, then the frame and each dimension written as its own part.
+        let runs = 1 + 1 + Dimension.allCases.count
+        #expect(outcome.costUSD.map { abs($0 - 0.02 * Double(runs)) < 0.0001 } ?? (engine == .codex))
         let args = try String(contentsOf: fixture.directory.appendingPathComponent("received-arguments.txt"), encoding: .utf8)
+        // Scores cap Claude Code's thinking so writing the card can't spend a whole reply deliberating.
+        let thinking = try String(contentsOf: fixture.directory.appendingPathComponent("received-thinking-tokens.txt"), encoding: .utf8)
+        #expect(thinking == (engine == .claude ? "\(AssessmentOptions.scoreThinkingTokens) 1" : "unset unset"))
         if engine == .claude {
             #expect(args.contains("--tools\nRead\nGrep\nGlob\n--allowedTools\nRead\nGrep\nGlob\n--permission-mode\ndontAsk"))
             #expect(!args.contains("WebSearch"))
@@ -170,10 +175,10 @@ struct AssessmentTests {
         let events = Events()
         let started = Date()
         let raw = try await assessor.runStructured(prompt: "Score this", schema: JSONSchema.scoreCard, packDir: fixture.directory,
-                                                   sources: [], options: options, wrapUp: (0.5, Assessor.wrapUpPrompt)) { events.append($0) }
+                                                   sources: [], options: options, wrapUp: (2, Assessor.wrapUpPrompt)) { events.append($0) }
         #expect(raw.wrappedUp)
         #expect(raw.sessionID == CLIFixture.forkID)
-        #expect(Date().timeIntervalSince(started) < 5)
+        #expect(Date().timeIntervalSince(started) < 7)
         #expect(events.texts.contains { $0.contains("Time limit reached") })
         let args = try String(contentsOf: fixture.directory.appendingPathComponent("received-arguments.txt"), encoding: .utf8)
         #expect(args.contains(engine == .claude ? "--resume\n\(CLIFixture.sessionID)\n--fork-session" : "fork\n\(CLIFixture.sessionID)"))
@@ -221,6 +226,7 @@ private struct CLIFixture {
         let script = #"""
         #!/bin/sh
         printf '%s\n' "$@" > received-arguments.txt
+        printf '%s %s' "${MAX_THINKING_TOKENS:-unset}" "${CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING:-unset}" > received-thinking-tokens.txt
         session_id="\#(Self.sessionID)"
         is_fork=0
         for arg in "$@"; do
