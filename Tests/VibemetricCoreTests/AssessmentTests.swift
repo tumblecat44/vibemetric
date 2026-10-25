@@ -15,6 +15,9 @@ struct AssessmentTests {
         #expect(outcome.cliVersion == "fixture")
         #expect(outcome.costUSD == (engine == .claude ? 0.02 : nil))
         let args = try String(contentsOf: fixture.directory.appendingPathComponent("received-arguments.txt"), encoding: .utf8)
+        // Scores cap Claude Code's thinking so writing the card can't spend a whole reply deliberating.
+        let thinking = try String(contentsOf: fixture.directory.appendingPathComponent("received-thinking-tokens.txt"), encoding: .utf8)
+        #expect(thinking == (engine == .claude ? String(AssessmentOptions.scoreThinkingTokens) : "unset"))
         if engine == .claude {
             #expect(args.contains("--tools\nRead\nGrep\nGlob\n--allowedTools\nRead\nGrep\nGlob\n--permission-mode\ndontAsk"))
             #expect(!args.contains("WebSearch"))
@@ -221,6 +224,7 @@ private struct CLIFixture {
         let script = #"""
         #!/bin/sh
         printf '%s\n' "$@" > received-arguments.txt
+        printf '%s' "${MAX_THINKING_TOKENS:-unset}" > received-thinking-tokens.txt
         session_id="\#(Self.sessionID)"
         is_fork=0
         for arg in "$@"; do

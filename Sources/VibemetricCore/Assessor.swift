@@ -8,6 +8,10 @@ public struct AssessmentOptions: Sendable {
     /// `Assessor.run` caps `timeout` at it, so a score asks for it by setting `timeout` (the default suits deep dives).
     public static let scoreTimeLimit: TimeInterval = 30 * 60
     public var wrapUpAfter: TimeInterval = 6.5 * 60
+    /// The silent reasoning Claude Code may spend on one reply; nil leaves the CLI's default.
+    public var thinkingTokens: Int?
+    /// A score's cap. Uncapped, writing the card could think until the reply's 32,000-token limit and write nothing.
+    public static let scoreThinkingTokens = 8_000
     /// The digests a score reads in full: every session since the last score first, then leads, then a spread.
     public static let readingTarget = 70
     /// The person's own notes for the judge, e.g. "the demo-skill sessions were only a test".
@@ -88,6 +92,7 @@ public final class Assessor: Sendable {
                                  digestCount: Self.digestCount(packDir), engine: options.engine, instructions: options.instructions)
         var options = options
         options.timeout = min(options.timeout, AssessmentOptions.scoreTimeLimit)
+        options.thinkingTokens = options.thinkingTokens ?? AssessmentOptions.scoreThinkingTokens
         let raw = try await runStructured(prompt: prompt, schema: JSONSchema.scoreCard, packDir: packDir, sources: sources,
                                           options: options, wrapUp: (options.wrapUpAfter, Self.wrapUpPrompt),
                                           onProgress: onProgress)
@@ -188,12 +193,14 @@ public final class Assessor: Sendable {
         try schema.write(to: schemaFile, atomically: true, encoding: .utf8)
         let arguments = Self.arguments(options: options, sources: sources, schema: schema, schemaFile: schemaFile, resultFile: resultFile,
                                        webAccess: webAccess, forkSessionID: forkSessionID, readableDirectories: workingDirectory == nil ? [] : [packDir])
+        var environment = installed.environment
+        if let thinkingTokens = options.thinkingTokens, engine == .claude { environment["MAX_THINKING_TOKENS"] = String(thinkingTokens) }
         let reader = AssessmentStream(engine: engine, onProgress: onProgress)
         onProgress(.started)
         let output: CLIProcess.Output
         do {
             output = try await process.run(executable: installed.executable, arguments: arguments,
-                                           directory: workingDirectory ?? packDir, environment: installed.environment, input: promptFile,
+                                           directory: workingDirectory ?? packDir, environment: environment, input: promptFile,
                                            timeout: options.timeout) { reader.consume($0) }
         } catch AssessmentError.timedOut where resumable {
             reader.finish()
