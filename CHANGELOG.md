@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.14 (2026-10-25)
+
+- Scoring rubric 5. Each category now lists the habits behind its score, like "Changes are checked in the real flow". Each habit is marked Yes, Partly, Not yet, or Not enough evidence, with a real example from your sessions, and a count when enough tasks were read. Missing evidence never lowers a score, and a score change names the new evidence behind it. Because the rubric changed, your next score starts a new baseline.
+- Opening a category shows tabs: Problem, Solution, Your habits, and Strengths. Go deeper sits below them.
+- Scores finish in about two minutes. The card is written in parts at the same time, which reuse the work already read instead of paying for it again.
+- Scoring keeps going if your Mac sleeps partway through.
+- Official app: Go deeper stands out more, with a sparkle icon and an outline.
+
 ## 0.4.13 (2026-10-22)
 
 - "What you're doing well" shows its points in a rounded card that matches the category list, with a green dot for each point and more space between lines.
