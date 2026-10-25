@@ -68,6 +68,7 @@ struct CategoryDetails: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if result.levelNow != nil || result.checks?.isEmpty == false { WhyThisScore(result: result) }
             if result.isReadable {
                 if let strengths = result.strengths {
                     // Newer cards: what works on its own, above a problem that holds only the gap.
@@ -233,6 +234,86 @@ private struct WhatsWorking: View {
 }
 
 /// "Problem" / "Solution": a small bold label in the part's color, with its symbol.
+/// Why this score: the level reached, what the next level needs, and the rubric's checks with what the records
+/// showed. Not enough evidence is shown as such, apart from what is missing.
+private struct WhyThisScore: View {
+    var result: ScoreCard.DimensionResult
+
+    private var checks: [(title: String, check: ScoreCheck)] {
+        let titles = Dictionary(uniqueKeysWithValues: ScoreCheck.definitions(for: result.dimension).map { ($0.id, $0.title) })
+        return (result.checks ?? []).compactMap { check in titles[check.id].map { ($0, check) } }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            PartLabel(text: "Why this score", symbol: "scope", color: Theme.ink)
+            if let score = result.score, let now = result.levelNow, !now.isEmpty {
+                // A grid, so both sentences start at one edge whatever the labels' widths.
+                Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 6) {
+                    level("You're at \(score)", now, color: result.band.map(Theme.color(for:)) ?? Theme.muted)
+                    if let next = ScoreCheck.nextAnchor(after: score), let text = result.nextLevel, !text.isEmpty {
+                        level("To reach \(next)", text, color: Theme.muted)
+                    }
+                }
+            }
+            if !checks.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(checks, id: \.check.id) { item in row(item.title, item.check) }
+                }
+            }
+        }
+        .modifier(PartPanel(color: Theme.muted))
+    }
+
+    private func level(_ label: String, _ text: String, color: Color) -> some View {
+        GridRow {
+            Text(label).scaledFont(13, weight: .semibold).foregroundStyle(color)
+                .fixedSize()
+                .gridColumnAlignment(.leading)
+            Text(inline(text)).scaledFont(14).foregroundStyle(Theme.ink)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func row(_ title: String, _ check: ScoreCheck) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: symbol(check.status)).scaledFont(13, weight: .semibold).foregroundStyle(color(check.status))
+                .frame(width: 16)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(title).scaledFont(14, weight: .semibold).foregroundStyle(Theme.ink)
+                    Text([check.status.label, check.count].compactMap { $0 }.joined(separator: " · "))
+                        .scaledFont(12, weight: .medium).foregroundStyle(color(check.status))
+                }
+                if !check.note.isEmpty {
+                    Text(inline(check.note)).scaledFont(13).foregroundStyle(Theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func symbol(_ status: ScoreCheck.Status) -> String {
+        switch status {
+        case .met: "checkmark.circle.fill"
+        case .partly: "circle.lefthalf.filled"
+        case .notMet: "xmark.circle"
+        case .notSeen: "questionmark.circle"
+        }
+    }
+
+    private func color(_ status: ScoreCheck.Status) -> Color {
+        switch status {
+        case .met: Theme.color(for: .strong)
+        case .partly: Theme.color(for: .developing)
+        case .notMet: Theme.color(for: .bottleneck)
+        case .notSeen: Theme.muted
+        }
+    }
+}
+
 private struct PartLabel: View {
     var text: String
     var symbol: String

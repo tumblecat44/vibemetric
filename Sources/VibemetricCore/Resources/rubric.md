@@ -40,6 +40,21 @@ Assess the person's practices that remain in use at the assessment time across e
 - Bands: **0–5 = BOTTLENECK; 6–7 = DEVELOPING; 8–10 = STRONG**.  
 - **Permission bypass:** Running with a permission-bypass mode (for example `dangerously-skip-permissions`) is not penalized by itself, and there is no deduction for it. Rate Security on the restrictions, hooks, isolation, and checks the records show, wherever they apply. Claims of caution or safeguard files alone do not prove protection; missing records do not prove its absence.
 
+### Explaining each score: level, checks, and counts
+
+Every score must be explainable to the person in their own terms: which level they reached, what the next level needs, and the few concrete checks behind it.
+
+- **Level reached and next level.** State the anchor the score reached in plain words, and what the next anchor up requires. For 2, 4, 6, and 8, the reached level is the anchor below and the next level is the anchor above. At 10 there is no next level.
+- **Checks.** Each dimension lists two to four checks below its table. They are the observable practices that move a person up the anchors. Report every check with one status:
+  - **met**: the practice is the person's recurring way of working in the relevant tasks read;
+  - **partly**: it happens in some relevant tasks, or only when the person remembers to ask;
+  - **not met**: relevant tasks were read and the practice was absent, minimal, or ineffective;
+  - **not seen**: no task read called for it, or the records cannot show it. **Not seen is not not met.** It never lowers a score below what the other evidence supports, and it is reported as not enough evidence, not as a weakness.
+- Give each check one plain sentence with a real case: the project, what the person or AI did or did not do, and the result. Do not repeat the rubric's wording.
+- **Counts.** Where a check can be counted, give how many of the relevant tasks you read showed it, as `seen` of `of`, for example 9 of 14 code changes verified. Count only tasks actually read; one outcome across continuations and retries is one task. Give a count only when at least 3 relevant tasks were read; otherwise leave it out and say in the sentence that the check rests on few examples.
+- **The score follows the checks.** Choose the anchor from the same evidence the checks report. A score must not claim an anchor whose checks are not met, and checks that are met must be reflected in the score. When the checks and the anchor disagree, explain why in the reason.
+- **Score changes.** When a previous assessment exists and a score differs from it, name the new evidence that moved it: what changed in the person's practice, with dates. Reading a different subset of the same history, or a different impression of the same evidence, does not move a score.
+
 ### Project screening: small-scale, one-off projects
 
 Screen projects before scoring so that intentionally lightweight work is not mistaken for evidence of weak ability. For example, a game made for fun in one sitting need not demonstrate the practices expected of a maintained service. Use **small-scale, one-off project (소규모·단발성 프로젝트)** as the classification; do not infer eligibility from labels such as “side project” or “toy project.”
@@ -78,6 +93,12 @@ In the Scope note, briefly list screened projects with their deployment/use stat
 | **9** | Reviews failure scenarios and available alternatives with AI as well as the normal user flow. Identifies missing requirements, makes decisions that fit their intent, and incorporates those decisions into the instructions at execution handoff covering the goal, expected behavior, completion criteria, and constraints. For example, also considers retries after a failed login and whether work done before login should be preserved. |
 | **10** | When clarifying ambiguous requirements, has AI present one question and recommendation at a time, then examines the next related issue after the user answers. Resolves facts the AI can investigate through research and works through the necessary issues in sequence to fill gaps in the requirements. Execution does not begin until the user and AI confirm that their understanding agrees and the user organizes the final goal, expected behavior, completion criteria, and constraints into consistent execution instructions reflecting their own understanding. |
 
+**Checks:**
+
+- `user_outcome` · **Says the end user's outcome.** The handoff states who the work is for, what they should be able to do, and the result they get, not only the feature to build (anchor 5).
+- `done_check` · **Says how done will be checked.** The handoff states the expected behavior and how completion will be checked: a test, a command, a visible result, or a scenario (anchor 7).
+- `settles_unknowns` · **Settles unclear requirements first.** Ambiguities, failure cases, and alternatives are resolved with AI before building, and the decisions reach the execution instructions (anchors 7–10).
+
 ---
 
 ### 2. Context Engineering · Keeping the Right Context in Front of AI
@@ -97,6 +118,12 @@ In the Scope note, briefly list screened projects with their deployment/use stat
 | **9** | **Keeping context current is systematic across the main projects.** Updating the context file is part of finishing work: new decisions, gotchas, and commands are captured as they arise, and stale lines are removed. Projects share a consistent structure, and later tasks show few failures from missing or outdated context. |
 | **10** | **Context maintains itself.** AI notices when context was missing, wrong, or bloated and fixes the guidance without being asked. Files stay concise as projects grow through pruning and reorganizing, and later work confirms the effect. |
 
+**Checks:**
+
+- `essentials_covered` · **Project notes cover the essentials.** Each main project's context file covers what AI must know: purpose, layout, how to run and test, conventions and constraints, and known gotchas (anchor 5).
+- `concise_structure` · **Project notes are concise and organized.** Essentials come first and details live in linked documents; files for different tools agree; nothing is bloated with pasted history (anchor 7).
+- `kept_current` · **Project notes are kept current.** Notes are updated when commands, structure, or decisions change, as part of finishing work, and stale lines are removed (anchors 7–9).
+
 **Boundary:** Context Engineering assesses how task information reaches AI; Memory & Knowledge assesses how stored information is maintained for later use.
 
 ---
@@ -113,6 +140,12 @@ In the Scope note, briefly list screened projects with their deployment/use stat
 | **7** | **Builds on personally reviewed and subsequently used memories by defining what to store, where to store it, and when to update it according to their work.** For example, stores user preferences in shared memory and project environments and cautions in the relevant project's memory. Also establishes rules such as “Do not save conditions specific to this request in persistent memory” and “When existing information changes, update the existing entry rather than adding a contradictory one.” Reflects these rules in memory instructions or settings and verifies examples of AI actually saving and updating information accordingly. Multiple files or stores are not required. |
 | **9** | **The designed storage, update, and cleanup procedures run by default in subsequent conversations, as the usual practice rather than an occasional cleanup.** For example, has AI search for duplicate or conflicting entries before saving new information, then add, update, merge, or delete entries based on the findings. Defines when to review relevant memories, such as after a task finishes or project information changes. AI follows this procedure without the user specifying each item to clean up and how to change it every time. Records from a later separate conversation show updated memories being used and retired information not being used, producing an appropriate answer or action for the task. File existence, read-only inspection, or automated cleanup alone does not establish that the management procedure produces useful later outcomes. |
 | **10** | **AI detects and corrects problems in memory or its management, including problems missed by the existing procedure, without item-by-item user instructions, changes how information is stored and updated where needed, and checks the effects in subsequent conversations.** For example, if information stored without a project name is repeatedly applied to other projects, goes beyond correcting the individual entry. Changes the rules to include the applicable project when saving project information and reviews existing entries as well. Then checks that new conversations for different projects use the appropriate memories. When other problems are found, such as permanently saving one-time requests, leaving duplicates after an update, or saving deleted information again, changes the management procedure based on the cause and checks it again. |
+
+**Checks:**
+
+- `saves_what_matters` · **Saves what later work needs.** The person has AI remember preferences, corrections, and project facts that later conversations need (anchors 3–5).
+- `reviews_memory` · **Reviews and cleans up memory.** Stored memories are opened, corrected, merged, or deleted when wrong or outdated (anchor 5).
+- `memory_rules` · **Has rules for what goes where.** What to store, where, and when to update is defined, and later conversations follow it by default (anchors 7–9).
 
 **Evidence clarification:** Judge the recurring memory-management practice visible in the examined records: what the user saves, reviews, corrects, and organizes, and what later conversations apply. Distinguish saving information from reviewing and maintaining it.
 
@@ -133,6 +166,12 @@ In the Scope note, briefly list screened projects with their deployment/use stat
 | **9** | **Tool use is systematic.** Recurring workflows across the main projects are captured as skills or configured tools and used by default. New recurring tasks are turned into skills as they appear, and records show these skills used repeatedly with successful results. Creating a skill file alone does not qualify. |
 | **10** | **The toolkit is maintained and shared.** Skills are kept current as the work changes and used across projects over time, and proven, regularly used skills or MCP servers are made usable by others with installation instructions, configuration inputs, and examples, through a public repository, marketplace, or team distribution. Saving them locally or sharing screenshots does not count as distribution. |
 
+**Checks:**
+
+- `tools_do_work` · **Connected tools do the real work.** Agents operate services through CLIs, MCP, or connectors in real work instead of the person doing it by hand (anchor 5).
+- `procedures_saved` · **Recurring work is saved as tools or skills.** Recurring procedures are captured as skills or configured tools adapted to the project and used without re-explaining (anchors 7–9).
+- `kept_and_shared` · **Proven tools are maintained and shared.** Skills and tools are kept current as work changes, and proven ones are made usable by others (anchor 10).
+
 ---
 
 ### 5. Orchestration I: Task Mapping · Breaking Work Down and Wiring It Together
@@ -147,6 +186,12 @@ In the Scope note, briefly list screened projects with their deployment/use stat
 | **7** | **The map is checked against execution, adjusted where needed, and wired for flow.** Pieces that prove too large or tangled are split, and simple tasks are deliberately not over-split. Pieces are routed to the agent or session suited to them; outputs feed the next piece without manual copying; independent pieces run in parallel where that helps. Records establish completed, connected work and successful routing. When the map needs adjustment, they show what failed, what changed, and what the next execution established; a map that works may be retained without an invented problem or gratuitous change. |
 | **9** | **The breakdown and wiring are saved and are the default way multi-part work runs.** For example, a skill or team setup defines how this kind of work is divided, which agent or session takes each piece, and what passes between them. Later tasks follow it without the user re-explaining the structure, and records show the pieces completed and connected as defined. |
 | **10** | **The map improves from experience across multiple tasks.** Recurring problems—pieces that repeatedly fail, conflict, wait idle, or get redone—lead to changes in how work is divided or wired, and later tasks confirm fewer such problems. Removing unnecessary pieces, agents, or handoffs also qualifies; greater structural complexity does not itself earn points. |
+
+**Checks:**
+
+- `checkable_pieces` · **Splits big work into checkable pieces.** Multi-part work is broken into small pieces, each with its own completion check (anchor 5).
+- `wired_flow` · **Orders and routes the pieces.** Pieces run in dependency order with defined inputs and outputs, go to suitable agents or sessions, and are adjusted when they prove too large (anchor 7).
+- `saved_structure` · **Reuses a saved way of splitting work.** The way this kind of work is divided and handed off is saved and followed in later tasks without re-explaining (anchors 9–10).
 
 **Evidence clarification:** Judge the recurring way work is divided, connected, and executed in the examined records. Explain the project’s purpose and how inputs, outputs, and dependencies operated. Assess later reuse and improvement where the anchor requires them. An AI-generated task map or worker assignment shows what AI arranged; credit the user’s own choices or adopted workflow as supported by the exchange, and attribute AI’s design decisions to AI.
 
@@ -166,6 +211,12 @@ In the Scope note, briefly list screened projects with their deployment/use stat
 | **7** | **Changes the loop based on problems revealed during execution, and results are integrated and checked as a whole.** For example, requires new evidence or a different approach when the same failure repeats. When several agents contribute, a coordinator combines their outputs and finds gaps or conflicts, such as a mismatch between values sent by the interface and those the server expects, though correcting them still needs further user instruction. Records establish the problem, the change, and how the next execution differed. |
 | **9** | **Normal progress and necessary exception paths run without the user directing each step, and the saved loop is the default way results are handled in later work.** Failed checks route to correction, insufficient permissions route to a person with the needed information, interrupted work resumes from what was completed, and a coordinator sends problems back to the responsible agent, integrates the corrections, and verifies again. The loop and its exception handling are saved, with records of their use in later separate tasks. Rare exceptions may be checked through safe simulations; documentation alone is insufficient. Do not require unneeded features. |
 | **10** | **Identifies weaknesses and waste in the loop itself across multiple executions, improves it, and checks the effect in later separate tasks.** For example, changes check order or escalation rules in response to recurring omissions and rework, then confirms fewer such problems or more reliable results in subsequent work. Removing ineffective steps or reducing automation also qualifies. Greater structural complexity does not itself earn points. |
+
+**Checks:**
+
+- `results_decide` · **Results decide the next step.** A check's result leads to a fix and recheck, to stopping, or to escalation, rather than ad hoc retries (anchor 3).
+- `defined_loop` · **Loops have goals, checks, and stopping rules.** The loop defines what passing means, what to recheck, and when to stop or report what remains (anchors 5–7).
+- `loop_by_default` · **The loop runs by default and improves.** The saved loop handles normal progress and exceptions in later work, and is changed when it proves weak (anchors 9–10).
 
 **Evidence clarification:** Judge the recurring result-driven procedure and how it is revised in the examined work. Distinguish what the user configured, selected, or changed from AI’s own execution and internal retries. Attribute a worker instruction or loop revision to the actor shown in the exchange. Where an anchor assesses autonomous operation or improvement, credit that behavior as such.
 
@@ -190,6 +241,13 @@ In the Scope note, briefly list screened projects with their deployment/use stat
 | **9** | **Verification is systematic and built in.** Tests and evals run automatically across the main projects, through CI, pre-merge hooks, or verification skills run by default. New features arrive with tests. Bugs found in real work become test cases, and eval sets grow from real failures. Checks are shown to catch failures. |
 | **10** | **The habit sustains itself across projects and over time.** The agent runs the required checks unprompted before declaring work done and labels anything unverified. Test coverage and eval results are tracked and gaps are closed. Eval results drive decisions about prompt, model, and AI-setup changes (adopt, revise, or roll back), and later work confirms those decisions held. |
 
+**Checks:**
+
+- `real_checks` · **Changes are checked in the real flow.** Substantive changes are verified by running the actual flow, not accepted on the AI's word (anchors 5–7).
+- `core_tests` · **Core behavior has tests that run and pass.** Substantial projects have automated tests for their core behavior that are run and kept passing (anchor 7).
+- `automatic_checks` · **Checks run automatically.** Tests and checks run without being asked: CI, pre-merge hooks, or verification skills run by default (anchor 9).
+- `ai_evals` · **AI features are evaluated.** Products with AI features evaluate outputs on representative inputs and use the results. Not seen when no product has AI features (anchors 5–9).
+
 **Evidence clarification:** Apply the project screening above and judge each project against what it needs. A check that runs establishes verification only for what it covers; report the share of substantive changes and projects verified rather than counting examples. Distinguish checks the user requested from checks that run by default.
 
 **Boundary:** Testing & Evals covers whether results are proven and AI quality is measured; result-driven workflow control belongs to Orchestration II, and cost-aware model selection belongs to Efficiency & Cost.
@@ -211,6 +269,12 @@ This assesses practical problem handling in AI-assisted work, including reasonin
 | **9** | **Consistently, across tasks, examines the work to distinguish what should continue from what needs a change of direction.** For example, in one task, checks that changes and results fit the requested scope and lets the work proceed. In another, notices an unrequested data structure change during a bug fix and says “Leave this change out of this fix. If it is necessary, first bring me the reason and its impact.” Records must establish what the user examined to decide to proceed, revise, or defer, and whether each decision was reflected in the work. Do not judge by approval or interruption counts alone. |
 | **10** | **Revises their own instructions when later evidence contradicts them and checks the results of the revised instructions.** For example, the user initially limits work to “Fix only the frontend,” but execution records show the server returning data in a different order each time. The user then changes the instruction: “Lift the frontend-only restriction. Fix the server's sorting condition while preserving the response format.” Checks whether the change resolves the problem. This behavior—examining the assumptions behind their own instructions and revising them when necessary—also appears in later separate tasks. Merely changing requirements or accepting AI's disagreement without examination does not qualify. |
 
+**Checks:**
+
+- `specific_feedback` · **Says exactly what is wrong and checks the fix.** Corrections name where the problem is and the behavior wanted, and the result is checked (anchor 3).
+- `asks_for_evidence` · **Asks for evidence before accepting.** Before accepting a proposed cause or fix, the person asks for and examines the evidence (anchor 5).
+- `changes_course` · **Stops wrong assumptions and extra scope.** When work rests on a wrong assumption or grows beyond the request, the person identifies it and changes the approach (anchors 7–9).
+
 **Boundary:** Testing & Evals covers discovering errors; Human Steering covers the user’s resulting decision. Escalation procedures belong to Orchestration II: Feedback Loops, and permission controls belong to Security.
 
 ---
@@ -227,6 +291,12 @@ This assesses practical problem handling in AI-assisted work, including reasonin
 | **7** | **Uses execution records to confirm that restrictions and checks work.** Checks whether allowlists, deny rules, and hooks allowed or blocked the intended actions, and whether security checks caught real issues. If a permission or missing check contributed to a mistake, records the cause and corrects the settings, hooks, or checks, then reruns them. |
 | **9** | **Project-specific security rules and checks are saved and apply across the main projects without prompting, not in a single repository.** For example, deny rules and a hook that blocks secrets or risky production commands, or a security-review skill run before merging. Records from later tasks show them preventing or catching problems. Prior incidents are not required: verified settings may be retained and gaps found in safe checks addressed. |
 | **10** | **Security practice is maintained across multiple tasks.** New kinds of issues found in real work become new rules or checks, which are verified to catch the issue, and later work shows them continuing to apply. There is an observed case of a hook, sandbox, or deny rule blocking a risky action at runtime rather than through prompting, and deny rules remain effective under permission-bypass modes. |
+
+**Checks:**
+
+- `limited_access` · **Agents get only the access a task needs.** Read-only or narrow access is enforced through permission settings, scopes, or blocking hooks, not only stated (anchor 5).
+- `security_checks` · **AI-built code gets security checks.** Secret scanning, dependency, injection, or access-control checks run on what AI builds where relevant (anchor 5).
+- `rules_by_default` · **Security rules apply by default.** Project security rules and checks are saved and apply across the main projects without prompting, and records show them working (anchors 7–9).
 
 **Evidence clarification:** Judge recurring operational agent restrictions and product security checks separately, within the scope established by the examined records. A product sandbox test establishes the behavior of that product feature; evidence of restrictions on the working agent establishes operational protection. Assess the relevant aspects required by the anchor.
 
@@ -246,6 +316,12 @@ This assesses practical problem handling in AI-assisted work, including reasonin
 | **7** | **Uses execution records to check and adjust choices.** Reviews task results, the model and effort used, token usage, and elapsed time together, then changes subsequent assignments when a model was excessive for a simple task or insufficient capability caused more rework. Includes coordination, verification, and rework in total cost; if monetary cost is unavailable, uses usage and time without claiming savings. |
 | **9** | **Model and effort criteria or a routing service are saved and applied by default across the main projects.** For example, “Lightweight models for collecting and summarizing material, standard models for implementation with a defined scope, stronger models for design decisions,” or an automatic routing service with an allowed model range and cost/quality priorities. Records from later tasks show the routing applied and results and usage checked. |
 | **10** | **Cost-aware routing continues across multiple tasks and is maintained from results.** Checks the models and effort actually assigned, task results, usage, and time to avoid unnecessary capability for simple tasks while providing what difficult tasks need. Retains suitable criteria and adjusts rules or service settings when excessive cost or insufficient quality is confirmed, with later work confirming the effect. |
+
+**Checks:**
+
+- `fit_model` · **Matches model and effort to the task.** Lighter models or lower effort go to simple work and stronger ones to hard judgment, including for subagents (anchor 5).
+- `adjusts_from_results` · **Adjusts from results and usage.** Choices change after reviewing results, usage, and time, when a model proved excessive or insufficient (anchor 7).
+- `routing_by_default` · **Model rules apply by default.** Saved model and effort rules or a routing service apply across the main projects without re-deciding each time (anchors 9–10).
 
 ## 3. Output format
 

@@ -12,7 +12,7 @@ public struct AssessmentOptions: Sendable {
     public static let readingTarget = 70
     /// The person's own notes for the judge, e.g. "the demo-skill sessions were only a test".
     public var instructions: String?
-    public static let rubricVersion = "4"
+    public static let rubricVersion = "5"
     public static let maxInstructionsLength = 2000
 
     public init(engine: AssessmentEngine = .claude, model: String? = nil, instructions: String? = nil) {
@@ -95,6 +95,7 @@ public final class Assessor: Sendable {
         do {
             card = try JSONDecoder().decode(ScoreCard.self, from: raw.data)
             try Self.validate(card)
+            card.normalizeChecks()
         } catch {
             throw AssessmentError.noStructuredOutput(options.engine, "The response did not match the score-card format. Try again.")
         }
@@ -451,8 +452,17 @@ public final class Assessor: Sendable {
           - `evidence`: up to 3 references you verified: tool, full session id, date (YYYY-MM-DD), `project` (the project's short name; \
         when a session ran in a parent folder such as `Documents` or the home folder, name the project it worked on), \
         and `note`, one short line on what happened there, for example "12 edits, no test run, then reported done".
-          - `changeReason`: null when there is no previous card or the score is unchanged; otherwise one sentence on what in the records \
-        led to a different score than last time.
+          - `changeReason`: null when there is no previous card or the score is unchanged; otherwise one sentence naming the new \
+        evidence that moved it: what changed in the person's practice, with dates. A different subset of the same history is not a reason.
+          - `levelNow`: the anchor this score reached, in one plain sentence of at most 14 words, for example "Checking is common, \
+        but core behavior in your main projects still has gaps." For 2, 4, 6 and 8 it is the anchor below.
+          - `nextLevel`: what the next anchor up needs, in one plain sentence of at most 16 words, for example "Most changes get a \
+        real check, and core tests run and keep passing." null at 10.
+          - `checks`: every check the rubric lists under this dimension's table, once each, in its order, with its exact `id`, \
+        `status` (met, partly, not_met, not_seen) and `note`: one plain sentence with a real case, naming the project and who did \
+        what. not_seen means no task read called for it; it is not enough evidence, never a weakness. `seen` and `of`: how many of \
+        the relevant tasks you read showed it, only when at least 3 relevant tasks were read; otherwise both null and the note says \
+        it rests on few examples. Choose the score from the same evidence: it must not claim an anchor whose checks are not met.
         - `improvement`: "One improvement to make first". `title` is the task, at most 10 words, starting with a verb. `dimension` is the \
         dimension it raises. `situation` explains one problem through 2 or 3 connected, plain sentences. Lead with the \
         consequence for the person, then explain what the person and AI did that produced it. Include the task and intended \

@@ -32,6 +32,15 @@ enum JSONSchema {
             "solutionSteps": array(str, max: 4),
             "evidence": array(evidence, max: 3),
             "changeReason": ["type": ["string", "null"]],
+            "levelNow": str,
+            "nextLevel": ["type": ["string", "null"]],
+            "checks": array(object([
+                "id": ["type": "string", "enum": ScoreCheck.allIDs],
+                "status": ["type": "string", "enum": ScoreCheck.Status.allCases.map(\.rawValue)],
+                "note": str,
+                "seen": ["type": ["integer", "null"], "minimum": 0],
+                "of": ["type": ["integer", "null"], "minimum": 0],
+            ]), max: 4),
         ])
         let schema = object([
             "language": str,
