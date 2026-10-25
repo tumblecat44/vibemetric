@@ -364,6 +364,26 @@ public struct ScoreCard: Codable, Sendable {
     /// What the person does well, as 2–4 one-liners for the result's first screen. nil on cards scored before it
     /// existed; the app then uses the best categories' headlines.
     public var highlights: [String]?
+    /// The result's opening summary: 4–6 plain points mixing what works and what holds the person back. nil on cards
+    /// scored before it existed; those show `highlights` under "What you're doing well" instead.
+    public var overview: [SummaryPoint]?
+
+    /// `overview` grouped: what works first, then what holds the person back, each in the scorer's order.
+    public var groupedOverview: [SummaryPoint]? {
+        overview.map { points in points.filter { $0.tone == .good } + points.filter { $0.tone == .gap } }
+    }
+
+    /// One point of `overview`.
+    public struct SummaryPoint: Codable, Sendable, Equatable {
+        public enum Tone: String, Codable, Sendable, CaseIterable { case good, gap }
+        public var tone: Tone
+        public var text: String
+
+        public init(tone: Tone, text: String) {
+            self.tone = tone
+            self.text = text
+        }
+    }
     public var dimensions: [DimensionResult]
     public var improvement: Improvement
     /// nil when there was no previous card to follow up on.

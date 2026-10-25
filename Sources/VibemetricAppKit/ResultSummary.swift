@@ -21,7 +21,8 @@ struct ResultSummary: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 26) {
             score
-            if !highlights.isEmpty { doingWell }
+            // Newer results open with a summary of good and bad; older ones keep what's going well.
+            if let overview = card.groupedOverview, !overview.isEmpty { summary(overview) } else if !highlights.isEmpty { doingWell }
             if !fixes.isEmpty { toFix }
         }
     }
@@ -74,6 +75,35 @@ struct ResultSummary: View {
                             .lineSpacing(3)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.rule, lineWidth: 1))
+        }
+    }
+
+    // MARK: Summary
+
+    /// The scorer's opening points in the same rounded card: what works first, with a green check, then what holds the
+    /// person back, with an amber mark.
+    private func summary(_ points: [ScoreCard.SummaryPoint]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SummaryHeading(text: "Summary", symbol: "text.alignleft", color: Theme.ink)
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(Array(points.enumerated()), id: \.offset) { _, point in
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Image(systemName: point.tone == .good ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                            .scaledFont(13, weight: .semibold)
+                            .foregroundStyle(point.tone == .good ? Theme.color(for: .strong) : Theme.color(for: .developing))
+                            .accessibilityLabel(point.tone == .good ? "Working well" : "To improve")
+                        Text(inline(point.text)).scaledFont(15).foregroundStyle(Theme.ink)
+                            .lineSpacing(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .accessibilityElement(children: .combine)
                 }
             }
             .padding(.horizontal, 18)

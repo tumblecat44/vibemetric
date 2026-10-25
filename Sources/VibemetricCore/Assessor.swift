@@ -511,7 +511,7 @@ public final class Assessor: Sendable {
         switch part {
         case .frame:
             return intro + """
-                 This part returns the card's overall fields: `language`, `diagnosis`, `summary`, `highlights`, `improvement`, \
+                 This part returns the card's overall fields: `language`, `diagnosis`, `summary`, `highlights`, `overview`, `improvement`, \
                 `followUp`, `roadmap`, and `scope`, following the Return format exactly. Other parts write the 10 dimensions. \
                 First decide each dimension's score from the evidence, without writing the dimensions out, so these fields \
                 agree with those scores. Set `sessionsExamined` to the digests and transcripts you actually read\
@@ -626,6 +626,22 @@ public final class Assessor: Sendable {
         of the result. One sentence each, about 8 to 16 words, that says what they do and why it helps, with no "but" and \
         no numbers unless essential. For example "You saved your release steps as a skill, so AI repeats them the same way \
         every time."
+        - `overview`: the result's opening summary, 4 to 6 points the app shows under "Summary" before anything else. Write \
+        them for someone who does not code, such as a manager or a designer: they should understand every word without \
+        knowing the tools. Mix what works and what holds the person back, as the evidence supports: `tone` `good` for a \
+        practice that helps, `gap` for one that is missing or weak. List every good point first, then the gaps, each group \
+        most important first. Include at least one of each when the evidence supports it, and never invent one to balance \
+        the list. A gap describes the practice, not a missing record: when evidence is only thin, leave it out. Keep the \
+        points consistent with the dimensions' scores and issues.
+        `text`: one short sentence of about 8 to 16 everyday words that says what the person or their AI does and what it \
+        means for their work. No technical terms, tool or product names, commands, version numbers, error codes, project \
+        names, or counts that need context. A file name is fine when it helps, in backticks with a few plain words on what \
+        it is, for example "your project notes file (`CLAUDE.md`)". Otherwise name the idea: "a saved set of instructions" \
+        rather than "a skill", "the AI's saved notes" rather than "memory files", "the most powerful AI model" rather than a \
+        model's name, "checks" or "tests" in plain words. For example, instead of "Your release skill \
+        and agents ran a full dry run of version 0.4.2", write "You turned your release routine into saved steps the AI \
+        follows on its own." Instead of "Almost every session runs on the strongest model, including research and image \
+        prompts", write "You use the most powerful AI even for simple jobs, which costs more than it needs to."
         - `dimensions`: all 10 in rubric order. `score` is an integer 0–10, or null with `status` `not_assessable` only under the rubric's Not assessable rule; never use `not_reviewed`.
           - `headline`: the verdict, at most 10 words, for example "You rarely make the AI prove its work".
           - `issueLine`: below 8, the problem as one sentence of about 12 to 20 words, shown in this dimension's box on the \

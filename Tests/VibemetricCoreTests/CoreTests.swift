@@ -75,7 +75,7 @@ final class CoreTests: XCTestCase {
 
     func testSchemaIsValidJSON() throws {
         let obj = try JSONSerialization.jsonObject(with: Data(JSONSchema.scoreCard.utf8)) as? [String: Any]
-        XCTAssertEqual((obj?["required"] as? [String])?.count, 9) // rubric 4 dropped `deductions`; `highlights` added
+        XCTAssertEqual((obj?["required"] as? [String])?.count, 10) // rubric 4 dropped `deductions`; `highlights`, then `overview`, added
         XCTAssertTrue((obj?["required"] as? [String])?.contains("summary") == true)
     }
 

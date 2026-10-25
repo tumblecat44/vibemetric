@@ -87,6 +87,10 @@ enum JSONSchema {
             "diagnosis": str,
             "summary": array(str, min: 2, max: 3),
             "highlights": array(str, min: 2, max: 4),
+            "overview": array(object([
+                "tone": ["type": "string", "enum": ScoreCard.SummaryPoint.Tone.allCases.map(\.rawValue)],
+                "text": str,
+            ]), min: 4, max: 6),
             "dimensions": array(dimension, min: dimensions.count, max: dimensions.count),
             "improvement": object([
                 "title": str, "situation": str,

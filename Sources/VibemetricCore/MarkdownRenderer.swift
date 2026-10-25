@@ -9,7 +9,9 @@ public enum MarkdownRenderer {
             for d in card.deductions ?? [] { md += "_Includes a −\(d.points) point deduction: \(d.reason)_\n\n" }
         }
         md += card.diagnosis + "\n\n"
-        if let summary = card.summary, !summary.isEmpty {
+        if let overview = card.groupedOverview, !overview.isEmpty {
+            md += "### Summary\n\n" + overview.map { "- \($0.tone == .good ? "✓" : "△") \($0.text)" }.joined(separator: "\n") + "\n\n"
+        } else if let summary = card.summary, !summary.isEmpty {
             md += summary.map { "- \($0)" }.joined(separator: "\n") + "\n\n"
         }
         if let previous { md += changesSection(card, previous: previous, previousDate: previousDate) }
