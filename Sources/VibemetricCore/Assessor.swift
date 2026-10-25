@@ -194,7 +194,11 @@ public final class Assessor: Sendable {
         let arguments = Self.arguments(options: options, sources: sources, schema: schema, schemaFile: schemaFile, resultFile: resultFile,
                                        webAccess: webAccess, forkSessionID: forkSessionID, readableDirectories: workingDirectory == nil ? [] : [packDir])
         var environment = installed.environment
-        if let thinkingTokens = options.thinkingTokens, engine == .claude { environment["MAX_THINKING_TOKENS"] = String(thinkingTokens) }
+        if let thinkingTokens = options.thinkingTokens, engine == .claude {
+            // Claude Code ignores the budget on models with adaptive thinking (Sonnet and Opus 4.6) unless that is turned off.
+            environment["MAX_THINKING_TOKENS"] = String(thinkingTokens)
+            environment["CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING"] = "1"
+        }
         let reader = AssessmentStream(engine: engine, onProgress: onProgress)
         onProgress(.started)
         let output: CLIProcess.Output
