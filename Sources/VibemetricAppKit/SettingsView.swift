@@ -1,11 +1,12 @@
 import SwiftUI
 import VibemetricCore
 
-/// Vibemetric → Settings… (⌘,), shown in the main window. Scoring engine and notes, daily score, Pro, and startup.
+/// Vibemetric → Settings… (⌘,), shown in the main window. Scoring engine and notes, automatic score, Pro, and startup.
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @AppStorage(AutoSettings.enabledKey) private var autoEnabled = true
     @AppStorage(AutoSettings.minuteKey) private var autoMinute = AutoSchedule.defaultMinuteOfDay
+    @AppStorage(AutoSettings.daysKey) private var autoDays = AutoSchedule.everyDay
     @AppStorage(AutoSettings.skipIdleKey) private var skipWhenIdle = true
     @AppStorage(Notifier.enabledKey) private var notifyWhenScored = true
     @Environment(\.textScale) private var scale
@@ -19,7 +20,7 @@ struct SettingsView: View {
                 Text("Settings").scaledFont(22, weight: .semibold).foregroundStyle(Theme.ink)
 
                 SettingsSection("Engine and Model", systemImage: "gauge.with.dots.needle.67percent",
-                                footer: "Applies to your first assessment, every manual score, and daily automatic scores.") {
+                                footer: "Applies to your first assessment, every manual score, and automatic scores.") {
                     AssessmentEnginePicker(compact: true)
                 }
 
@@ -38,12 +39,20 @@ struct SettingsView: View {
 
                 SettingsSection("Schedule", systemImage: "clock",
                                 footer: "Runs while Vibemetric is open. If your Mac is asleep at that time, it runs when the Mac wakes. Each run uses your selected scoring engine’s account, so skipping idle days saves usage.") {
-                    FieldRow("Daily") {
+                    FieldRow("Automatic") {
                         HStack(spacing: 10) {
                             Toggle("", isOn: $autoEnabled).toggleStyle(.switch).labelsHidden()
-                            Text("Score automatically every day").scaledFont(13).foregroundStyle(Theme.ink)
+                            Text("Score automatically on a schedule").scaledFont(13).foregroundStyle(Theme.ink)
                         }
                     }
+                    FieldRow("Days") {
+                        HStack(spacing: 12) {
+                            DaysField(days: $autoDays)
+                            Text(AutoSchedule(days: autoDays).daysDescription()).scaledFont(12).foregroundStyle(Theme.muted)
+                        }
+                    }
+                    .disabled(!autoEnabled)
+                    .opacity(autoEnabled ? 1 : 0.5)
                     FieldRow("Time") { TimeField(minuteOfDay: $autoMinute) }
                         .disabled(!autoEnabled)
                         .opacity(autoEnabled ? 1 : 0.5)
@@ -55,8 +64,8 @@ struct SettingsView: View {
                     }
                     .disabled(!autoEnabled)
                     .opacity(autoEnabled ? 1 : 0.5)
-                    if autoEnabled, let next = AutoSchedule(enabled: true, minuteOfDay: autoMinute).next(after: Date()) {
-                        FieldRow("Next") { Text(RelativeDate.format(next)).scaledFont(13).foregroundStyle(Theme.ink) }
+                    if autoEnabled, let next = AutoSchedule(enabled: true, minuteOfDay: autoMinute, days: autoDays).next(after: Date()) {
+                        FieldRow("Next") { Text(RelativeDate.formatUpcoming(next)).scaledFont(13).foregroundStyle(Theme.ink) }
                     }
                     if let status = model.lastAutoStatus {
                         FieldRow("Last") { Text(status).scaledFont(13).foregroundStyle(Theme.ink) }
@@ -66,7 +75,7 @@ struct SettingsView: View {
                 ForEach(Extensions.settingsSections.indices, id: \.self) { Extensions.settingsSections[$0]() }
 
                 SettingsSection("General", systemImage: "gearshape",
-                                footer: "Notifications show your new score and what changed; if they don't appear, allow Vibemetric in System Settings → Notifications. Opening at login keeps the daily score running.") {
+                                footer: "Notifications show your new score and what changed; if they don't appear, allow Vibemetric in System Settings → Notifications. Opening at login keeps automatic scores running.") {
                     FieldRow("Alerts") {
                         HStack(spacing: 10) {
                             Toggle("", isOn: $notifyWhenScored).toggleStyle(.switch).labelsHidden()
@@ -193,7 +202,40 @@ struct NotesEditor: View {
     }
 }
 
-/// The daily time as one field the same size as the others: hour, minute, and AM/PM menus.
+/// The days of the week the automatic score runs, one round button per day in the calendar's week order.
+/// At least one day stays on: turning off the last one does nothing.
+struct DaysField: View {
+    @Binding var days: Int
+    @Environment(\.textScale) private var scale
+
+    var body: some View {
+        let calendar = Calendar.current
+        let schedule = AutoSchedule(days: days)
+        HStack(spacing: 6) {
+            ForEach(AutoSchedule.weekOrder(calendar: calendar), id: \.self) { weekday in
+                let on = schedule.runs(onWeekday: weekday)
+                Button {
+                    let bit = 1 << (weekday - 1)
+                    let updated = days ^ bit
+                    if updated & AutoSchedule.everyDay != 0 { days = updated }
+                } label: {
+                    Text(calendar.veryShortStandaloneWeekdaySymbols[weekday - 1])
+                        .scaledFont(12, weight: .semibold)
+                        .foregroundStyle(on ? Color.white : Theme.ink)
+                        .frame(width: 30 * scale, height: 30 * scale)
+                        .background(on ? Theme.accent : Theme.paper, in: Circle())
+                        .overlay(Circle().strokeBorder(on ? Color.clear : Theme.rule))
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(calendar.standaloneWeekdaySymbols[weekday - 1])
+                .accessibilityAddTraits(on ? .isSelected : [])
+            }
+        }
+    }
+}
+
+/// The scheduled time as one field the same size as the others: hour, minute, and AM/PM menus.
 struct TimeField: View {
     @Binding var minuteOfDay: Int
     @Environment(\.textScale) private var scale
@@ -228,7 +270,7 @@ struct TimeField: View {
         .background(Theme.paper, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.rule))
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Daily score time")
+        .accessibilityLabel("Automatic score time")
     }
 
     private func part<Items: View>(_ value: String, width: CGFloat, @ViewBuilder items: () -> Items) -> some View {

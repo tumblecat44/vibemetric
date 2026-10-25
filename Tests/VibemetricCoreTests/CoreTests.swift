@@ -203,6 +203,45 @@ final class AutoScheduleTests: XCTestCase {
         XCTAssertEqual(s.next(after: at(29, 9, 30), calendar: cal), at(30, 9, 30))
         XCTAssertNil(AutoSchedule(enabled: false).next(after: at(29, 8, 0), calendar: cal))
     }
+
+    // Sept 28, 2026 is a Monday.
+    private let mondayWednesday = 1 << 1 | 1 << 3
+
+    func testChosenDaysOnly() {
+        let s = AutoSchedule(days: mondayWednesday) // 2:00pm
+        XCTAssertFalse(s.isDue(now: at(29, 17, 0), lastResultAt: nil, lastAttemptAt: nil, calendar: cal), "Tuesday isn't chosen")
+        XCTAssertTrue(s.isDue(now: at(30, 14, 0), lastResultAt: nil, lastAttemptAt: nil, calendar: cal))
+        XCTAssertEqual(s.next(after: at(28, 15, 0), calendar: cal), at(30, 14, 0), "Monday's slot passed; next is Wednesday")
+        XCTAssertEqual(s.next(after: at(30, 14, 0), calendar: cal),
+                       cal.date(from: DateComponents(year: 2026, month: 10, day: 5, hour: 14)), "then the next Monday")
+        XCTAssertEqual(AutoSchedule(days: 0).days, AutoSchedule.everyDay, "No day chosen means every day")
+    }
+
+    func testDaysDescription() {
+        var cal = cal
+        cal.locale = Locale(identifier: "en_US")
+        func words(_ days: Int) -> String { AutoSchedule(days: days).daysDescription(calendar: cal) }
+        XCTAssertEqual(words(AutoSchedule.everyDay), "Every day")
+        XCTAssertEqual(words(AutoSchedule.weekdays), "Weekdays")
+        XCTAssertEqual(words(AutoSchedule.weekends), "Weekends")
+        XCTAssertEqual(words(1 << 1), "Every Monday")
+        XCTAssertEqual(words(mondayWednesday), "Every Monday and Wednesday")
+        XCTAssertEqual(words(mondayWednesday | 1 << 5), "Every Mon, Wed and Fri")
+        XCTAssertEqual(words(mondayWednesday | 1 << 0), "Every Sun, Mon and Wed")
+        cal.firstWeekday = 2
+        XCTAssertEqual(words(mondayWednesday | 1 << 0), "Every Mon, Wed and Sun", "Follows the calendar's first weekday")
+    }
+
+    func testUpcomingDates() {
+        var cal = cal
+        cal.locale = Locale(identifier: "en_US")
+        let locale = Locale(identifier: "en_US")
+        func f(_ date: Date) -> String { RelativeDate.formatUpcoming(date, now: at(29, 8, 0), calendar: cal, locale: locale) }
+        XCTAssertEqual(f(at(29, 14, 0)), "Today 2:00pm")
+        XCTAssertEqual(f(at(30, 14, 0)), "Tomorrow 2:00pm")
+        XCTAssertEqual(f(cal.date(from: DateComponents(year: 2026, month: 10, day: 2, hour: 14))!), "Friday 2:00pm")
+        XCTAssertEqual(f(cal.date(from: DateComponents(year: 2026, month: 10, day: 10, hour: 14))!), "Oct 10 2:00pm")
+    }
 }
 
 final class FollowUpTests: XCTestCase {

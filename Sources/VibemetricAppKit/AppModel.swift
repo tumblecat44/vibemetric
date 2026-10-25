@@ -14,7 +14,7 @@ public struct CardRecord: Codable, Identifiable, Hashable {
     public var card: ScoreCard
     /// The result this run was anchored to, if any. Its scores are the baseline for "what changed".
     var previousId: String?
-    /// True when the daily schedule started this run rather than the user.
+    /// True when the schedule started this run rather than the user.
     var automatic: Bool?
     /// Missing on legacy records, which were all scored by Claude Code.
     var engine: AssessmentEngine?
@@ -351,7 +351,7 @@ public final class AppModel {
     /// For AppKit code and views without the model in their environment.
     static func openSettings() { shared?.showSettings() }
 
-    // MARK: Daily automatic score
+    // MARK: Automatic score
 
     var autoSchedule: AutoSchedule { AutoSettings.schedule }
 

@@ -22,6 +22,25 @@ public enum RelativeDate {
         }
     }
 
+    /// A time still to come, such as the next automatic score: "Today 2:00pm", "Tomorrow 2:00pm",
+    /// "Wednesday 2:00pm" within the week, then "Nov 3 2:00pm".
+    public static func formatUpcoming(_ date: Date, now: Date = Date(), calendar: Calendar = .current, locale: Locale = .current) -> String {
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)).day ?? 0
+        let time = timeString(date, calendar: calendar, locale: locale)
+        switch days {
+        case ...0: return "Today \(time)"
+        case 1: return "Tomorrow \(time)"
+        case ...daysAsRelative:
+            let f = DateFormatter()
+            f.calendar = calendar
+            f.timeZone = calendar.timeZone
+            f.locale = locale
+            f.setLocalizedDateFormatFromTemplate("EEEE")
+            return "\(f.string(from: date)) \(time)"
+        default: return "\(dateString(date, now: now, calendar: calendar, locale: locale)) \(time)"
+        }
+    }
+
     /// "2:30pm": lowercase, no space, no leading zero.
     static func timeString(_ date: Date, calendar: Calendar, locale: Locale) -> String {
         let f = DateFormatter()
