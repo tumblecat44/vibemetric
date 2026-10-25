@@ -113,7 +113,7 @@ public final class Assessor: Sendable {
         var spent: (cost: Double?, turns: Int?) = (0, 0)
         var cliVersion: String?, actualModel: String?
         do {
-            let output = try await runOnce(prompt: prompt + Self.readingRequest, schema: JSONSchema.readingCheckpoint, packDir: packDir,
+            let output = try await runOnce(prompt: prompt + Self.readingRequest, schema: Self.readingSchema(options.engine), packDir: packDir,
                                            sources: sources, options: reading, webAccess: false, forkSessionID: nil, workingDirectory: nil,
                                            resumable: true, requiresOutput: false, onProgress: onProgress)
             (sessionID, wrappedUp) = (output.sessionID, false)
@@ -131,11 +131,22 @@ public final class Assessor: Sendable {
         let quiet: @Sendable (Progress) -> Void = { event in if case .started = event { return }; onProgress(event) }
         let parts: [CardPart] = [.frame] + Dimension.allCases.map { .dimension($0) }
         var outputs: [CardPart: StructuredOutput] = [:]
+        // The parts reuse the reading's prompt cache through the shared format. As a backstop the first part starts
+        // alone, and the others follow at its first reply (or `cacheWait`), when it has cached the session too. With a
+        // different format per part, each paid to load the whole session itself: about four times one writer's cost.
+        let cached = OneTimeSignal()
         try await withThrowingTaskGroup(of: (CardPart, StructuredOutput).self) { group in
-            for part in parts {
+            group.addTask {
+                defer { cached.fire() }
+                return (parts[0], try await self.writePart(parts[0], of: parts.count, wrappedUp: wrappedUp, sessionID: sessionID,
+                                                           end: end, packDir: packDir, sources: sources, options: options,
+                                                           onFirstReply: { cached.fire() }, onProgress: quiet))
+            }
+            for part in parts.dropFirst() {
                 group.addTask {
-                    (part, try await self.writePart(part, of: parts.count, wrappedUp: wrappedUp, sessionID: sessionID, end: end,
-                                                    packDir: packDir, sources: sources, options: options, onProgress: quiet))
+                    await cached.wait(atMost: Self.cacheWait)
+                    return (part, try await self.writePart(part, of: parts.count, wrappedUp: wrappedUp, sessionID: sessionID, end: end,
+                                                           packDir: packDir, sources: sources, options: options, onProgress: quiet))
                 }
             }
             for try await (part, output) in group { outputs[part] = output }
@@ -163,23 +174,46 @@ public final class Assessor: Sendable {
                                  sessionID: sessionID, wrappedUp: wrappedUp)
     }
 
+    /// The longest the other parts wait for the first part's first reply before starting anyway.
+    static let cacheWait: TimeInterval = 15
+
     /// One part of the card a writing run returns.
     enum CardPart: Hashable, Sendable {
         /// Everything except the dimensions.
         case frame
         case dimension(Dimension)
 
-        var schema: String {
+        /// Claude's parts share one format with the reading run, so they reuse its prompt cache. Codex needs every
+        /// field required, so each of its parts keeps an exact format of its own.
+        func schema(_ engine: AssessmentEngine) -> String {
+            if engine == .claude { return JSONSchema.sharedParts }
             switch self {
-            case .frame: JSONSchema.cardFrame
-            case let .dimension(dimension): JSONSchema.cardDimension(dimension)
+            case .frame: return JSONSchema.cardFrame
+            case let .dimension(dimension): return JSONSchema.cardDimension(dimension)
+            }
+        }
+
+        /// Whether a reply holds this part's fields: the shared format requires none, so the app checks them.
+        func isComplete(_ data: Data) -> Bool {
+            guard let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return false }
+            switch self {
+            case .frame:
+                // The fields the card cannot decode without; summary and highlights are optional there too.
+                return ["language", "diagnosis", "improvement", "roadmap", "scope"].allSatisfy { object[$0] != nil }
+            case let .dimension(dimension):
+                return (object["dimensions"] as? [[String: Any]] ?? []).contains { $0["dimension"] as? String == dimension.rawValue }
             }
         }
     }
 
+    /// The reading run's format: on Claude the shared one, so the writing parts can reuse its cache.
+    static func readingSchema(_ engine: AssessmentEngine) -> String {
+        engine == .claude ? JSONSchema.sharedParts : JSONSchema.readingCheckpoint
+    }
+
     /// Writes one part from a copy of the reading session, trying once more if the reply did not match its schema.
     private func writePart(_ part: CardPart, of count: Int, wrappedUp: Bool, sessionID: String, end: TimeInterval, packDir: URL,
-                           sources: [TranscriptSource], options: AssessmentOptions,
+                           sources: [TranscriptSource], options: AssessmentOptions, onFirstReply: (@Sendable () -> Void)? = nil,
                            onProgress: @escaping @Sendable (Progress) -> Void) async throws -> StructuredOutput {
         var attempt = 0
         while true {
@@ -187,9 +221,14 @@ public final class Assessor: Sendable {
             write.timeout = end - AwakeClock.now
             guard write.timeout > 1 else { throw AssessmentError.timedOut }
             do {
-                return try await runOnce(prompt: Self.partRequest(part, of: count, wrappedUp: wrappedUp), schema: part.schema,
-                                         packDir: packDir, sources: sources, options: write, webAccess: false,
-                                         forkSessionID: sessionID, workingDirectory: nil, onProgress: onProgress)
+                let output = try await runOnce(prompt: Self.partRequest(part, of: count, wrappedUp: wrappedUp),
+                                               schema: part.schema(options.engine), packDir: packDir, sources: sources,
+                                               options: write, webAccess: false, forkSessionID: sessionID, workingDirectory: nil,
+                                               onFirstReply: onFirstReply, onProgress: onProgress)
+                guard part.isComplete(output.data) else {
+                    throw AssessmentError.noStructuredOutput(options.engine, "A part of the card came back without its fields.")
+                }
+                return output
             } catch AssessmentError.noStructuredOutput where attempt == 0 && end - AwakeClock.now > 60 {
                 attempt += 1
             }
@@ -278,7 +317,7 @@ public final class Assessor: Sendable {
 
     private func runOnce(prompt: String, schema: String, packDir: URL, sources: [TranscriptSource],
                          options: AssessmentOptions, webAccess: Bool, forkSessionID: String?, workingDirectory: URL?,
-                         resumable: Bool = false, requiresOutput: Bool = true,
+                         resumable: Bool = false, requiresOutput: Bool = true, onFirstReply: (@Sendable () -> Void)? = nil,
                          onProgress: @escaping @Sendable (Progress) -> Void) async throws -> StructuredOutput {
         try Task.checkCancellation()
         let engine = options.engine
@@ -310,7 +349,7 @@ public final class Assessor: Sendable {
             environment["MAX_THINKING_TOKENS"] = String(thinkingTokens)
             environment["CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING"] = "1"
         }
-        let reader = AssessmentStream(engine: engine, onProgress: onProgress)
+        let reader = AssessmentStream(engine: engine, onProgress: onProgress, onFirstReply: onFirstReply)
         onProgress(.started)
         let output: CLIProcess.Output
         let process = processes.start()
@@ -458,7 +497,7 @@ public final class Assessor: Sendable {
         # This run: reading only
 
         This run only reads. Do not write the card now, even when you have finished reading. When you are done, or the \
-        reading budget is used, return a one-sentence `note` saying what you read. The app then continues this session in \
+        reading budget is used, return only a one-sentence `note` saying what you read, and no other field. The app then continues this session in \
         separate copies that each write part of the card, from what you read here and without reading more. So as you read, \
         note the counts, cases, session ids, dates, and projects each dimension's fields and checks will need.
         """
@@ -598,7 +637,7 @@ public final class Assessor: Sendable {
         like and one case that should fail." An empty string at 8 or above.
           - `strengths`: up to 3 things the person already does well in this dimension, one short sentence each, as it happened \
         in their sessions, with a number where one exists, for example "Commits and pushes go to a cheaper subagent, 12 times in two sessions." \
-        The app shows them under "What's working:" above the problem. An empty array when nothing stands out. Group related habits \
+        The app shows them under "Strengths". An empty array when nothing stands out. Group related habits \
         into one sentence rather than listing them separately.
           - `saw`: the supported problem or limitation in this dimension, written as `situation` below asks. The app shows \
         it under "Problem:" and in the list of issues. Start with the problem, not a list of what already works. Include \
@@ -710,5 +749,38 @@ extension Assessor {
         </notes>
 
         """
+    }
+}
+
+/// Opens once and stays open: waiters return when it fires, or after their own time limit.
+final class OneTimeSignal: @unchecked Sendable {
+    private let lock = NSLock()
+    private var fired = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func fire() {
+        let waiting: [CheckedContinuation<Void, Never>] = lock.withLock {
+            guard !fired else { return [] }
+            fired = true
+            defer { waiters = [] }
+            return waiters
+        }
+        waiting.forEach { $0.resume() }
+    }
+
+    func wait(atMost seconds: TimeInterval) async {
+        let timer = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            self?.fire()
+        }
+        defer { timer.cancel() }
+        await withCheckedContinuation { continuation in
+            let open: Bool = lock.withLock {
+                if fired { return true }
+                waiters.append(continuation)
+                return false
+            }
+            if open { continuation.resume() }
+        }
     }
 }

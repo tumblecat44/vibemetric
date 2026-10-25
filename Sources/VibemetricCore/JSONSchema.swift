@@ -16,6 +16,21 @@ enum JSONSchema {
         encode(["dimensions": cardProperties(dimensions: [dimension])["dimensions"]!])
     }
 
+    /// One format for Claude's reading run and every writing part: the reading note and all of the card's fields, none
+    /// required, so each run fills only its own. Claude Code sends the format at the start of every request, and the
+    /// prompt cache works only on an identical start, so with one format the writing copies reuse the reading's cache
+    /// instead of each paying to load the whole session again. The app checks each part's fields (`CardPart.isComplete`).
+    static var sharedParts: String {
+        var props = cardProperties(dimensions: Dimension.allCases)
+        var dimensions = props["dimensions"] as! [String: Any]
+        dimensions["minItems"] = 0
+        props["dimensions"] = dimensions
+        props["note"] = ["type": "string"]
+        let schema: [String: Any] = ["type": "object", "additionalProperties": false, "properties": props, "required": [String]()]
+        let data = try! JSONSerialization.data(withJSONObject: schema, options: [.sortedKeys])
+        return String(data: data, encoding: .utf8)!
+    }
+
     /// What a reading run returns: a short note. The saved session carries everything it read.
     static let readingCheckpoint = #"{"type":"object","additionalProperties":false,"properties":{"note":{"type":"string"}},"required":["note"]}"#
 

@@ -16,11 +16,22 @@ final class AssessmentStream: @unchecked Sendable {
     private var buffer = Data()
     private var state = Snapshot()
     private var reportedItems = Set<String>()
+    /// Called once, at the model's first reply: by then it has read the whole prompt, so the prompt is cached.
+    private let onFirstReply: (@Sendable () -> Void)?
+    private var replied = false
     var snapshot: Snapshot { lock.withLock { state } }
 
-    init(engine: AssessmentEngine, onProgress: @escaping @Sendable (Assessor.Progress) -> Void) {
+    init(engine: AssessmentEngine, onProgress: @escaping @Sendable (Assessor.Progress) -> Void,
+         onFirstReply: (@Sendable () -> Void)? = nil) {
         self.engine = engine
         self.onProgress = onProgress
+        self.onFirstReply = onFirstReply
+    }
+
+    private func noteReply() {
+        guard !replied else { return }
+        replied = true
+        onFirstReply?()
     }
 
     func consume(_ chunk: Data) {
@@ -51,6 +62,7 @@ final class AssessmentStream: @unchecked Sendable {
             if event["subtype"] as? String == "init" { state.sessionID = event["session_id"] as? String }
             state.model = event["model"] as? String ?? state.model
         case "assistant":
+            noteReply()
             let message = event["message"] as? [String: Any] ?? [:]
             state.model = message["model"] as? String ?? state.model
             for part in message["content"] as? [[String: Any]] ?? [] {
@@ -84,6 +96,7 @@ final class AssessmentStream: @unchecked Sendable {
             // A reconnect can emit a non-terminal error; only turn.failed or exit status ends the run.
             if let message = event["message"] as? String { onProgress(.thinking(Redactor.scrub(message).clipped(160))) }
         case "item.started", "item.completed":
+            noteReply()
             guard let item = event["item"] as? [String: Any] else { return }
             let key = "\(item["id"] as? String ?? ""):\(item["type"] as? String ?? "")"
             switch item["type"] as? String {
