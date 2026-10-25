@@ -59,13 +59,13 @@ struct ReadableCardContent: View {
 }
 
 /// A category's full explanation: what works, the problem with its evidence, the solution and its steps, any
-/// deduction, the footer (the Pro deep dive in official builds), and a link to why this score.
+/// deduction, the footer (the Pro deep dive in official builds), and a link to your habits.
 struct CategoryDetails: View {
     var result: ScoreCard.DimensionResult
     var note: String?
     var deductions: [ScoreCard.Deduction] = []
     var footer: AnyView?
-    @State private var showingWhy = false
+    @State private var showingHabits = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -99,26 +99,26 @@ struct CategoryDetails: View {
             }
             if !result.isReadable { EvidenceChips(evidence: result.evidence) }
             if let footer { footer }
-            if result.levelNow != nil || result.checks?.isEmpty == false {
-                Button("Why this score?") { showingWhy = true }
+            if result.checks?.isEmpty == false {
+                Button("Your habits") { showingHabits = true }
                     .buttonStyle(.link)
                     .scaledFont(13)
-                    .sheet(isPresented: $showingWhy) { WhyThisScoreSheet(result: result) }
+                    .sheet(isPresented: $showingHabits) { YourHabitsSheet(result: result) }
             }
         }
     }
 }
 
-/// Why this score, in a sheet of its own, opened from the link under a category's details.
-private struct WhyThisScoreSheet: View {
+/// Your habits, in a sheet of its own, opened from the link under a category's details.
+private struct YourHabitsSheet: View {
     var result: ScoreCard.DimensionResult
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Why this score · \(result.dimension.title)").scaledFont(18, weight: .bold).foregroundStyle(Theme.ink)
+            Text("Your habits · \(result.dimension.title)").scaledFont(18, weight: .bold).foregroundStyle(Theme.ink)
             ScrollView {
-                WhyThisScore(result: result, showsLabel: false)
+                YourHabits(result: result, showsLabel: false)
             }
             HStack {
                 Spacer()
@@ -263,9 +263,9 @@ private struct WhatsWorking: View {
 }
 
 /// "Problem" / "Solution": a small bold label in the part's color, with its symbol.
-/// Why this score: the level reached, what the next level needs, and the rubric's checks with what the records
-/// showed. Not enough evidence is shown as such, apart from what is missing.
-private struct WhyThisScore: View {
+/// Your habits: the rubric's checks for this category with what the records showed. Not enough evidence is shown as
+/// such, apart from what is missing.
+private struct YourHabits: View {
     var result: ScoreCard.DimensionResult
     var showsLabel = true
 
@@ -276,16 +276,7 @@ private struct WhyThisScore: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if showsLabel { PartLabel(text: "Why this score", symbol: "scope", color: Theme.ink) }
-            if let score = result.score, let now = result.levelNow, !now.isEmpty {
-                // A grid, so both sentences start at one edge whatever the labels' widths.
-                Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 6) {
-                    level("You're at \(score)", now, color: result.band.map(Theme.color(for:)) ?? Theme.muted)
-                    if let next = ScoreCheck.nextAnchor(after: score), let text = result.nextLevel, !text.isEmpty {
-                        level("To reach \(next)", text, color: Theme.muted)
-                    }
-                }
-            }
+            if showsLabel { PartLabel(text: "Your habits", symbol: "scope", color: Theme.ink) }
             if !checks.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(checks, id: \.check.id) { item in row(item.title, item.check) }
@@ -293,17 +284,6 @@ private struct WhyThisScore: View {
             }
         }
         .modifier(PartPanel(color: Theme.muted))
-    }
-
-    private func level(_ label: String, _ text: String, color: Color) -> some View {
-        GridRow {
-            Text(label).scaledFont(13, weight: .semibold).foregroundStyle(color)
-                .fixedSize()
-                .gridColumnAlignment(.leading)
-            Text(inline(text)).scaledFont(14).foregroundStyle(Theme.ink)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
     }
 
     private func row(_ title: String, _ check: ScoreCheck) -> some View {
