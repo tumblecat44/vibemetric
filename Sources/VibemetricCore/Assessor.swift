@@ -156,7 +156,7 @@ public final class Assessor: Sendable {
             guard let sessionID = stopped.sessionID, UUID(uuidString: sessionID) != nil else { throw AssessmentError.timedOut }
             onProgress(.thinking(Self.wrapUpNotice))
             var rest = options
-            rest.timeout = max(options.timeout - AwakeClock.now - started, 30)
+            rest.timeout = max(options.timeout - (AwakeClock.now - started), 30)
             var output = try await runOnce(prompt: wrapUp.prompt, schema: schema, packDir: packDir, sources: sources, options: rest,
                                            webAccess: webAccess, forkSessionID: sessionID, workingDirectory: workingDirectory,
                                            onProgress: onProgress)
