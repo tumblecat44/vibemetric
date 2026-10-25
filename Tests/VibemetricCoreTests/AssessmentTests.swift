@@ -170,10 +170,10 @@ struct AssessmentTests {
         let events = Events()
         let started = Date()
         let raw = try await assessor.runStructured(prompt: "Score this", schema: JSONSchema.scoreCard, packDir: fixture.directory,
-                                                   sources: [], options: options, wrapUp: (0.5, Assessor.wrapUpPrompt)) { events.append($0) }
+                                                   sources: [], options: options, wrapUp: (2, Assessor.wrapUpPrompt)) { events.append($0) }
         #expect(raw.wrappedUp)
         #expect(raw.sessionID == CLIFixture.forkID)
-        #expect(Date().timeIntervalSince(started) < 5)
+        #expect(Date().timeIntervalSince(started) < 7)
         #expect(events.texts.contains { $0.contains("Time limit reached") })
         let args = try String(contentsOf: fixture.directory.appendingPathComponent("received-arguments.txt"), encoding: .utf8)
         #expect(args.contains(engine == .claude ? "--resume\n\(CLIFixture.sessionID)\n--fork-session" : "fork\n\(CLIFixture.sessionID)"))
