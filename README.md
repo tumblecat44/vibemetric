@@ -48,7 +48,7 @@ Requires **macOS 14+** (Sonoma) on Apple Silicon or Intel. Download the latest `
 ### First run
 
 1. Open Vibemetric. It scans your history in about a second and shows how many sessions it found.
-2. Choose **Claude Code** or **Codex**, then click **Score me**. Scoring takes a few minutes while the engine reads the evidence. The choice is saved and used for the daily score.
+2. Choose **Claude Code** or **Codex**, then click **Score me**. Scoring takes a few minutes while the engine reads the evidence. The choice is saved and used for automatic scores.
 3. Your score appears in the window and in the menu bar. Click it for the most urgent problems and their fixes.
 
 Shortcuts: **⌘N** starts a new assessment; **⌘+ / ⌘- / ⌘0** change the text size.
@@ -58,7 +58,7 @@ Shortcuts: **⌘N** starts a new assessment; **⌘+ / ⌘- / ⌘0** change the t
 - **Problem and Solution.** Each fix shows the problem as short bullets, with the sessions it comes from, and the solution with **Prompt** and **Steps** tabs.
 - **Fix this first.** The most useful change leads, with the other weak spots one swipe away.
 - **Plain-language summary.** Two or three bullets anyone can read: what's going well, what's holding you back, what to do first.
-- **Daily score in the menu bar.** The two most urgent problems and their fixes, one click away. Automatic daily scoring, or **Score me again** any time.
+- **Your score in the menu bar.** The two most urgent problems and their fixes, one click away. Automatic scoring every day or on the weekdays you choose, or **Score me again** any time.
 - **Compared with last time.** Each run is compared with your previous compatible result, and the card says what changed and why.
 - **Share card.** Export a PNG of your scores (scores and summary only, never session details).
 - **Pro deep dives** (official app): for any category, a deeper report with real examples from your sessions, the root cause, tools and setup steps, and a step-by-step plan.
@@ -92,7 +92,7 @@ Each is scored 0–10 from what you actually did, not from how many prompts you 
 
 ## Free and Pro
 
-This repository is the **complete free app**, open source under the [MIT license](LICENSE): scanning, scoring, the score card, the menu bar and daily scores.
+This repository is the **complete free app**, open source under the [MIT license](LICENSE): scanning, scoring, the score card, the menu bar and automatic scores.
 
 **Pro features** (deep dives, Pro Reviews, recommendations) use Vibemetric's hosted service and are available only in the official app from [vibemetric.app](https://www.vibemetric.app). They attach through the plug-in points in [`Extensions.swift`](Sources/VibemetricAppKit/Extensions.swift); in a build from this source those are all empty.
 

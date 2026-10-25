@@ -42,7 +42,7 @@ public final class Notifier: NSObject, UNUserNotificationCenterDelegate {
 
     public func failed(_ message: String, automatic: Bool) {
         let content = UNMutableNotificationContent()
-        content.title = automatic ? "Daily score didn't finish" : "Scoring didn't finish"
+        content.title = automatic ? "Automatic score didn't finish" : "Scoring didn't finish"
         content.body = message
         content.sound = .default
         post(content, id: "failed-\(Date().timeIntervalSince1970)")

@@ -2,10 +2,12 @@ import Foundation
 import ServiceManagement
 import VibemetricCore
 
-/// Preferences for the daily automatic score. Views bind to the same keys with @AppStorage.
+/// Preferences for the automatic score. Views bind to the same keys with @AppStorage.
 enum AutoSettings {
     static let enabledKey = "autoScoreEnabled"
     static let minuteKey = "autoScoreMinute"
+    /// `AutoSchedule.days`; missing means every day, as before days could be chosen.
+    static let daysKey = "autoScoreDays"
     static let skipIdleKey = "autoScoreSkipWhenIdle"
     static let lastAttemptKey = "autoScoreLastAttempt"
     static let lastStatusKey = "autoScoreLastStatus"
@@ -14,7 +16,8 @@ enum AutoSettings {
         let d = UserDefaults.standard
         return AutoSchedule(
             enabled: d.object(forKey: enabledKey) as? Bool ?? true,
-            minuteOfDay: d.object(forKey: minuteKey) as? Int ?? AutoSchedule.defaultMinuteOfDay
+            minuteOfDay: d.object(forKey: minuteKey) as? Int ?? AutoSchedule.defaultMinuteOfDay,
+            days: d.object(forKey: daysKey) as? Int ?? AutoSchedule.everyDay
         )
     }
 

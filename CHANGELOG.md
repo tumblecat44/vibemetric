@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Automatic scores can run on the days you choose, not only every day: pick days such as every Monday, or Monday and Wednesday, in Settings → Schedule. "Next" shows the day and time of the next score, such as "Tomorrow 2:00pm" or "Wednesday 2:00pm".
+
 ## 0.4.15 (2026-10-25)
 
 - New scores open with a Summary: 4 to 6 plain-language points, what you do well first, then what holds you back, written so anyone can follow them. Results scored before this version keep "What you're doing well".

@@ -32,6 +32,7 @@ struct MenuBarPanel: View {
     // Read so the "Next automatic score" line refreshes as soon as Settings change.
     @AppStorage(AutoSettings.enabledKey) private var autoEnabled = true
     @AppStorage(AutoSettings.minuteKey) private var autoMinute = AutoSchedule.defaultMinuteOfDay
+    @AppStorage(AutoSettings.daysKey) private var autoDays = AutoSchedule.everyDay
     @Environment(\.textScale) private var scale
     /// Closes the popover before an action opens another window.
     var close: () -> Void = {}
@@ -58,8 +59,8 @@ struct MenuBarPanel: View {
                 }
             }
 
-            if let next = AutoSchedule(enabled: autoEnabled, minuteOfDay: autoMinute).next(after: Date()) {
-                Text("Next automatic score: \(RelativeDate.format(next))")
+            if let next = AutoSchedule(enabled: autoEnabled, minuteOfDay: autoMinute, days: autoDays).next(after: Date()) {
+                Text("Next automatic score: \(RelativeDate.formatUpcoming(next))")
                     .scaledFont(11)
                     .foregroundStyle(.secondary)
             }
