@@ -59,16 +59,16 @@ struct ReadableCardContent: View {
 }
 
 /// A category's full explanation: what works, the problem with its evidence, the solution and its steps, any
-/// deduction, and the footer (the Pro deep dive in official builds).
+/// deduction, the footer (the Pro deep dive in official builds), and a link to why this score.
 struct CategoryDetails: View {
     var result: ScoreCard.DimensionResult
     var note: String?
     var deductions: [ScoreCard.Deduction] = []
     var footer: AnyView?
+    @State private var showingWhy = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if result.levelNow != nil || result.checks?.isEmpty == false { WhyThisScore(result: result) }
             if result.isReadable {
                 if let strengths = result.strengths {
                     // Newer cards: what works on its own, above a problem that holds only the gap.
@@ -99,7 +99,36 @@ struct CategoryDetails: View {
             }
             if !result.isReadable { EvidenceChips(evidence: result.evidence) }
             if let footer { footer }
+            if result.levelNow != nil || result.checks?.isEmpty == false {
+                Button("Why this score?") { showingWhy = true }
+                    .buttonStyle(.link)
+                    .scaledFont(13)
+                    .sheet(isPresented: $showingWhy) { WhyThisScoreSheet(result: result) }
+            }
         }
+    }
+}
+
+/// Why this score, in a sheet of its own, opened from the link under a category's details.
+private struct WhyThisScoreSheet: View {
+    var result: ScoreCard.DimensionResult
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Why this score · \(result.dimension.title)").scaledFont(18, weight: .bold).foregroundStyle(Theme.ink)
+            ScrollView {
+                WhyThisScore(result: result, showsLabel: false)
+            }
+            HStack {
+                Spacer()
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(24)
+        .frame(width: 560)
+        .frame(maxHeight: 640)
     }
 }
 
@@ -238,6 +267,7 @@ private struct WhatsWorking: View {
 /// showed. Not enough evidence is shown as such, apart from what is missing.
 private struct WhyThisScore: View {
     var result: ScoreCard.DimensionResult
+    var showsLabel = true
 
     private var checks: [(title: String, check: ScoreCheck)] {
         let titles = Dictionary(uniqueKeysWithValues: ScoreCheck.definitions(for: result.dimension).map { ($0.id, $0.title) })
@@ -246,7 +276,7 @@ private struct WhyThisScore: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            PartLabel(text: "Why this score", symbol: "scope", color: Theme.ink)
+            if showsLabel { PartLabel(text: "Why this score", symbol: "scope", color: Theme.ink) }
             if let score = result.score, let now = result.levelNow, !now.isEmpty {
                 // A grid, so both sentences start at one edge whatever the labels' widths.
                 Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 6) {
