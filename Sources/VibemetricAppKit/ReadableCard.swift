@@ -58,29 +58,97 @@ struct ReadableCardContent: View {
     }
 }
 
-/// A category's full explanation: what works, the problem with its evidence, the solution and its steps, any
-/// deduction, the footer (the Pro deep dive in official builds), and a link to your habits.
+/// A category's full explanation as tabs: Problem, Solution, Your habits and Strengths, each shown when it has
+/// something to say. Any deduction and the footer (the Pro deep dive, 「Go deeper」, in official builds) sit below the
+/// tabs, so they stay in view whichever tab is open.
 struct CategoryDetails: View {
     var result: ScoreCard.DimensionResult
     var note: String?
     var deductions: [ScoreCard.Deduction] = []
     var footer: AnyView?
-    @State private var showingHabits = false
+
+    enum Tab: String, CaseIterable, Identifiable {
+        case problem = "Problem", solution = "Solution", habits = "Your habits", working = "Strengths"
+        var id: String { rawValue }
+
+        var symbol: String {
+            switch self {
+            case .problem: "exclamationmark.triangle.fill"
+            case .solution: "lightbulb.fill"
+            case .habits: "checklist"
+            case .working: "checkmark.circle.fill"
+            }
+        }
+
+        var color: Color {
+            switch self {
+            case .problem: Theme.color(for: .bottleneck)
+            case .solution: Theme.color(for: .strong)
+            case .habits: Theme.accent
+            case .working: Theme.blue
+            }
+        }
+    }
+    @State private var chosen: Tab?
+
+    /// Older cards keep a strong category's good news in its problem text, with no separate strengths.
+    private var olderStrong: Bool { result.strengths == nil && result.band == .strong }
+    private var problemText: String {
+        [result.saw ?? "", result.impact ?? ""].map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+            .joined(separator: " ")
+    }
+    private var problemPoints: [String] { olderStrong ? [] : sentences(problemText) }
+    private var workingPoints: [String] { result.strengths ?? (olderStrong ? sentences(problemText) : []) }
+    private var solution: String { result.tryThis ?? "" }
+    private var steps: [String] { result.solutionSteps ?? [] }
+
+    var tabs: [Tab] {
+        Tab.allCases.filter { tab in
+            switch tab {
+            case .problem: !problemPoints.isEmpty
+            case .solution: !solution.isEmpty || !steps.isEmpty
+            case .habits: result.checks?.isEmpty == false
+            case .working: !workingPoints.isEmpty
+            }
+        }
+    }
+    private var selected: Tab? { chosen.flatMap { tabs.contains($0) ? $0 : nil } ?? tabs.first }
+
+    @ViewBuilder private func content(_ tab: Tab) -> some View {
+        switch tab {
+        case .problem: ProblemTab(points: problemPoints, evidence: result.evidence)
+        case .solution: SolutionTab(solution: solution, steps: steps)
+        case .habits: YourHabits(result: result)
+        case .working: WorkingTab(points: workingPoints)
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if result.isReadable {
-                if let strengths = result.strengths {
-                    // Newer cards: what works on its own, above a problem that holds only the gap.
-                    if !strengths.isEmpty { WhatsWorking(points: strengths) }
-                    ProblemSolution(problem: [result.saw ?? "", result.impact ?? ""], evidence: result.evidence,
-                                    solution: result.tryThis ?? "", steps: result.solutionSteps ?? [],
-                                    nextStep: result.band == .strong)
-                } else {
-                    // Older cards: a strong category's text is what went well.
-                    ProblemSolution(problem: [result.saw ?? "", result.impact ?? ""], evidence: result.evidence,
-                                    solution: result.tryThis ?? "", steps: result.solutionSteps ?? [],
-                                    goodNews: result.band == .strong, nextStep: result.band == .strong)
+                if let selected {
+                    // The tabs and what they open form one box, so the tabs read as the box's headings.
+                    VStack(spacing: 0) {
+                        TabBar(tabs: tabs, selected: selected) { chosen = $0 }
+                        // Every tab's content is laid out and only the open one shown, so the box keeps the height of
+                        // its tallest tab and doesn't jump when another is chosen.
+                        ZStack(alignment: .topLeading) {
+                            ForEach(tabs) { tab in
+                                content(tab)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .opacity(tab == selected ? 1 : 0)
+                                    .allowsHitTesting(tab == selected)
+                                    .accessibilityHidden(tab != selected)
+                            }
+                        }
+                        .padding(.vertical, 16)
+                        .padding(.horizontal, 16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(selected.color.opacity(0.06))
+                    }
+                    .background(Theme.card)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.rule, lineWidth: 1))
                 }
             } else {
                 // A category from an older card inside a readable one: its reason as written.
@@ -99,175 +167,104 @@ struct CategoryDetails: View {
             }
             if !result.isReadable { EvidenceChips(evidence: result.evidence) }
             if let footer { footer }
-            if result.checks?.isEmpty == false {
-                Button("Your habits") { showingHabits = true }
-                    .buttonStyle(.link)
-                    .scaledFont(13)
-                    .sheet(isPresented: $showingHabits) { YourHabitsSheet(result: result) }
-            }
         }
     }
 }
 
-/// Your habits, in a sheet of its own, opened from the link under a category's details.
-private struct YourHabitsSheet: View {
-    var result: ScoreCard.DimensionResult
-    @Environment(\.dismiss) private var dismiss
+/// The details' tabs across the top of their box, each as wide as the others: an icon and a name in its part's color.
+/// The open tab is bold on a light tint over a thick underline, so which one is open is plain at a glance.
+private struct TabBar: View {
+    var tabs: [CategoryDetails.Tab]
+    var selected: CategoryDetails.Tab
+    var select: (CategoryDetails.Tab) -> Void
+    @State private var hovered: CategoryDetails.Tab?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Your habits · \(result.dimension.title)").scaledFont(18, weight: .bold).foregroundStyle(Theme.ink)
-            ScrollView {
-                YourHabits(result: result, showsLabel: false)
-            }
-            HStack {
-                Spacer()
-                Button("Done") { dismiss() }
-                    .keyboardShortcut(.defaultAction)
+        HStack(spacing: 0) {
+            ForEach(tabs) { tab in
+                let isOn = tab == selected
+                Button { select(tab) } label: {
+                    VStack(spacing: 0) {
+                        Label(tab.rawValue, systemImage: tab.symbol)
+                            .scaledFont(14, weight: isOn ? .bold : .semibold)
+                            .lineLimit(1)
+                            .foregroundStyle(tab.color)
+                            .padding(.vertical, 11)
+                            .frame(maxWidth: .infinity)
+                        Rectangle().fill(isOn ? tab.color : Color.clear).frame(height: 3)
+                    }
+                    .background(isOn ? tab.color.opacity(0.12) : (hovered == tab ? Theme.rule.opacity(0.4) : Color.clear))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .onHover { hovered = $0 ? tab : (hovered == tab ? nil : hovered) }
+                .accessibilityAddTraits(isOn ? [.isSelected] : [])
             }
         }
-        .padding(24)
-        .frame(width: 560)
-        .frame(maxHeight: 640)
+        .overlay(alignment: .bottom) { Rectangle().fill(Theme.rule).frame(height: 1) }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Details")
     }
 }
 
-/// Problem and Solution: the one structure every fix and category uses.
-/// Problem is what happened and what it cost, as one paragraph, with the sessions it comes from.
-/// Solution is the fix in one line; when there is more, tabs hold the prompt to paste and the steps.
-/// `goodNews` labels the first part "What's working" (older cards, whose strong categories describe what went well);
-/// `nextStep` labels the second part "Next step", for a strong category.
-private struct ProblemSolution: View {
-    /// Sentences joined into one paragraph; empty ones are left out.
-    var problem: [String]
-    var evidence: [ScoreCard.Evidence] = []
+/// What happened and what it cost, one sentence a bullet, with the sessions it comes from.
+private struct ProblemTab: View {
+    var points: [String]
+    var evidence: [ScoreCard.Evidence]
+    private var color: Color { Theme.color(for: .bottleneck) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Bullets(points: points.map { Text(inline($0)) }, color: color)
+            EvidenceChips(evidence: evidence)
+        }
+    }
+}
+
+/// The fix: its title in bold, then how to do it.
+private struct SolutionTab: View {
     var solution: String
-    var prompt: String? = nil
-    var steps: [String] = []
-    var tryItOn: String? = nil
-    var signOfSuccess: String? = nil
-    var goodNews = false
-    var nextStep = false
-
-    private enum Tab: String, CaseIterable { case prompt = "Prompt", steps = "Steps" }
-    @State private var tab: Tab = .prompt
-
-    private var problemText: String {
-        problem.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.joined(separator: " ")
-    }
-    /// The problem as bullets, one sentence each.
-    private var problemPoints: [String] { sentences(problemText) }
-    private var hasPrompt: Bool { !(prompt ?? "").trimmingCharacters(in: .whitespaces).isEmpty }
-    private var hasSteps: Bool { !steps.isEmpty || !(tryItOn ?? "").isEmpty || !(signOfSuccess ?? "").isEmpty }
+    var steps: [String]
+    private var color: Color { Theme.color(for: .strong) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            if !problemText.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    PartLabel(text: goodNews ? "What's working" : "Problem",
-                              symbol: goodNews ? "checkmark.circle.fill" : "exclamationmark.triangle.fill", color: problemColor)
-                    VStack(alignment: .leading, spacing: 5) {
-                        ForEach(Array(problemPoints.enumerated()), id: \.offset) { _, point in
-                            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                Text("•").foregroundStyle(problemColor)
-                                Text(inline(point)).fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-                    }
-                    .scaledFont(14)
-                    .foregroundStyle(Theme.ink)
-                    EvidenceChips(evidence: evidence)
-                }
-                .modifier(PartPanel(color: problemColor))
-            }
-            if !solution.isEmpty || hasPrompt || hasSteps {
-                VStack(alignment: .leading, spacing: 8) {
-                    PartLabel(text: nextStep ? "Next step" : "Solution",
-                              symbol: nextStep ? "arrow.up.right.circle.fill" : "lightbulb.fill", color: solutionColor)
-                    if !solution.isEmpty || hasSteps { stepsView }
-                    if hasPrompt && hasSteps {
-                        // Drawn tabs rather than a segmented Picker, so they also render in snapshots.
-                        HStack(spacing: 4) {
-                            ForEach(Tab.allCases, id: \.self) { t in
-                                Button { tab = t } label: {
-                                    Text(t.rawValue)
-                                        .scaledFont(13, weight: .semibold)
-                                        .padding(.horizontal, 12).padding(.vertical, 4)
-                                        .foregroundStyle(tab == t ? Theme.paper : Theme.muted)
-                                        .background(tab == t ? Theme.ink : Color.clear, in: Capsule())
-                                        .contentShape(Capsule())
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(3)
-                        .background(Theme.rule.opacity(0.5), in: Capsule())
-                        .padding(.top, 2)
-                    }
-                    if hasPrompt && (tab == .prompt || !hasSteps) {
-                        CopyBox(caption: "Paste this into your context file or prompt", text: prompt!)
-                    }
-                }
-                .modifier(PartPanel(color: solutionColor))
-            }
-        }
+        Bullets(points: (solution.isEmpty ? [] : [Text(inline(solution)).fontWeight(.semibold)]) + steps.map { Text(inline($0)) },
+                color: color)
     }
+}
 
-    private var problemColor: Color { goodNews ? Theme.color(for: .strong) : Theme.color(for: .bottleneck) }
-    private var solutionColor: Color { nextStep ? Theme.accent : Theme.color(for: .strong) }
+/// What the person already does well in this category.
+private struct WorkingTab: View {
+    var points: [String]
+    private var color: Color { Theme.blue }
 
-    /// The solution as bullets, laid out like the problem's: its title first in bold, then how to do it,
-    /// where to try it, and how to tell it worked.
-    private var stepsView: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            if !solution.isEmpty { bullet(Text(inline(solution)).fontWeight(.semibold)) }
-            ForEach(Array(steps.enumerated()), id: \.offset) { _, step in bullet(Text(inline(step))) }
-            if let tryItOn, !tryItOn.isEmpty { bullet(Text("Try it on: ").fontWeight(.semibold) + Text(inline(tryItOn))) }
-            if let signOfSuccess, !signOfSuccess.isEmpty {
-                bullet(Text("You'll know it worked when: ").fontWeight(.semibold) + Text(inline(signOfSuccess)))
+    var body: some View {
+        Bullets(points: points.map { Text(inline($0)) }, color: color)
+    }
+}
+
+private struct Bullets: View {
+    var points: [Text]
+    var color: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            ForEach(Array(points.enumerated()), id: \.offset) { _, point in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("•").foregroundStyle(color)
+                    point.lineSpacing(3).fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
         .scaledFont(14)
         .foregroundStyle(Theme.ink)
     }
-
-    private func bullet(_ text: Text) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("•").foregroundStyle(solutionColor)
-            text.fixedSize(horizontal: false, vertical: true)
-        }
-    }
 }
 
-/// What the person already does well in a category, shown above its Problem in the category details.
-private struct WhatsWorking: View {
-    var points: [String]
-    private var color: Color { Theme.color(for: .strong) }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            PartLabel(text: "What's working", symbol: "checkmark.circle.fill", color: color)
-            VStack(alignment: .leading, spacing: 5) {
-                ForEach(Array(points.enumerated()), id: \.offset) { _, point in
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text("•").foregroundStyle(color)
-                        Text(inline(point)).fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-            }
-            .scaledFont(14)
-            .foregroundStyle(Theme.ink)
-        }
-        .modifier(PartPanel(color: color))
-    }
-}
-
-/// "Problem" / "Solution": a small bold label in the part's color, with its symbol.
 /// Your habits: the rubric's checks for this category with what the records showed. Not enough evidence is shown as
 /// such, apart from what is missing.
 private struct YourHabits: View {
     var result: ScoreCard.DimensionResult
-    var showsLabel = true
 
     private var checks: [(title: String, check: ScoreCheck)] {
         let titles = Dictionary(uniqueKeysWithValues: ScoreCheck.definitions(for: result.dimension).map { ($0.id, $0.title) })
@@ -275,22 +272,16 @@ private struct YourHabits: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if showsLabel { PartLabel(text: "Your habits", symbol: "scope", color: Theme.ink) }
-            if !checks.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(checks, id: \.check.id) { item in row(item.title, item.check) }
-                }
-            }
+        VStack(alignment: .leading, spacing: 14) {
+            ForEach(checks, id: \.check.id) { item in row(item.title, item.check) }
         }
-        .modifier(PartPanel(color: Theme.muted))
     }
 
     private func row(_ title: String, _ check: ScoreCheck) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Image(systemName: symbol(check.status)).scaledFont(13, weight: .semibold).foregroundStyle(color(check.status))
                 .frame(width: 16)
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(title).scaledFont(14, weight: .semibold).foregroundStyle(Theme.ink)
                     Text([check.status.label, check.count].compactMap { $0 }.joined(separator: " · "))
@@ -298,6 +289,7 @@ private struct YourHabits: View {
                 }
                 if !check.note.isEmpty {
                     Text(inline(check.note)).scaledFont(13).foregroundStyle(Theme.muted)
+                        .lineSpacing(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -321,58 +313,6 @@ private struct YourHabits: View {
         case .notMet: Theme.color(for: .bottleneck)
         case .notSeen: Theme.muted
         }
-    }
-}
-
-private struct PartLabel: View {
-    var text: String
-    var symbol: String
-    var color: Color
-    var body: some View {
-        Label(text, systemImage: symbol)
-            .scaledFont(13, weight: .bold)
-            .foregroundStyle(color)
-    }
-}
-
-/// The panel behind Problem or Solution: a light tint of the part's color, so the two read as separate
-/// blocks at a glance.
-private struct PartPanel: ViewModifier {
-    var color: Color
-    func body(content: Content) -> some View {
-        content
-            .padding(.vertical, 12)
-            .padding(.horizontal, 14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(color.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
-    }
-}
-
-/// Text to paste, in a box with a Copy button.
-private struct CopyBox: View {
-    var caption: String
-    var text: String
-    @State private var copied = false
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(caption).scaledFont(12).foregroundStyle(Theme.muted)
-                Text(inline(text)).scaledFont(14).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-            Button(copied ? "Copied" : "Copy") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(text, forType: .string)
-                copied = true
-                Task { try? await Task.sleep(for: .seconds(1.5)); copied = false }
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(Theme.accent)
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 10))
     }
 }
 

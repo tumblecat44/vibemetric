@@ -9,6 +9,8 @@ public enum Theme {
     public static let muted = Color(light: .init(red: 0.45, green: 0.43, blue: 0.40, alpha: 1), dark: .init(red: 0.62, green: 0.60, blue: 0.56, alpha: 1))
     public static let rule = Color(light: .init(red: 0.88, green: 0.86, blue: 0.82, alpha: 1), dark: .init(red: 0.24, green: 0.23, blue: 0.21, alpha: 1))
     public static let accent = Color(light: .init(red: 0.85, green: 0.35, blue: 0.16, alpha: 1), dark: .init(red: 0.98, green: 0.52, blue: 0.30, alpha: 1))
+    /// A calm blue for what already works, so it reads apart from a solution's green.
+    public static let blue = Color(light: .init(red: 0.17, green: 0.42, blue: 0.82, alpha: 1), dark: .init(red: 0.42, green: 0.64, blue: 0.98, alpha: 1))
 
     public static func color(for band: Band) -> Color {
         switch band {

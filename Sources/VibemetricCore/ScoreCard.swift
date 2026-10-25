@@ -216,7 +216,7 @@ public struct ScoreCard: Codable, Sendable {
 
         /// The readable fields as one Markdown text, for the report and other single-block readers.
         static func compose(strengths: [String] = [], saw: String?, impact: String?, tryThis: String?, steps: [String] = []) -> String {
-            var parts = strengths.isEmpty ? [] : ["**What's working:**\n" + strengths.map { "- \($0)" }.joined(separator: "\n")]
+            var parts = strengths.isEmpty ? [] : ["**Strengths:**\n" + strengths.map { "- \($0)" }.joined(separator: "\n")]
             parts += [("What we saw", saw), ("Why it matters", impact), ("Try this", tryThis)]
                 .compactMap { label, text in text.flatMap { $0.isEmpty ? nil : "**\(label):** \($0)" } }
             var text = parts.joined(separator: "\n\n")

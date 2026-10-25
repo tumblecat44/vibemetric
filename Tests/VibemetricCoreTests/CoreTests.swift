@@ -426,7 +426,7 @@ final class ReadableCardTests: XCTestCase {
         let d = card.dimensions[0]
         XCTAssertEqual(d.strengths, ["Commits go to a cheaper subagent, 12 times in two sessions."])
         XCTAssertEqual(d.saw, "Tests ran after 8 of 31 code changes.")
-        XCTAssertTrue(d.reason.hasPrefix("**What's working:**\n- Commits go to a cheaper subagent"))
+        XCTAssertTrue(d.reason.hasPrefix("**Strengths:**\n- Commits go to a cheaper subagent"))
         XCTAssertTrue(d.reason.contains("**What we saw:** Tests ran"))
         let again = try JSONDecoder().decode(ScoreCard.self, from: JSONEncoder().encode(card))
         XCTAssertEqual(again.dimensions[0].strengths, d.strengths)
