@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.16 (2026-10-25)
 
 - Automatic scores can run on the days you choose, not only every day: pick days such as every Monday, or Monday and Wednesday, in Settings → Schedule. "Next" shows the day and time of the next score, such as "Tomorrow 2:00pm" or "Wednesday 2:00pm".
 
