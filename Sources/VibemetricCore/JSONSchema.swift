@@ -2,7 +2,32 @@ import Foundation
 
 /// Shared structured-output schema for Claude Code and Codex, mirroring `ScoreCard`.
 enum JSONSchema {
-    static var scoreCard: String {
+    static var scoreCard: String { encode(cardProperties(dimensions: Dimension.allCases)) }
+
+    /// A writing part's card fields: everything except `dimensions`.
+    static var cardFrame: String {
+        var props = cardProperties(dimensions: [])
+        props.removeValue(forKey: "dimensions")
+        return encode(props)
+    }
+
+    /// A writing part's card fields for one dimension: `dimensions` holding just that one.
+    static func cardDimension(_ dimension: Dimension) -> String {
+        encode(["dimensions": cardProperties(dimensions: [dimension])["dimensions"]!])
+    }
+
+    /// What a reading run returns: a short note. The saved session carries everything it read.
+    static let readingCheckpoint = #"{"type":"object","additionalProperties":false,"properties":{"note":{"type":"string"}},"required":["note"]}"#
+
+    private static func encode(_ props: [String: Any]) -> String {
+        let schema: [String: Any] = ["type": "object", "additionalProperties": false, "properties": props,
+                                     "required": props.keys.sorted()]
+        let data = try! JSONSerialization.data(withJSONObject: schema, options: [.sortedKeys])
+        return String(data: data, encoding: .utf8)!
+    }
+
+    /// The card's top-level properties, with `dimensions` limited to `dimensions` (exactly that many entries).
+    private static func cardProperties(dimensions: [Dimension]) -> [String: Any] {
         let str: [String: Any] = ["type": "string"]
         let int: [String: Any] = ["type": "integer"]
         func object(_ props: [String: Any], optional: Set<String> = []) -> [String: Any] {
@@ -19,7 +44,7 @@ enum JSONSchema {
         let evidence = object(["tool": str, "sessionId": str, "date": str, "note": str, "project": str])
         let dimensionID: [String: Any] = ["type": "string", "enum": Dimension.allCases.map(\.rawValue)]
         let dimension = object([
-            "dimension": dimensionID,
+            "dimension": ["type": "string", "enum": dimensions.map(\.rawValue)] as [String: Any],
             "score": ["type": ["integer", "null"], "minimum": 0, "maximum": 10],
             "status": ["type": "string", "enum": ["scored", "not_assessable", "not_reviewed"]],
             "headline": str,
@@ -42,12 +67,12 @@ enum JSONSchema {
                 "of": ["type": ["integer", "null"], "minimum": 0],
             ]), max: 4),
         ])
-        let schema = object([
+        return [
             "language": str,
             "diagnosis": str,
             "summary": array(str, min: 2, max: 3),
             "highlights": array(str, min: 2, max: 4),
-            "dimensions": array(dimension, min: 10, max: 10),
+            "dimensions": array(dimension, min: dimensions.count, max: dimensions.count),
             "improvement": object([
                 "title": str, "situation": str,
                 "actions": array(str, min: 3, max: 4),
@@ -76,8 +101,6 @@ enum JSONSchema {
                 "elapsedMinutes": ["type": "number"],
                 "limits": array(str),
             ]),
-        ])
-        let data = try! JSONSerialization.data(withJSONObject: schema, options: [.sortedKeys])
-        return String(data: data, encoding: .utf8)!
+        ]
     }
 }

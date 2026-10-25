@@ -85,38 +85,134 @@ public final class Assessor: Sendable {
         "nextjs.org", "react.dev", "vercel.com", "docs.railway.com", "stripe.com", "docs.stripe.com",
     ]
 
-    private let process = CLIProcess()
+    private let processes = CLIProcessGroup()
     private let installation: CLIInstallation?
 
     public init(installation: CLIInstallation? = nil) { self.installation = installation }
-    public func cancel() { process.cancel() }
+    public func cancel() { processes.cancel() }
 
+    /// Scores in two steps: one run reads the evidence pack, then copies of its saved session write the card's parts
+    /// at the same time (the overall fields, and each dimension on its own), so writing takes as long as one part.
     public func run(packDir: URL, sources: [TranscriptSource], options: AssessmentOptions = AssessmentOptions(),
                     previousDate: Date? = nil, onProgress: @escaping @Sendable (Progress) -> Void) async throws -> AssessmentOutcome {
-        let started = Date()
+        let started = Date(), clockStarted = AwakeClock.now
         let prompt = Self.prompt(sources: sources, now: started, previousDate: previousDate,
                                  digestCount: Self.digestCount(packDir), engine: options.engine, instructions: options.instructions)
         var options = options
         options.timeout = min(options.timeout, AssessmentOptions.scoreTimeLimit)
         options.thinkingTokens = options.thinkingTokens ?? AssessmentOptions.scoreThinkingTokens
-        let raw = try await runStructured(prompt: prompt, schema: JSONSchema.scoreCard, packDir: packDir, sources: sources,
-                                          options: options, wrapUp: (options.wrapUpAfter, Self.wrapUpPrompt),
-                                          onProgress: onProgress)
+        // Idle sleep freezes the CLI mid-run, so keep the Mac awake while it works. The display may still sleep.
+        let activity = ProcessInfo.processInfo.beginActivity(options: .userInitiated, reason: "Vibemetric is scoring AI coding sessions")
+        defer { ProcessInfo.processInfo.endActivity(activity) }
+        let end = clockStarted + options.timeout
+
+        // 1. Read, until the model is done or `wrapUpAfter`, keeping at least a few minutes for writing.
+        var reading = options
+        reading.timeout = min(options.wrapUpAfter, max(options.timeout - 3 * 60, options.timeout / 2))
+        let sessionID: String, wrappedUp: Bool
+        var spent: (cost: Double?, turns: Int?) = (0, 0)
+        var cliVersion: String?, actualModel: String?
+        do {
+            let output = try await runOnce(prompt: prompt + Self.readingRequest, schema: JSONSchema.readingCheckpoint, packDir: packDir,
+                                           sources: sources, options: reading, webAccess: false, forkSessionID: nil, workingDirectory: nil,
+                                           resumable: true, requiresOutput: false, onProgress: onProgress)
+            (sessionID, wrappedUp) = (output.sessionID, false)
+            spent = (output.costUSD, output.turns)
+            (cliVersion, actualModel) = (output.cliVersion, output.actualModel)
+        } catch let stopped as DeadlineReached {
+            // Without a saved session there is nothing to write from.
+            guard let saved = stopped.sessionID, UUID(uuidString: saved) != nil else { throw AssessmentError.timedOut }
+            (sessionID, wrappedUp) = (saved, true)
+            spent = (nil, nil)
+        }
+
+        // 2. Write every part at once from copies of the reading session.
+        onProgress(.thinking(wrappedUp ? Self.wrapUpNotice : Self.writingNotice))
+        let quiet: @Sendable (Progress) -> Void = { event in if case .started = event { return }; onProgress(event) }
+        let parts: [CardPart] = [.frame] + Dimension.allCases.map { .dimension($0) }
+        var outputs: [CardPart: StructuredOutput] = [:]
+        try await withThrowingTaskGroup(of: (CardPart, StructuredOutput).self) { group in
+            for part in parts {
+                group.addTask {
+                    (part, try await self.writePart(part, of: parts.count, wrappedUp: wrappedUp, sessionID: sessionID, end: end,
+                                                    packDir: packDir, sources: sources, options: options, onProgress: quiet))
+                }
+            }
+            for try await (part, output) in group { outputs[part] = output }
+        }
+
         var card: ScoreCard
         do {
-            card = try JSONDecoder().decode(ScoreCard.self, from: raw.data)
+            card = try JSONDecoder().decode(ScoreCard.self, from: Self.assemble(outputs))
             try Self.validate(card)
             card.normalizeChecks()
         } catch {
             throw AssessmentError.noStructuredOutput(options.engine, "The response did not match the score-card format. Try again.")
         }
-        card.scope.elapsedMinutes = (raw.elapsed / 60 * 10).rounded() / 10
+        let elapsed = AwakeClock.now - clockStarted
+        card.scope.elapsedMinutes = (elapsed / 60 * 10).rounded() / 10
+        for output in outputs.values {
+            spent.cost = spent.cost.flatMap { total in output.costUSD.map { total + $0 } }
+            spent.turns = spent.turns.flatMap { total in output.turns.map { total + $0 } }
+        }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return AssessmentOutcome(card: card, rawJSON: try encoder.encode(card), elapsed: raw.elapsed,
-                                 costUSD: raw.costUSD, turns: raw.turns,
-                                 engine: options.engine, cliVersion: raw.cliVersion, actualModel: raw.actualModel, sessionID: raw.sessionID,
-                                 wrappedUp: raw.wrappedUp)
+        return AssessmentOutcome(card: card, rawJSON: try encoder.encode(card), elapsed: elapsed,
+                                 costUSD: spent.cost, turns: spent.turns, engine: options.engine,
+                                 cliVersion: cliVersion ?? outputs[.frame]?.cliVersion, actualModel: actualModel ?? outputs[.frame]?.actualModel,
+                                 sessionID: sessionID, wrappedUp: wrappedUp)
+    }
+
+    /// One part of the card a writing run returns.
+    enum CardPart: Hashable, Sendable {
+        /// Everything except the dimensions.
+        case frame
+        case dimension(Dimension)
+
+        var schema: String {
+            switch self {
+            case .frame: JSONSchema.cardFrame
+            case let .dimension(dimension): JSONSchema.cardDimension(dimension)
+            }
+        }
+    }
+
+    /// Writes one part from a copy of the reading session, trying once more if the reply did not match its schema.
+    private func writePart(_ part: CardPart, of count: Int, wrappedUp: Bool, sessionID: String, end: TimeInterval, packDir: URL,
+                           sources: [TranscriptSource], options: AssessmentOptions,
+                           onProgress: @escaping @Sendable (Progress) -> Void) async throws -> StructuredOutput {
+        var attempt = 0
+        while true {
+            var write = options
+            write.timeout = end - AwakeClock.now
+            guard write.timeout > 1 else { throw AssessmentError.timedOut }
+            do {
+                return try await runOnce(prompt: Self.partRequest(part, of: count, wrappedUp: wrappedUp), schema: part.schema,
+                                         packDir: packDir, sources: sources, options: write, webAccess: false,
+                                         forkSessionID: sessionID, workingDirectory: nil, onProgress: onProgress)
+            } catch AssessmentError.noStructuredOutput where attempt == 0 && end - AwakeClock.now > 60 {
+                attempt += 1
+            }
+        }
+    }
+
+    /// The parts' replies as one score card: the frame's fields plus each dimension, in rubric order.
+    static func assemble(_ outputs: [CardPart: StructuredOutput]) throws -> Data {
+        func object(_ part: CardPart) throws -> [String: Any] {
+            guard let data = outputs[part]?.data, let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw AssessmentError.noStructuredOutput(.claude, "A part of the card is missing.")
+            }
+            return object
+        }
+        var card = try object(.frame)
+        card["dimensions"] = try Dimension.allCases.map { dimension -> Any in
+            let entries = try object(.dimension(dimension))["dimensions"] as? [[String: Any]] ?? []
+            guard let entry = entries.first(where: { $0["dimension"] as? String == dimension.rawValue }) else {
+                throw AssessmentError.noStructuredOutput(.claude, "The card has no \(dimension.title) result.")
+            }
+            return entry
+        }
+        return try JSONSerialization.data(withJSONObject: card)
     }
 
     /// What one structured CLI run returned: the JSON that matched the schema, plus how the run went.
@@ -174,13 +270,16 @@ public final class Assessor: Sendable {
 
     /// Shown in the activity log when a run reaches its reading time limit and is asked to write the card.
     public static let wrapUpNotice = "Time limit reached. Writing the score from what was read so far."
+    /// Shown in the activity log when reading finished before its time limit and the card's parts are being written.
+    public static let writingNotice = "Reading done. Writing the score card's parts at the same time."
 
     /// A run stopped at its time limit, with the session it had saved so far.
     struct DeadlineReached: Error { var sessionID: String? }
 
     private func runOnce(prompt: String, schema: String, packDir: URL, sources: [TranscriptSource],
                          options: AssessmentOptions, webAccess: Bool, forkSessionID: String?, workingDirectory: URL?,
-                         resumable: Bool = false, onProgress: @escaping @Sendable (Progress) -> Void) async throws -> StructuredOutput {
+                         resumable: Bool = false, requiresOutput: Bool = true,
+                         onProgress: @escaping @Sendable (Progress) -> Void) async throws -> StructuredOutput {
         try Task.checkCancellation()
         let engine = options.engine
         let installed: CLIInstallation
@@ -191,9 +290,11 @@ public final class Assessor: Sendable {
             throw AssessmentError.failed(engine, "The saved session ID is invalid.")
         }
         let started = AwakeClock.now
-        let promptFile = packDir.appendingPathComponent("assessment-prompt.txt")
-        let schemaFile = packDir.appendingPathComponent("assessment-schema.json")
-        let resultFile = packDir.appendingPathComponent("assessment-result.json")
+        // Each run has its own files, so runs in the same pack at the same time never read each other's.
+        let run = UUID().uuidString.prefix(8)
+        let promptFile = packDir.appendingPathComponent("assessment-prompt-\(run).txt")
+        let schemaFile = packDir.appendingPathComponent("assessment-schema-\(run).json")
+        let resultFile = packDir.appendingPathComponent("assessment-result-\(run).json")
         defer {
             for file in [promptFile, schemaFile, resultFile] { try? FileManager.default.removeItem(at: file) }
         }
@@ -208,6 +309,8 @@ public final class Assessor: Sendable {
         let reader = AssessmentStream(engine: engine, onProgress: onProgress)
         onProgress(.started)
         let output: CLIProcess.Output
+        let process = processes.start()
+        defer { processes.finished(process) }
         do {
             output = try await process.run(executable: installed.executable, arguments: arguments,
                                            directory: workingDirectory ?? packDir, environment: environment, input: promptFile,
@@ -231,19 +334,28 @@ public final class Assessor: Sendable {
         let data: Data
         switch engine {
         case .claude:
-            guard let result = snapshot.claudeResult else { throw AssessmentError.noStructuredOutput(engine, stderr) }
-            let structured = result["structured_output"] ?? (result["result"] as? String).flatMap {
-                try? JSONSerialization.jsonObject(with: Data($0.utf8))
+            let structured = snapshot.claudeResult.flatMap { result in
+                result["structured_output"] ?? (result["result"] as? String).flatMap {
+                    try? JSONSerialization.jsonObject(with: Data($0.utf8))
+                }
             }
-            guard let structured, JSONSerialization.isValidJSONObject(structured) else {
+            if let structured, JSONSerialization.isValidJSONObject(structured) {
+                data = try JSONSerialization.data(withJSONObject: structured)
+            } else if !requiresOutput {
+                data = Data()
+            } else if snapshot.claudeResult == nil {
+                throw AssessmentError.noStructuredOutput(engine, stderr)
+            } else {
                 throw AssessmentError.noStructuredOutput(engine, "Try again with a different model.")
             }
-            data = try JSONSerialization.data(withJSONObject: structured)
         case .codex:
-            guard snapshot.completed, let final = try? Data(contentsOf: resultFile), !final.isEmpty else {
+            if snapshot.completed, let final = try? Data(contentsOf: resultFile), !final.isEmpty {
+                data = final
+            } else if !requiresOutput {
+                data = Data()
+            } else {
                 throw AssessmentError.noStructuredOutput(engine, "The final response was missing or the run did not finish.")
             }
-            data = final
         }
         return StructuredOutput(data: data, elapsed: AwakeClock.now - started,
                          costUSD: snapshot.claudeResult?["total_cost_usd"] as? Double,
@@ -334,6 +446,42 @@ public final class Assessor: Sendable {
         from the evidence you have already read. Score every dimension you have evidence for. Set `sessionsExamined` to the \
         digests and transcripts you actually read, and add a line to `scope.limits` saying the run stopped reading at its time limit.
         """
+
+    /// Added to the assessment prompt for the reading run, which saves what it read for the writing parts.
+    static let readingRequest = """
+
+
+        # This run: reading only
+
+        This run only reads. Do not write the card now, even when you have finished reading. When you are done, or the \
+        reading budget is used, return a one-sentence `note` saying what you read. The app then continues this session in \
+        separate copies that each write part of the card, from what you read here and without reading more. So as you read, \
+        note the counts, cases, session ids, dates, and projects each dimension's fields and checks will need.
+        """
+
+    /// The request one writing part continues the reading session with.
+    static func partRequest(_ part: CardPart, of count: Int, wrappedUp: Bool) -> String {
+        let intro = """
+            Reading is complete\(wrappedUp ? " (it stopped at its time limit)" : ""). Do not read any more files. The score card is \
+            written in \(count) parts at the same time, each in its own copy of this session.
+            """
+        switch part {
+        case .frame:
+            return intro + """
+                 This part returns the card's overall fields: `language`, `diagnosis`, `summary`, `highlights`, `improvement`, \
+                `followUp`, `roadmap`, and `scope`, following the Return format exactly. Other parts write the 10 dimensions. \
+                First decide each dimension's score from the evidence, without writing the dimensions out, so these fields \
+                agree with those scores. Set `sessionsExamined` to the digests and transcripts you actually read\
+                \(wrappedUp ? ", and add a line to `scope.limits` saying the run stopped reading at its time limit" : "").
+                """
+        case let .dimension(dimension):
+            return intro + """
+                 This part returns `dimensions` with exactly one entry: \(dimension.title) (`\(dimension.rawValue)`), with \
+                every field the Return format lists for a dimension, following it exactly. Other parts write the other \
+                dimensions and the overall fields.
+                """
+        }
+    }
 
     static func prompt(sources: [TranscriptSource], now: Date, previousDate: Date? = nil, digestCount: Int = 0, engine: AssessmentEngine = .claude,
                        instructions: String? = nil) -> String {

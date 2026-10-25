@@ -13,7 +13,9 @@ struct AssessmentTests {
         #expect(outcome.sessionID == CLIFixture.sessionID)
         #expect(outcome.engine == engine)
         #expect(outcome.cliVersion == "fixture")
-        #expect(outcome.costUSD == (engine == .claude ? 0.02 : nil))
+        // One reading run, then the frame and each dimension written as its own part.
+        let runs = 1 + 1 + Dimension.allCases.count
+        #expect(outcome.costUSD.map { abs($0 - 0.02 * Double(runs)) < 0.0001 } ?? (engine == .codex))
         let args = try String(contentsOf: fixture.directory.appendingPathComponent("received-arguments.txt"), encoding: .utf8)
         // Scores cap Claude Code's thinking so writing the card can't spend a whole reply deliberating.
         let thinking = try String(contentsOf: fixture.directory.appendingPathComponent("received-thinking-tokens.txt"), encoding: .utf8)
