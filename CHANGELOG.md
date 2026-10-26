@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 (2026-10-25)
 
 - Each category in a new score shows two quick lines under its name: what works, with a green check, and what holds it back, with an amber mark. Results scored before this version keep their single line.
 - Official app: a deep dive opens in three tabs, Problem, Fix and Root cause, like a category's details. The problem reads as a short story (what you wanted, what you did, what happened, what you keep dealing with) under a highlighted summary, and the prompt to make the fix sits in its own panel, always shown, with a larger Copy button.
