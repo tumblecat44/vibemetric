@@ -31,6 +31,9 @@ enum JSONSchema {
         return String(data: data, encoding: .utf8)!
     }
 
+    /// What a rewrite of the card's long quick lines returns: each line's id with its shorter text.
+    static let shorterLines = #"{"type":"object","additionalProperties":false,"properties":{"lines":{"type":"array","items":{"type":"object","additionalProperties":false,"properties":{"id":{"type":"string"},"text":{"type":"string"}},"required":["id","text"]}}},"required":["lines"]}"#
+
     /// What a reading run returns: a short note. The saved session carries everything it read.
     static let readingCheckpoint = #"{"type":"object","additionalProperties":false,"properties":{"note":{"type":"string"}},"required":["note"]}"#
 
