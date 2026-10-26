@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.1 (2026-10-26)
+
+- The Summary and each category's quick lines are short and plain again: one everyday sentence each, without tool or project names. Any line that still comes back long is rewritten shorter before the result is shown.
+
 ## 0.5.0 (2026-10-25)
 
 - Each category in a new score shows two quick lines under its name: what works, with a green check, and what holds it back, with an amber mark. Results scored before this version keep their single line.
