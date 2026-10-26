@@ -160,9 +160,26 @@ public final class Assessor: Sendable {
         } catch {
             throw AssessmentError.noStructuredOutput(options.engine, "The response did not match the score-card format. Try again.")
         }
+
+        // 3. The quick lines a reader sees first often come back long and technical, after so much reading. Any well
+        // past its length goes to one small run, without the reading, that rewrites them short and plain.
+        var shortening: StructuredOutput?
+        let long = Self.longLines(in: card)
+        if !long.isEmpty, end - AwakeClock.now > 45 {
+            onProgress(.thinking(Self.shorteningNotice))
+            var short = options
+            short.timeout = min(end - AwakeClock.now, 3 * 60)
+            if let output = try? await runOnce(prompt: Self.shorterLinesRequest(long), schema: JSONSchema.shorterLines,
+                                               packDir: packDir, sources: sources, options: short, webAccess: false,
+                                               forkSessionID: nil, workingDirectory: nil, onProgress: quiet),
+               let reply = try? JSONDecoder().decode(ShorterLines.self, from: output.data) {
+                Self.apply(reply.lines, to: &card)
+                shortening = output
+            }
+        }
         let elapsed = AwakeClock.now - clockStarted
         card.scope.elapsedMinutes = (elapsed / 60 * 10).rounded() / 10
-        for output in outputs.values {
+        for output in Array(outputs.values) + [shortening].compactMap({ $0 }) {
             spent.cost = spent.cost.flatMap { total in output.costUSD.map { total + $0 } }
             spent.turns = spent.turns.flatMap { total in output.turns.map { total + $0 } }
         }
@@ -252,6 +269,80 @@ public final class Assessor: Sendable {
             return entry
         }
         return try JSONSerialization.data(withJSONObject: card)
+    }
+
+    /// A quick line on the card, where it is, and the most words the prompt asks for.
+    struct LongLine: Equatable, Sendable {
+        var id: String
+        var text: String
+        var limit: Int
+    }
+
+    /// The quick lines read before any detail that run well past their length: a quarter over, so a line a word or
+    /// two long stays as written.
+    static func longLines(in card: ScoreCard) -> [LongLine] {
+        var lines: [LongLine] = []
+        func check(_ id: String, _ text: String?, _ limit: Int) {
+            guard let text, text.split(whereSeparator: \.isWhitespace).count > limit + limit / 4 else { return }
+            lines.append(LongLine(id: id, text: text, limit: limit))
+        }
+        for (i, point) in (card.overview ?? []).enumerated() { check("overview.\(i)", point.text, 16) }
+        for (i, line) in (card.highlights ?? []).enumerated() { check("highlights.\(i)", line, 16) }
+        for (i, d) in card.dimensions.enumerated() {
+            check("dimensions.\(i).goodLine", d.goodLine, 9)
+            check("dimensions.\(i).gapLine", d.gapLine, 9)
+            check("dimensions.\(i).issueLine", d.issueLine, 20)
+            check("dimensions.\(i).fixLine", d.fixLine, 18)
+        }
+        return lines
+    }
+
+    struct ShorterLines: Decodable {
+        struct Line: Decodable { var id: String; var text: String }
+        var lines: [Line]
+    }
+
+    /// Puts the rewritten lines back where they came from. Unknown ids and empty text are ignored.
+    static func apply(_ lines: [ShorterLines.Line], to card: inout ScoreCard) {
+        for line in lines {
+            let text = line.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { continue }
+            let parts = line.id.split(separator: ".").map(String.init)
+            guard parts.count >= 2, let i = Int(parts[1]) else { continue }
+            switch parts[0] {
+            case "overview" where card.overview?.indices.contains(i) == true: card.overview?[i].text = text
+            case "highlights" where card.highlights?.indices.contains(i) == true: card.highlights?[i] = text
+            case "dimensions" where parts.count == 3 && card.dimensions.indices.contains(i):
+                switch parts[2] {
+                case "goodLine": card.dimensions[i].goodLine = text
+                case "gapLine": card.dimensions[i].gapLine = text
+                case "issueLine": card.dimensions[i].issueLine = text
+                case "fixLine": card.dimensions[i].fixLine = text
+                default: break
+                }
+            default: break
+            }
+        }
+    }
+
+    /// Shown in the activity log while the long quick lines are rewritten.
+    public static let shorteningNotice = "Making the summary lines shorter and plainer."
+
+    static func shorterLinesRequest(_ lines: [LongLine]) -> String {
+        let list = lines.map { line -> [String: Any] in ["id": line.id, "text": line.text, "maxWords": line.limit] }
+        let json = (try? JSONSerialization.data(withJSONObject: list, options: [.prettyPrinted, .sortedKeys]))
+            .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        return """
+            Do not read any files. Below are lines from a report on how someone works with AI coding tools. They are the \
+            first thing the person reads, and the reader may not code, such as a manager or a designer. Each is too long \
+            or too technical. Rewrite each as one short, complete sentence of at most `maxWords` everyday words, keeping \
+            its meaning and whether it says something good or a problem. Use "you" or "your AI" as the subject. Leave out \
+            tool, product, model and project names, commands, file paths, numbers and jargon: name the idea instead, such \
+            as "saved instructions" or "checks". Keep the reply in the language the lines are written in. Return every id \
+            with its new text.
+
+            \(json)
+            """
     }
 
     /// What one structured CLI run returned: the JSON that matched the schema, plus how the run went.
@@ -516,12 +607,18 @@ public final class Assessor: Sendable {
                 First decide each dimension's score from the evidence, without writing the dimensions out, so these fields \
                 agree with those scores. Set `sessionsExamined` to the digests and transcripts you actually read\
                 \(wrappedUp ? ", and add a line to `scope.limits` saying the run stopped reading at its time limit" : "").
+                 Before writing, remember who reads `overview` and `highlights` first: someone who may not code. Each is one \
+                plain sentence of 8 to 16 everyday words, with no tool, product, model or project names, commands, file \
+                paths, or counts. The detail you just read belongs in the dimensions and `improvement`, not here.
                 """
         case let .dimension(dimension):
             return intro + """
                  This part returns `dimensions` with exactly one entry: \(dimension.title) (`\(dimension.rawValue)`), with \
                 every field the Return format lists for a dimension, following it exactly. Other parts write the other \
-                dimensions and the overall fields.
+                dimensions and the overall fields. Before writing, remember who reads the quick lines first: someone who \
+                may not code. `goodLine` and `gapLine` are 5 to 9 everyday words each, `issueLine` 12 to 20 and `fixLine` \
+                10 to 18, plain sentences with no tool, product, model or project names, commands, file paths, or numbers. \
+                The detail you just read belongs in `saw`, `impact`, `strengths` and `evidence`.
                 """
         }
     }
