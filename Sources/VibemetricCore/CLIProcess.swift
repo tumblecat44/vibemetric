@@ -13,16 +13,9 @@ final class CLIProcess: @unchecked Sendable {
     private let lock = NSLock()
     private var process: Process?
     private var cancelled = false
-    private var stoppedEarly = false
 
     func cancel() {
         let active = lock.withLock { cancelled = true; return process }
-        if let active { Self.stop(active) }
-    }
-
-    /// Ends the running invocation as if its time were up, so the caller can continue from what it already has.
-    func stopEarly() {
-        let active = lock.withLock { stoppedEarly = true; return process }
         if let active { Self.stop(active) }
     }
 
@@ -62,7 +55,6 @@ final class CLIProcess: @unchecked Sendable {
             precondition(process == nil, "Only one invocation per CLIProcess")
             try proc.run()
             process = proc
-            stoppedEarly = false
         }
         defer { lock.withLock { process = nil } }
         let stdout = BoundedData(), stderr = BoundedData(), expired = LockedFlag()
@@ -92,7 +84,7 @@ final class CLIProcess: @unchecked Sendable {
         deadline.cancel()
         reads.wait()
         if lock.withLock({ cancelled }) { throw CancellationError() }
-        if expired.value || lock.withLock({ stoppedEarly }) { throw AssessmentError.timedOut }
+        if expired.value { throw AssessmentError.timedOut }
         return Output(status: proc.terminationStatus, stdout: stdout.data, stderr: stderr.data)
     }
 
@@ -126,4 +118,32 @@ private final class LockedFlag: @unchecked Sendable {
     private var storage = false
     var value: Bool { lock.withLock { storage } }
     func set() { lock.withLock { storage = true } }
+}
+
+/// The invocations of one owner that may run at the same time, such as the parts of a score card written in
+/// parallel. Cancelling stops every running one and every one started afterwards.
+final class CLIProcessGroup: @unchecked Sendable {
+    private let lock = NSLock()
+    private var running: [ObjectIdentifier: CLIProcess] = [:]
+    private var cancelled = false
+
+    /// A new invocation that this group cancels; pass it to `finished(_:)` when it is done.
+    func start() -> CLIProcess {
+        let process = CLIProcess()
+        let cancelNow = lock.withLock { () -> Bool in
+            running[ObjectIdentifier(process)] = process
+            return cancelled
+        }
+        if cancelNow { process.cancel() }
+        return process
+    }
+
+    func finished(_ process: CLIProcess) {
+        lock.withLock { running[ObjectIdentifier(process)] = nil }
+    }
+
+    func cancel() {
+        let active = lock.withLock { cancelled = true; return Array(running.values) }
+        active.forEach { $0.cancel() }
+    }
 }

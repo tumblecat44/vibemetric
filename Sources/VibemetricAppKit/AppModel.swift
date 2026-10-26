@@ -585,7 +585,7 @@ public final class AppModel {
             progress.noteRead(what)
             activity.append(Activity(text: what, isThought: false))
         case let .thinking(text):
-            if text == Assessor.wrapUpNotice { progress.startWriting() }
+            if text == Assessor.wrapUpNotice || text == Assessor.writingNotice { progress.startWriting() }
             activity.append(Activity(text: text, isThought: true))
         }
         if activity.count > 200 { activity.removeFirst(activity.count - 200) }

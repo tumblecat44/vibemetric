@@ -6,7 +6,7 @@ enum JSONSchema {
         scoreCard(for: .codex)
     }
 
-    /// The only answer a reading phase accepts, so the score card cannot be returned before reading is done.
+    /// What a Codex reading run returns: a short note. The saved session carries everything it read.
     static let readingCheckpoint = #"{"type":"object","additionalProperties":false,"properties":{"note":{"type":"string"}},"required":["note"]}"#
 
     private static let str: [String: Any] = ["type": "string"]
@@ -87,21 +87,34 @@ enum JSONSchema {
             }
     }
 
-    /// Only the listed dimensions, for asking again for the parts of a card that came back incomplete.
-    static func dimensionsPatch(for engine: AssessmentEngine, dimensions: [Dimension]) -> String {
-        let wanted = dimensionSchemas(for: engine).filter { dimensions.contains($0.0) }.map(\.1)
-        return encoded(object(["dimensions": array(["anyOf": wanted], min: wanted.count, max: wanted.count)]))
-    }
-
     static func scoreCard(for engine: AssessmentEngine) -> String {
         encoded(object(cardProperties(for: engine)))
     }
 
-    /// The card without its dimensions: everything written after the dimensions are in.
+    /// A writing part's card fields: everything except `dimensions`.
     static func cardFrame(for engine: AssessmentEngine) -> String {
         var properties = cardProperties(for: engine)
         properties["dimensions"] = nil
         return encoded(object(properties))
+    }
+
+    /// A writing part's card fields for one dimension: `dimensions` holding just that one.
+    static func cardDimension(for engine: AssessmentEngine, _ dimension: Dimension) -> String {
+        let schema = dimensionSchemas(for: engine).first { $0.0 == dimension }!.1
+        return encoded(object(["dimensions": array(schema, min: 1, max: 1)]))
+    }
+
+    /// One format for Claude's reading run and every writing part: the reading note and all of the card's fields, none
+    /// required, so each run fills only its own. Claude Code sends the format at the start of every request, and the
+    /// prompt cache works only on an identical start, so with one format the writing copies reuse the reading's cache
+    /// instead of each paying to load the whole session again. The app checks each part's fields (`CardPart.isComplete`).
+    static var sharedParts: String {
+        var properties = cardProperties(for: .claude)
+        var dimensions = properties["dimensions"] as! [String: Any]
+        dimensions["minItems"] = 0
+        properties["dimensions"] = dimensions
+        properties["note"] = str
+        return encoded(["type": "object", "additionalProperties": false, "properties": properties, "required": [String]()])
     }
 
     private static func cardProperties(for engine: AssessmentEngine) -> [String: Any] {
