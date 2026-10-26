@@ -66,6 +66,8 @@ enum JSONSchema {
             "saw": str,
             "issueLine": str,
             "fixLine": str,
+            "goodLine": str,
+            "gapLine": str,
             "strengths": array(str, max: 3),
             "impact": str,
             "tryThis": ["type": ["string", "null"]],

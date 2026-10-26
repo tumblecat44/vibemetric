@@ -67,9 +67,10 @@ struct CategoryDetails: View {
     var deductions: [ScoreCard.Deduction] = []
     var footer: AnyView?
 
-    enum Tab: String, CaseIterable, Identifiable {
+    enum Tab: String, CaseIterable, Identifiable, DetailTab {
         case problem = "Problem", solution = "Solution", habits = "Your habits", working = "Strengths"
         var id: String { rawValue }
+        var title: String { rawValue }
 
         var symbol: String {
             switch self {
@@ -112,7 +113,6 @@ struct CategoryDetails: View {
             }
         }
     }
-    private var selected: Tab? { chosen.flatMap { tabs.contains($0) ? $0 : nil } ?? tabs.first }
 
     @ViewBuilder private func content(_ tab: Tab) -> some View {
         switch tab {
@@ -126,30 +126,7 @@ struct CategoryDetails: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if result.isReadable {
-                if let selected {
-                    // The tabs and what they open form one box, so the tabs read as the box's headings.
-                    VStack(spacing: 0) {
-                        TabBar(tabs: tabs, selected: selected) { chosen = $0 }
-                        // Every tab's content is laid out and only the open one shown, so the box keeps the height of
-                        // its tallest tab and doesn't jump when another is chosen.
-                        ZStack(alignment: .topLeading) {
-                            ForEach(tabs) { tab in
-                                content(tab)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .opacity(tab == selected ? 1 : 0)
-                                    .allowsHitTesting(tab == selected)
-                                    .accessibilityHidden(tab != selected)
-                            }
-                        }
-                        .padding(.vertical, 16)
-                        .padding(.horizontal, 16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(selected.color.opacity(0.06))
-                    }
-                    .background(Theme.card)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.rule, lineWidth: 1))
-                }
+                TabbedBox(tabs: tabs, chosen: $chosen) { content($0) }
             } else {
                 // A category from an older card inside a readable one: its reason as written.
                 Text(markdown(result.reason)).scaledFont(13).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
@@ -171,13 +148,65 @@ struct CategoryDetails: View {
     }
 }
 
+/// One tab of a `TabbedBox`: its name, icon and color.
+public protocol DetailTab: Hashable, Identifiable {
+    var title: String { get }
+    var symbol: String { get }
+    var color: Color { get }
+}
+
+/// Tabs and what the open one shows, as one box, so the tabs read as the box's headings. With `keepsHeight`, every
+/// tab's content is laid out and only the open one shown, so the box keeps the height of its tallest tab and doesn't
+/// jump when another is chosen; without it, the box fits the open tab (for long pages, where a short tab would
+/// otherwise sit above a large gap).
+public struct TabbedBox<Tab: DetailTab, Content: View>: View {
+    var tabs: [Tab]
+    @Binding var chosen: Tab?
+    var keepsHeight: Bool
+    var content: (Tab) -> Content
+
+    public init(tabs: [Tab], chosen: Binding<Tab?>, keepsHeight: Bool = true, @ViewBuilder content: @escaping (Tab) -> Content) {
+        self.tabs = tabs
+        _chosen = chosen
+        self.keepsHeight = keepsHeight
+        self.content = content
+    }
+
+    /// The chosen tab while it's still offered, else the first.
+    private var selected: Tab? { chosen.flatMap { tabs.contains($0) ? $0 : nil } ?? tabs.first }
+
+    public var body: some View {
+        if let selected {
+            VStack(spacing: 0) {
+                TabBar(tabs: tabs, selected: selected) { chosen = $0 }
+                ZStack(alignment: .topLeading) {
+                    ForEach(keepsHeight ? tabs : [selected]) { tab in
+                        content(tab)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .opacity(tab == selected ? 1 : 0)
+                            .allowsHitTesting(tab == selected)
+                            .accessibilityHidden(tab != selected)
+                    }
+                }
+                .padding(.vertical, 16)
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(selected.color.opacity(0.06))
+            }
+            .background(Theme.card)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.rule, lineWidth: 1))
+        }
+    }
+}
+
 /// The details' tabs across the top of their box, each as wide as the others: an icon and a name in its part's color.
 /// The open tab is bold on a light tint over a thick underline, so which one is open is plain at a glance.
-private struct TabBar: View {
-    var tabs: [CategoryDetails.Tab]
-    var selected: CategoryDetails.Tab
-    var select: (CategoryDetails.Tab) -> Void
-    @State private var hovered: CategoryDetails.Tab?
+private struct TabBar<Tab: DetailTab>: View {
+    var tabs: [Tab]
+    var selected: Tab
+    var select: (Tab) -> Void
+    @State private var hovered: Tab?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -185,7 +214,7 @@ private struct TabBar: View {
                 let isOn = tab == selected
                 Button { select(tab) } label: {
                     VStack(spacing: 0) {
-                        Label(tab.rawValue, systemImage: tab.symbol)
+                        Label(tab.title, systemImage: tab.symbol)
                             .scaledFont(14, weight: isOn ? .bold : .semibold)
                             .lineLimit(1)
                             .foregroundStyle(tab.color)

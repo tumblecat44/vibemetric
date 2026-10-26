@@ -164,7 +164,8 @@ struct ResultSummary: View {
     }
 }
 
-/// One category as a row of the list: a score ring, its name with the issue under it, and a chevron. A click opens the
+/// One category as a row of the list: a score ring, its name with its good and gap lines (or, on older cards, the
+/// issue) under it, and a chevron. A click opens the
 /// full explanation, with the fix, below.
 private struct FixBox: View {
     var result: ScoreCard.DimensionResult
@@ -191,6 +192,14 @@ private struct FixBox: View {
         if let first = result.saw.flatMap(Self.firstSentence), first.count <= 120,
            first.split(separator: " ").count >= 6 { return first }
         return result.headline
+    }
+
+    /// The good line, then the gap line, when the card has them.
+    private var quickLines: [(good: Bool, text: String)] {
+        [(true, result.goodLine), (false, result.gapLine)].compactMap { good, text in
+            guard let text = text?.trimmingCharacters(in: .whitespaces), !text.isEmpty else { return nil }
+            return (good, text)
+        }
     }
 
     static func firstSentence(_ text: String) -> String? {
@@ -240,9 +249,22 @@ private struct FixBox: View {
                     Text(result.dimension.title).scaledFont(15, weight: .semibold).foregroundStyle(Theme.ink)
                     if let change { DeltaBadge(change: change) }
                 }
-                Text(inline(issue)).scaledFont(13).foregroundStyle(Theme.muted)
-                    .lineSpacing(1)
-                    .fixedSize(horizontal: false, vertical: true)
+                if !quickLines.isEmpty {
+                    ForEach(Array(quickLines.enumerated()), id: \.offset) { _, line in
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Image(systemName: line.good ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                                .scaledFont(11, weight: .semibold)
+                                .foregroundStyle(line.good ? Theme.color(for: .strong) : Theme.color(for: .developing))
+                                .accessibilityLabel(line.good ? "Working well" : "To improve")
+                            Text(inline(line.text)).scaledFont(13).foregroundStyle(Theme.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                } else {
+                    Text(inline(issue)).scaledFont(13).foregroundStyle(Theme.muted)
+                        .lineSpacing(1)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Image(systemName: "chevron.right")

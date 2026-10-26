@@ -136,6 +136,10 @@ public struct ScoreCard: Codable, Sendable {
         /// show the headline and `tryThis` there instead.
         public var issueLine: String?
         public var fixLine: String?
+        /// What works and what holds this dimension back, in a few everyday words each, shown under its name in the
+        /// category list. nil on older cards, which show `issueLine` there instead.
+        public var goodLine: String?
+        public var gapLine: String?
         /// Why this score: the level reached and what the next one needs, in plain words. nil on older cards and at 10
         /// for `nextLevel`.
         public var levelNow: String?
@@ -185,7 +189,7 @@ public struct ScoreCard: Codable, Sendable {
 
         enum CodingKeys: String, CodingKey {
             case dimension, score, status, headline, reason, points, conclusion, evidence, changeReason, saw, strengths, impact, tryThis, solutionSteps,
-                 issueLine, fixLine, levelNow, nextLevel, checks
+                 issueLine, fixLine, goodLine, gapLine, levelNow, nextLevel, checks
         }
 
         public init(from decoder: Decoder) throws {
@@ -205,6 +209,8 @@ public struct ScoreCard: Codable, Sendable {
             solutionSteps = try c.decodeIfPresent([String].self, forKey: .solutionSteps)
             issueLine = try c.decodeIfPresent(String.self, forKey: .issueLine)
             fixLine = try c.decodeIfPresent(String.self, forKey: .fixLine)
+            goodLine = try c.decodeIfPresent(String.self, forKey: .goodLine)
+            gapLine = try c.decodeIfPresent(String.self, forKey: .gapLine)
             levelNow = try c.decodeIfPresent(String.self, forKey: .levelNow)
             nextLevel = try c.decodeIfPresent(String.self, forKey: .nextLevel)
             checks = try c.decodeIfPresent([ScoreCheck].self, forKey: .checks)

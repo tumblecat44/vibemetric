@@ -651,6 +651,13 @@ public final class Assessor: Sendable {
           - `fixLine`: below 8, the fix as one sentence of about 10 to 18 words, starting with a verb, that says what to change, \
         where, and in plain words what it gets them. For example "Add one line to each build request saying what done looks \
         like and one case that should fail." An empty string at 8 or above.
+          - `goodLine` and `gapLine`: the two quick lines under this dimension's name in the category list, read at a \
+        glance before anything else: `goodLine` what works in this dimension, `gapLine` the main thing holding it back, \
+        matching `issueLine`. Each is one short, complete sentence of 5 to 9 everyday words, written as `overview` asks: \
+        for someone who does not code, with no tool, product, model or project names, commands, numbers, or rubric terms. \
+        Write them from this person's records, never reusing an example's wording; the form looks like "Your AI keeps \
+        notes you can reuse." and "Nobody checks those notes for old facts." \
+        `gapLine` is an empty string at 10; `goodLine` is an empty string only when nothing in this dimension works yet.
           - `strengths`: up to 3 things the person already does well in this dimension, one short sentence each, as it happened \
         in their sessions, with a number where one exists, for example "Commits and pushes go to a cheaper subagent, 12 times in two sessions." \
         The app shows them under "Strengths". An empty array when nothing stands out. Group related habits \

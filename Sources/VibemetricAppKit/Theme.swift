@@ -4,7 +4,7 @@ import VibemetricCore
 /// Warm paper-and-ink palette that adapts to dark mode.
 public enum Theme {
     public static let paper = Color(light: .init(red: 0.976, green: 0.965, blue: 0.941, alpha: 1), dark: .init(red: 0.086, green: 0.082, blue: 0.075, alpha: 1))
-    static let card = Color(light: .white, dark: .init(red: 0.13, green: 0.125, blue: 0.115, alpha: 1))
+    public static let card = Color(light: .white, dark: .init(red: 0.13, green: 0.125, blue: 0.115, alpha: 1))
     public static let ink = Color(light: .init(red: 0.11, green: 0.10, blue: 0.09, alpha: 1), dark: .init(red: 0.94, green: 0.92, blue: 0.88, alpha: 1))
     public static let muted = Color(light: .init(red: 0.45, green: 0.43, blue: 0.40, alpha: 1), dark: .init(red: 0.62, green: 0.60, blue: 0.56, alpha: 1))
     public static let rule = Color(light: .init(red: 0.88, green: 0.86, blue: 0.82, alpha: 1), dark: .init(red: 0.24, green: 0.23, blue: 0.21, alpha: 1))
