@@ -629,7 +629,7 @@ public final class Assessor: Sendable {
 
         Original transcript roots:
         \(roots)
-        This version parses only these tools; disclose missing Cursor/Grok coverage where relevant.
+        This version parses only these tools; disclose missing Cursor/Grok coverage in `scope.limits` where relevant.
 
         Method: start with `overview.md` and `leads.md`, then read digests across projects, tools, and dates, following connections between sessions \
         (for example, a rule written in one session and applied in a later one). \(readingInstructions) Aim to finish in about five minutes. \
@@ -650,7 +650,8 @@ public final class Assessor: Sendable {
 
         Track distinct session bodies actually inspected. Count neither index rows nor repeated reads as new sessions.
         References need verified full session IDs from those records; never invent IDs for settings or overview entries.
-        Report unavailable, clipped, and unread scope honestly. Do not imply that the examined subset represents every record.
+        Report unavailable, clipped, and unread scope honestly, only in `scope.limits`. Do not imply there that the examined
+        subset represents every record.
         \(previousDate.map { Self.followUpRules(previousDate: f.string(from: $0)) } ?? "")\(instructions.map(Self.personNotes) ?? "")
 
         # Rubric reference
@@ -679,18 +680,18 @@ public final class Assessor: Sendable {
         Describe automatic practice as "without additional user intervention" (Korean: "추가 사용자 개입 없이"),
         rather than vague references to reminders or notifications. Use plain words for the behavior being assessed.
         - `summary`: two connected everyday sentences. Describe the supported practice and its consequence, grounded in
-        a representative project/task: what was wanted, what the person or AI did, and what was achieved or remains open.
+        a representative project/task: what was wanted, what the person or AI did, and what was achieved or what the work left unresolved.
         Every summary must name the actual project directory by its project name, without a personal home-directory prefix,
         not just a skill, tool, or feature name. Identify the task in that directory and its actor in complete sentences.
         Use an explicit subject meaning "you" or "AI", including in Korean; a directory followed by subjectless verbs
         such as "changed", "saved" or "chose" is incomplete. Use this structure in the person's language:
-        "In <actual directory>, <you or AI> <did the named task>. <Supported result or remaining limitation>."
+        "In <actual directory>, <you or AI> <did the named task>. <Supported result or what the work left unresolved>."
         The first sentence must explicitly name that person or AI; a passive sentence about a skill or file being
         updated is insufficient. Keep the actor explicit in every sentence describing an action. If the record does
-        not establish who acted, explain that limit honestly instead of inventing an actor.
+        not show who acted, describe the observed action itself; never invent an actor.
         If only a parent directory is recorded, use its directory name and describe the actual task there;
         do not invent a more specific directory. Do not leave a skill name to stand for an unexplained project.
-        For Unknown, identify the actual inspected directory scope, follow-up searches performed, and what remains unverified.
+        For Unknown, say that the evidence is insufficient to judge this competency, naming the inspected directories.
         For Low, name the inspected task and what the low-level practice looked like there.
         A count or project name alone does not explain a case. Keep detailed rating arguments in the expanded explanation.
         - `level`: high, medium, low, or unknown. Consider all relevant inspected practice, including contrary cases.
@@ -728,8 +729,8 @@ public final class Assessor: Sendable {
         Explain which level recurred most, whether High reached two thirds, and Medium for ties, with
         the actual shares and resulting level. Unknown tasks do not enter these percentages. Never invent cases, counts,
         or a distribution for unread records; one intended outcome across continuations, retries and delegated pieces is
-        one task. With no rated tasks, explain the targeted investigation, relevant scope, and remaining limit honestly
-        without meaningless percentages. Keep raw codes and K/H/M/L notation out of displayed prose.
+        one task. With no rated tasks, say in one or two sentences that the evidence is insufficient to judge this
+        competency, without percentages. Keep raw codes and K/H/M/L notation out of displayed prose.
         State counts naturally with 건 in Korean and name the person or AI as actor. A project or skill name alone is not
         an example. Do not refer the reader to observedBehavior instead of explaining the representative cases here.
         Put all of this in explanation.overallJudgment; do not add helper properties or task arrays.
@@ -738,7 +739,24 @@ public final class Assessor: Sendable {
 
         Before returning, read each explanation on its own: can the person tell which guide supports the practice,
         what distinguishes the levels, what actually happened in the selected cases, and why the examined evidence supports
-        the rating? Restore a missing connection rather than shortening the paragraph into a label.
+        the rating? Restore a missing connection rather than shortening the paragraph into a label. Then rewrite any
+        sentence that hedges or describes your own investigation, following "Assertive wording" below.
+
+        ## Assertive wording
+
+        State every judgment as a fact about the person's work. Each visible sentence outside `scope` says what the person
+        or AI did, what that shows, and the resulting level; the "How we rate this" paragraph already explains the criteria.
+        Never write about your own investigation in those sentences: how many sessions you read, what you did not read,
+        open, test, or confirm, or that a result is limited to the records you read. Do not hedge with phrases such as
+        "could not confirm", "was not seen", "did not appear", "was not established", or in Korean "확인하지 못했습니다",
+        "확인되지 않았습니다", "보이지 않았습니다", "판단한 내용이 없습니다", "읽은 세션에 한정됩니다".
+        - A missing practice is stated as the observed fact. Write "both tasks saved only when asked and recorded no
+        duration, so Medium", not "the duration condition and automatic saving rule could not be confirmed, so Medium".
+        - When you followed a lead only part of the way, describe exactly what the record shows up to that point, for
+        example "In thefirsthearing, AI wrote the decision to MEMORY.md", and nothing about what you did not check.
+        - Name a missing check only when the competency's levels ask for it, and tie it to the level it decides.
+        - Only an Unknown competency says that the evidence is insufficient to judge it.
+        Investigation limits belong only in `scope.limits` and `scope.unknownInvestigations`.
 
         ## Writing and the remaining schema fields
 
@@ -748,8 +766,7 @@ public final class Assessor: Sendable {
         actual actor. Preserve subsequent corrections and valid existing procedures. Connect the intended outcome,
         entrusted work, observed action/result, and supported remaining burden. Do not invent motives, benefits, damage,
         recurrence, costs, or quantities. Use a concrete number from the records when one exists. One completed repair is
-        not a general pattern. Keep unknown coverage distinct
-        from poor behavior and explain only the observed scope.
+        not a general pattern. Keep Unknown distinct from poor behavior.
 
         Use plain connected sentences, no Markdown headings, bullets, tables, emphasis, or emoji inside field strings.
         Inline source-name links in explanation.sourceBasis are the explicit exception: use [name](supplied URL).
@@ -759,10 +776,10 @@ public final class Assessor: Sendable {
         "the user" in those fields. Match a proposed change to its supported cause and distinguish past burden from expected benefit.
 
         - `language`: the person's primary language as a BCP-47 code.
-        - `diagnosis`: one plain sentence, at most 20 words, naming the main confirmed strength and observed problem or
-        specific unverified coverage. Do not turn unknown evidence into a weakness.
+        - `diagnosis`: one plain sentence, at most 20 words, naming the main confirmed strength and the main observed
+        problem. Do not turn unknown evidence into a weakness.
         - top-level `summary`: 2–3 short strings without bullet characters, at most 15 words each. Give what works, the
-        observed problem or coverage limit, and a supported next action in everyday language.
+        observed problem, and a supported next action in everyday language.
         - `highlights`, `issueLine`, and `fixLine` appear on the new summary screen. Summarize the same supported
         practices and gaps explained in the competency details; do not introduce a different finding or recommendation.
         Use complete everyday sentences addressed to the person, without rubric terms or unexplained technical shorthand.
@@ -773,20 +790,17 @@ public final class Assessor: Sendable {
         has weight 1/N, including Unknown. The app rounds once after the dimension sum and sums displayed scores for the total.
         Do not remove a competency, invent a numeric grade, add deductions, or return not_assessable/not_reviewed.
           - `headline`: the concrete verdict, at most 10 words.
-          - `issueLine`: when an observed gap or coverage limit exists, one standalone sentence of about 12–20 words summarizing the same problem as `saw`:
-        what happens and its supported consequence. If only coverage is missing, name that limit without inventing failure
-        or burden. Empty when no observed gap or coverage limit exists.
+          - `issueLine`: when an observed gap exists, one standalone sentence of about 12–20 words summarizing the same problem as `saw`:
+        what happens and its supported consequence. Empty when no observed gap exists.
           - `fixLine`: when a useful action is supported, one sentence of about 10–18 words summarizing the same action as `tryThis` and the competency
-        solution it represents. Start with a verb and say what changes and why. For missing coverage, use only a limited
-        verification action. Empty when no useful supported action exists.
+        solution it represents. Start with a verb and say what changes and why. Empty when no useful supported action exists.
           - `strengths`: up to three short supported practices in competency order; empty when none is established.
-          - `saw`: the first observed useful improvement in competency order, or the specific unverified practice. Explain
-        the actual problem first, what was missing, and why it mattered, without inventing burden or repeating the scoring
-        argument. Put strengths in strengths; omit labels such as "Positive:", "Gap:", and "Problem:". Empty when there is no observed gap or coverage limit.
+          - `saw`: the first observed useful improvement in competency order. Explain the actual problem first, what was
+        missing, and why it mattered, without inventing burden or repeating the scoring argument. Put strengths in
+        strengths; omit labels such as "Positive:", "Gap:", and "Problem:". Empty when there is no observed gap.
           - `impact`: one sentence of supported remaining burden/risk, without advice or predicted benefit. Empty when none
         is established or when all competencies are High.
-          - `tryThis`: one concrete action starting with a verb, or a clearly limited verification action for missing
-        records. Null when unsupported or when all competencies are High.
+          - `tryThis`: one concrete action starting with a verb. Null when unsupported or when all competencies are High.
           - `solutionSteps`: 2–4 full plain sentences covering what/where to change, how, why, and how to check it. Each adds
         to the title. No pasted prompts, rubric terms, or vague "consider". Empty when unsupported or when all competencies are High.
           - `evidence`: up to three verified references with tool, full session ID, YYYY-MM-DD date, actual project, and a
@@ -802,8 +816,8 @@ public final class Assessor: Sendable {
         but is not displayed. `tryItOn` names an actual task and `signOfSuccess` its observable improvement. Up to three verified
         evidence references. `count`/`countLabel` count the observed problem, with a label of at most six words; both null when
         no honest count exists. Do not put an assessment argument or rubric jargon in these problem/solution fields.
-        If no observed problem supports a change, give a neutral coverage explanation, three actions preserving valid practices
-        and stating what remains unverified, null instruction/counts, empty evidence, and no invented failure or benefit.
+        If no observed problem supports a change, say plainly that the observed practices hold, give three actions preserving
+        them, null instruction/counts, empty evidence, and no invented failure or benefit.
         Use the first dimension only as a schema placeholder and one roadmap entry saying no change plan is established.
         - `followUp`: always null.
         - `roadmap`: up to three items, each with `stage` (1, 2, 3 in order), `change`, and `result`;
