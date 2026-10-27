@@ -104,7 +104,7 @@ struct RootView: View {
     /// The sidebar's current width. The window's minimum is this plus the detail column's minimum, so dragging
     /// the window's edge in stops before it would take space from the sidebar.
     @State private var sidebarWidth = RootView.sidebarIdealWidth
-    /// Where the detail column starts in the window; the header's view picker moves left by half of it.
+    /// Where the detail column starts in the window, for centering the header's view picker.
     @State private var detailMinX: CGFloat = 0
 
     /// Sidebar widths: it never gets narrower than the minimum, and people can drag it out to the maximum.
@@ -169,27 +169,15 @@ struct RootView: View {
             }
             // The same buttons on every screen, so the toolbar never changes height or layout.
             .toolbar {
-                // Switching views sits in the middle of the window's header, above everything it changes. The detail
-                // column's toolbar centers it over the detail, so it moves left to the window's middle.
-                if !Extensions.sidebarTabs.isEmpty {
-                    ToolbarItem(placement: .principal) {
-                        Picker("View", selection: $model.sidebarTab) {
-                            Text(AppModel.generalTab).tag(AppModel.generalTab)
-                            ForEach(Extensions.sidebarTabs) { Text($0.id).tag($0.id) }
-                        }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                        .offset(x: -detailMinX / 2)
-                    }
-                }
+                if !Extensions.sidebarTabs.isEmpty { ViewPickerToolbar(sidebarWidth: detailMinX) }
                 CardExportToolbar(record: exportableRecord)
             }
-            .onChange(of: model.sidebarTab) { _, _ in model.showsSettings = false }
             .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minX } action: { detailMinX = $0 }
             // A small ideal width, so the split view lets the detail shrink to its minimum before anything else.
             .frame(minWidth: Self.detailMinWidth, idealWidth: Self.detailMinWidth, maxWidth: .infinity)
             .navigationSplitViewColumnWidth(min: Self.detailMinWidth, ideal: 860)
         }
+        .onChange(of: model.sidebarTab) { _, _ in model.showsSettings = false }
         .frame(minWidth: max(sidebarWidth, Self.sidebarMinWidth) + Self.sidebarChromeAllowance + Self.detailMinWidth)
         .onChange(of: columns) { _, visibility in
             if visibility != .all { columns = .all }
@@ -328,5 +316,34 @@ struct HistoryRow: View {
             }
         }
         .padding(.vertical, 2)
+    }
+}
+
+/// General and the extension tabs, in the middle of the window's header. The toolbar centers it over the detail
+/// column, so empty space as wide as the sidebar on its right moves it to the window's middle.
+private struct ViewPickerToolbar: ToolbarContent {
+    var sidebarWidth: CGFloat
+    @Environment(AppModel.self) private var model
+
+    var body: some ToolbarContent {
+        if #available(macOS 26, *) {
+            // The glass behind a toolbar item would stretch over the empty space too.
+            item.sharedBackgroundVisibility(.hidden)
+        } else {
+            item
+        }
+    }
+
+    private var item: some ToolbarContent {
+        @Bindable var model = model
+        return ToolbarItem(placement: .principal) {
+            Picker("View", selection: $model.sidebarTab) {
+                Text(AppModel.generalTab).tag(AppModel.generalTab)
+                ForEach(Extensions.sidebarTabs) { Text($0.id).tag($0.id) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.trailing, sidebarWidth)
+        }
     }
 }
