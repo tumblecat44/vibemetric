@@ -119,33 +119,48 @@ struct RootView: View {
     static let sidebarChromeAllowance: CGFloat = 8
 
     var body: some View {
+        Group {
+            if let tab = Extensions.headerTabs.first(where: { $0.id == model.headerTab }) {
+                ZStack {
+                    Theme.paper.ignoresSafeArea()
+                    if model.showsSettings { SettingsView() } else { tab.content() }
+                }
+                .toolbar {
+                    HeaderPickerToolbar(sidebarWidth: 0)
+                    SettingsToolbar()
+                }
+            } else {
+                splitView
+            }
+        }
+        .onChange(of: model.sidebarTab) { _, _ in model.showsSettings = false }
+        .onChange(of: model.headerTab) { _, _ in model.showsSettings = false }
+        .frame(minWidth: max(sidebarWidth, Self.sidebarMinWidth) + Self.sidebarChromeAllowance + Self.detailMinWidth)
+        // Lets the menu bar item (AppKit) reopen this window after it's been closed.
+        .onAppear { model.openMainWindow = { openWindow(id: "main") } }
+    }
+
+    /// "Scoring": the sidebar with General and the sidebar tabs, and the detail beside it.
+    private var splitView: some View {
         @Bindable var model = model
-        NavigationSplitView(columnVisibility: $columns) {
-            Group {
+        return NavigationSplitView(columnVisibility: $columns) {
+            VStack(spacing: 0) {
+                if !Extensions.sidebarTabs.isEmpty {
+                    Picker("View", selection: $model.sidebarTab) {
+                        Text(AppModel.generalTab).tag(AppModel.generalTab)
+                        ForEach(Extensions.sidebarTabs) { Text($0.id).tag($0.id) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                }
+
                 if let tab = Extensions.sidebarTabs.first(where: { $0.id == model.sidebarTab }) {
                     tab.sidebar()
                 } else {
                     generalList
                 }
-            }
-            // Settings pinned to the bottom of the sidebar, below the scrolling history.
-            .safeAreaInset(edge: .bottom) {
-                VStack(spacing: 0) {
-                    Divider()
-                    Button { model.showSettings() } label: {
-                        Label("Settings", systemImage: "gearshape")
-                            .scaledFont(13)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(model.showsSettings ? Color.primary : Color.secondary)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .help("Settings (⌘,)")
-                }
-                // Opaque, so result rows scrolling underneath don't show through the button.
-                .background(.bar)
             }
             // The toggle would fold the sidebar away; remove it before setting the widths, because a toolbar modifier
             // applied after `navigationSplitViewColumnWidth` hides the widths from the split view.
@@ -169,21 +184,18 @@ struct RootView: View {
             }
             // The same buttons on every screen, so the toolbar never changes height or layout.
             .toolbar {
-                if !Extensions.sidebarTabs.isEmpty { ViewPickerToolbar(sidebarWidth: detailMinX) }
+                HeaderPickerToolbar(sidebarWidth: detailMinX)
                 CardExportToolbar(record: exportableRecord)
+                SettingsToolbar()
             }
             .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minX } action: { detailMinX = $0 }
             // A small ideal width, so the split view lets the detail shrink to its minimum before anything else.
             .frame(minWidth: Self.detailMinWidth, idealWidth: Self.detailMinWidth, maxWidth: .infinity)
             .navigationSplitViewColumnWidth(min: Self.detailMinWidth, ideal: 860)
         }
-        .onChange(of: model.sidebarTab) { _, _ in model.showsSettings = false }
-        .frame(minWidth: max(sidebarWidth, Self.sidebarMinWidth) + Self.sidebarChromeAllowance + Self.detailMinWidth)
         .onChange(of: columns) { _, visibility in
             if visibility != .all { columns = .all }
         }
-        // Lets the menu bar item (AppKit) reopen this window after it's been closed.
-        .onAppear { model.openMainWindow = { openWindow(id: "main") } }
     }
 }
 
@@ -319,31 +331,49 @@ struct HistoryRow: View {
     }
 }
 
-/// General and the extension tabs, in the middle of the window's header. The toolbar centers it over the detail
-/// column, so empty space as wide as the sidebar on its right moves it to the window's middle.
-private struct ViewPickerToolbar: ToolbarContent {
+/// "Scoring" and the header tabs, in the middle of the window's header, when a module adds any. The toolbar centers
+/// it over the detail column, so empty space as wide as the sidebar on its right moves it to the window's middle.
+private struct HeaderPickerToolbar: ToolbarContent {
     var sidebarWidth: CGFloat
     @Environment(AppModel.self) private var model
 
     var body: some ToolbarContent {
-        if #available(macOS 26, *) {
-            // The glass behind a toolbar item would stretch over the empty space too.
-            item.sharedBackgroundVisibility(.hidden)
-        } else {
-            item
+        if !Extensions.headerTabs.isEmpty {
+            if #available(macOS 26, *) {
+                // The glass behind a toolbar item would stretch over the empty space too.
+                item.sharedBackgroundVisibility(.hidden)
+            } else {
+                item
+            }
         }
     }
 
     private var item: some ToolbarContent {
         @Bindable var model = model
         return ToolbarItem(placement: .principal) {
-            Picker("View", selection: $model.sidebarTab) {
-                Text(AppModel.generalTab).tag(AppModel.generalTab)
-                ForEach(Extensions.sidebarTabs) { Text($0.id).tag($0.id) }
+            Picker("View", selection: $model.headerTab) {
+                Text(AppModel.scoringTab).tag(AppModel.scoringTab)
+                ForEach(Extensions.headerTabs) { Text($0.id).tag($0.id) }
             }
             .pickerStyle(.segmented)
             .labelsHidden()
             .padding(.trailing, sidebarWidth)
+        }
+    }
+}
+
+/// The gear at the header's right end: opens Settings, and closes it again.
+private struct SettingsToolbar: ToolbarContent {
+    @Environment(AppModel.self) private var model
+
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                if model.showsSettings { model.showsSettings = false } else { model.showSettings() }
+            } label: {
+                Label("Settings", systemImage: model.showsSettings ? "gearshape.fill" : "gearshape")
+            }
+            .help("Settings (⌘,)")
         }
     }
 }

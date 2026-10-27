@@ -8,6 +8,9 @@ import VibemetricCore
 public enum Extensions {
     /// Extra sidebar views next to "General". The tab picker appears only when this isn't empty.
     public static var sidebarTabs: [SidebarTabExtension] = []
+    /// Extra views in the window header's picker, next to "Scoring". Each fills the window, without a sidebar. The
+    /// header picker appears only when this isn't empty.
+    public static var headerTabs: [HeaderTabExtension] = []
     /// Shown under each category on the score card.
     public static var categoryFooter: (@MainActor (VibemetricCore.Dimension, CardRecord) -> AnyView)?
     /// Extra sections at the end of the score card.
@@ -31,7 +34,7 @@ public enum Extensions {
 
     /// Empties every plug-in point. For tests that register a module and must not leak it into other tests.
     static func reset() {
-        sidebarTabs = []; categoryFooter = nil; cardSections = []; settingsSections = []; privacyNotes = []
+        sidebarTabs = []; headerTabs = []; categoryFooter = nil; cardSections = []; settingsSections = []; privacyNotes = []
         onCardSelected = []; onCardDeleted = []; isCardInUse = []; busyReason = []; notificationHandlers = [:]
         evidencePackContributors = []
     }
@@ -51,6 +54,18 @@ public struct SidebarTabExtension: Identifiable {
         self.id = id
         self.sidebar = sidebar
         self.detail = detail
+    }
+}
+
+/// A view that a module adds to the window header's picker, next to "Scoring". It fills the window, without a sidebar.
+public struct HeaderTabExtension: Identifiable {
+    /// The tab's label, for example "Reports".
+    public let id: String
+    public let content: @MainActor () -> AnyView
+
+    public init(id: String, content: @escaping @MainActor () -> AnyView) {
+        self.id = id
+        self.content = content
     }
 }
 
